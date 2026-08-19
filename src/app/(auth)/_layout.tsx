@@ -11,9 +11,9 @@ export default function AuthRoutesLayout() {
 
     if (isSignedIn) {
 
-        const role = user.publicMetadata.role;
+        // const role = user.publicMetadata.role;
 
-        console.log("Logged in use role: ", role);
+        // console.log("Logged in use role: ", role);
 
         return <Redirect href="/" />
     }
