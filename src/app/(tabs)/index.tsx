@@ -1,50 +1,41 @@
-import CompletedItems from '@/components/list/CompletedItems';
-import ListHeroCard from '@/components/list/ListHeroCard';
-import PendingItemCard from '@/components/list/PendingItemCard';
-import TabScreenBackground from '@/components/TabScreenBackground';
-import { GroceryItem } from '@/store/grocery-store';
-import { useAuth } from '@clerk/expo';
-import { Button, ScrollView, Text, View } from 'react-native';
+import HouseholdDashboard from '@/components/household/dashboard/HouseholdDashboard';
+import ManagementDashboard from '@/components/manager/dashboard/ManagementDashboard';
+import WaitUntilRoleAssigned from '@/components/shared/WaitUntilRoleAssigned';
+import SolarOwnerDashboard from '@/components/solar-owner/dashboard/SolarOwnerDashboard';
+import TechnicianDashboard from '@/components/technician/dashboard/TechnicianDashboard';
+import { getUserRole } from '@/lib/getUserRole';
+import { useUser } from '@clerk/expo';
+import { Redirect } from 'expo-router';
 
-export default function ListScreen() {
+export default function HomeScreen() {
 
-    const pendingItems: GroceryItem[] = [
-        { id: "1", name: "Bananas", quantity: 6, priority: "medium", category: "Produce", purchased: false, },
-        { id: "2", name: "Pasta Sauce", quantity: 1, priority: "high", category: "Pantry", purchased: false, },
-        { id: "3", name: "Whole Wheat Bread", quantity: 2, priority: "high", category: "Bakery", purchased: false, },
-        { id: "4", name: "Almond Milk", quantity: 1, priority: "medium", category: "Dairy", purchased: false, },
-        { id: "5", name: "Greek Yogurt", quantity: 2, priority: "high", category: "Dairy", purchased: false, },
-    ]
+    const { user, isLoaded, isSignedIn } = useUser();
 
-    const { signOut } = useAuth()
+    if (!isLoaded) {
+        return null;
+    }
 
-    return (
-        <ScrollView className='flex-1 bg-background py-4'
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ padding: 20, gap: 14 }}
-        >
-            <TabScreenBackground />
+    if (!isSignedIn || !user) {
+        return <Redirect href="/sign-in" />;
+    }
 
-            <ListHeroCard />
+    const role = getUserRole(user?.publicMetadata?.role);
 
-            <View className='w-full'>
-                <Button title="Sign out" onPress={() => signOut()} />
-            </View>
+    switch (role) {
+        case "manager":
+            return <ManagementDashboard />
 
-            <View className='flex-row items-center justify-between px-1'>
-                <Text className='text-sm font-semibold uppercase tracking-[1px] text-muted-foreground'>
-                    Shopping Items
-                </Text>
-                <Text className='text-sm text-muted-foreground'>
-                    {pendingItems.length} active
-                </Text>
-            </View>
+        case "solar_owner":
+            return <SolarOwnerDashboard />
 
-            {pendingItems.map((item) => (
-                <PendingItemCard key={item.id} item={item} />
-            ))}
+        case "household":
+            return <HouseholdDashboard />
 
-            <CompletedItems />
-        </ScrollView>
-    )
+        case "technician":
+            return <TechnicianDashboard />
+
+        default:
+            return <WaitUntilRoleAssigned />;
+    }
+
 }
