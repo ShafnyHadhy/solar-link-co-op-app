@@ -1,12 +1,16 @@
+import TabScreenBackground from '@/components/shared/TabScreenBackground';
 import useSocialAuth from '@/hooks/useSocialAuth';
-import { FontAwesome, FontAwesome6 } from "@expo/vector-icons";
+import { Feather, FontAwesome, FontAwesome6 } from "@expo/vector-icons";
 import { Image } from 'expo-image';
-import { Pressable, Text, View } from 'react-native';
+import { useColorScheme } from 'nativewind';
+import React from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SignInScreen() {
-
     const { handleSocialAuth, loadingStretergy } = useSocialAuth();
+    const { colorScheme } = useColorScheme();
+    const isDark = colorScheme === 'dark';
 
     const isGoogleClicked = loadingStretergy === "oauth_google";
     const isAppleClicked = loadingStretergy === "oauth_apple";
@@ -14,96 +18,127 @@ export default function SignInScreen() {
 
     const isLoading = isAppleClicked || isGitHubClicked || isGoogleClicked;
 
+    const iconColor = isDark ? "#F3F4F6" : "#1F2937";
+    const arrowColor = isDark ? "#9CA3AF" : "#6B7280";
+
     return (
-        <SafeAreaView className='flex-1 bg-primary dark:bg-secondary '>
-            {/* decorative elements */}
-            <View className="absolute -left-16 top-12 h-56 w-56 rounded-full bg-primary/80 dark:bg-background/40" />
-            <View className="absolute right-[-74px] top-40 h-72 w-72 rounded-full bg-primary/70 dark:bg-background/35" />
+        <SafeAreaView className='flex-1 bg-background'>
+            <TabScreenBackground />
 
-            <View className='px-6 pt-4'>
-                <Text className="text-center text-5xl font-extrabold tracking-tight text-primary-foreground uppercase font-mono dark:text-foreground">
-                    Solar-Link
-                </Text>
-
-                <Text className="mt-1 text-center text-[14px] text-primary-foreground/80 dark:text-foreground/75">
-                    Community based energy sharing platform
-                </Text>
-
-                <View className="mt-6 rounded-[30px] border border-white/20 bg-white/10 p-3">
-                    <Image
-                        source={require("../../../assets/images/auth.png")}
-                        style={{ width: "100%", height: 300 }}
-                        contentFit="contain"
-                    />
-                </View>
-            </View>
-
-            <View className="mt-8 flex-1 rounded-t-[36px] bg-card px-6 pb-8 pt-6">
-                <View className="self-center rounded-full bg-secondary px-3 py-1">
-                    <Text className="text-xs font-semibold uppercase tracking-[1px] text-secondary-foreground">
-                        Welcome Back
-                    </Text>
-                </View>
-                <Text className="mt-2 text-center text-sm leading-6 text-muted-foreground">
-                    Choose a social provider and jump right into your personalized grocery experience.
-                </Text>
-
-                <View className="mt-6">
-                    <Pressable
-                        className={`mb-3 h-14 flex-row items-center rounded-2xl border border-border bg-card px-4 active:opacity-90 ${isLoading ? "opacity-70" : ""
-                            }`}
-                        disabled={isLoading}
-                        onPress={() => handleSocialAuth("oauth_google")}
-                    >
-                        <View className="h-8 w-8 items-center justify-center rounded-full bg-white">
-                            <Image
-                                source={require("../../../assets/images/google.png")}
-                                style={{ width: 20, height: 20 }}
-                            />
+            <ScrollView 
+                contentContainerStyle={{ flexGrow: 1 }}
+                showsVerticalScrollIndicator={false}
+                className="flex-1"
+            >
+                <View className='px-6 pt-2 pb-6'>
+                    {/* Top Hero Image with Floating "Sun Power" Pill */}
+                    <View className="relative overflow-hidden rounded-[30px] border border-border/70 bg-card/60 dark:bg-card/40 p-2 shadow-sm">
+                        <Image
+                            source={require("../../../assets/images/auth.png")}
+                            style={{ width: "100%", height: 210 }}
+                            contentFit="contain"
+                        />
+                        <View className="absolute bottom-4 left-4 flex-row items-center rounded-full bg-card/90 border border-border/80 px-3.5 py-1.5 shadow-sm">
+                            <Feather name="sun" size={14} color="#F59E0B" />
+                            <Text className="ml-2 text-xs font-bold text-foreground">
+                                Sun Power
+                            </Text>
                         </View>
+                    </View>
 
-                        <Text className="ml-3 flex-1 text-lg font-semibold text-card-foreground">
-                            {isGoogleClicked ? "Connecting Google..." : "Continue with Google"}
+                    {/* Headline Matching UI Reference Design */}
+                    <View className="mt-5">
+                        <Text className="text-3xl font-light tracking-tight text-foreground">
+                            Smarter
+                        </Text>
+                        <View className="flex-row items-center flex-wrap gap-2 my-1">
+                            <Text className="text-4xl font-extrabold tracking-tight text-foreground">
+                                Solar
+                            </Text>
+                            <View className="rounded-xl bg-primary px-3 py-0.5">
+                                <Text className="text-4xl font-extrabold tracking-tight text-primary-foreground">
+                                    Energy
+                                </Text>
+                            </View>
+                        </View>
+                        <Text className="text-3xl font-extrabold tracking-tight text-foreground">
+                            Starts With You
                         </Text>
 
-                        <FontAwesome name="angle-right" size={18} color="#5f6e66" />
-                    </Pressable>
-
-                    <Pressable
-                        className={`mb-3 h-14 flex-row items-center rounded-2xl border border-border bg-card px-4 active:opacity-90 ${isLoading ? "opacity-70" : ""
-                            }`}
-                        disabled={isLoading}
-                        onPress={() => handleSocialAuth("oauth_github")}
-                    >
-                        <View className="h-8 w-8 items-center justify-center rounded-full bg-white">
-                            <FontAwesome name="github" size={24} color="#111" />
-                        </View>
-                        <Text className="ml-3 flex-1 text-lg font-semibold text-card-foreground">
-                            {isGitHubClicked ? "Connecting GitHub..." : "Continue with GitHub"}
+                        <Text className="mt-2 text-sm leading-5 text-muted-foreground">
+                            Stay informed about community energy usage and improve savings with smart solar sharing.
                         </Text>
-                        <FontAwesome name="angle-right" size={18} color="#5f6e66" />
-                    </Pressable>
+                    </View>
 
-                    <Pressable
-                        className={`mb-3 h-14 flex-row items-center rounded-2xl border border-foreground bg-foreground px-4 active:opacity-90 ${isLoading ? "opacity-70" : ""
-                            }`}
-                        disabled={isLoading}
-                        onPress={() => handleSocialAuth("oauth_apple")}
-                    >
-                        <View className="h-8 w-8 items-center justify-center rounded-full bg-white">
-                            <FontAwesome6 name="apple" size={22} color="#111" />
+                    {/* Social Logins Container */}
+                    <View className="mt-6 rounded-[28px] border border-border/70 bg-card/80 dark:bg-card/50 p-5 shadow-sm">
+                        <View className="self-center rounded-full bg-secondary px-3.5 py-1 mb-4">
+                            <Text className="text-xs font-semibold uppercase tracking-[1px] text-secondary-foreground">
+                                Connect & Get Started
+                            </Text>
                         </View>
-                        <Text className="ml-3 flex-1 text-lg font-semibold text-background">
-                            {isAppleClicked ? "Connecting Apple..." : "Continue with Apple"}
+
+                        <View className="space-y-3">
+                            <Pressable
+                                className={`h-13.5 flex-row items-center rounded-2xl border border-border bg-background/60 py-3 px-4 active:bg-secondary/40 ${
+                                    isLoading ? "opacity-70" : ""
+                                }`}
+                                disabled={isLoading}
+                                onPress={() => handleSocialAuth("oauth_google")}
+                            >
+                                <View className="h-8 w-8 items-center justify-center rounded-full bg-card border border-border/50">
+                                    <Image
+                                        source={require("../../../assets/images/google.png")}
+                                        style={{ width: 18, height: 18 }}
+                                    />
+                                </View>
+
+                                <Text className="ml-3 flex-1 text-base font-semibold text-card-foreground">
+                                    {isGoogleClicked ? "Connecting Google..." : "Continue with Google"}
+                                </Text>
+
+                                <FontAwesome name="angle-right" size={18} color={arrowColor} />
+                            </Pressable>
+
+                            <Pressable
+                                className={`mt-2.5 h-13.5 flex-row items-center rounded-2xl border border-border bg-background/60 py-3 px-4 active:bg-secondary/40 ${
+                                    isLoading ? "opacity-70" : ""
+                                }`}
+                                disabled={isLoading}
+                                onPress={() => handleSocialAuth("oauth_github")}
+                            >
+                                <View className="h-8 w-8 items-center justify-center rounded-full bg-card border border-border/50">
+                                    <FontAwesome name="github" size={20} color={iconColor} />
+                                </View>
+                                <Text className="ml-3 flex-1 text-base font-semibold text-card-foreground">
+                                    {isGitHubClicked ? "Connecting GitHub..." : "Continue with GitHub"}
+                                </Text>
+                                <FontAwesome name="angle-right" size={18} color={arrowColor} />
+                            </Pressable>
+
+                            <Pressable
+                                className={`mt-2.5 h-13.5 flex-row items-center rounded-2xl border border-border bg-background/60 py-3 px-4 active:bg-secondary/40 ${
+                                    isLoading ? "opacity-70" : ""
+                                }`}
+                                disabled={isLoading}
+                                onPress={() => handleSocialAuth("oauth_apple")}
+                            >
+                                <View className="h-8 w-8 items-center justify-center rounded-full bg-card border border-border/50">
+                                    <FontAwesome6 name="apple" size={18} color={iconColor} />
+                                </View>
+                                <Text className="ml-3 flex-1 text-base font-semibold text-card-foreground">
+                                    {isAppleClicked ? "Connecting Apple..." : "Continue with Apple"}
+                                </Text>
+                                <FontAwesome name="angle-right" size={18} color={arrowColor} />
+                            </Pressable>
+                        </View>
+
+                        <Text className="mt-4 text-center text-xs leading-4 text-muted-foreground">
+                            By continuing, you agree to Solar-Link's Terms and Privacy Policy.
                         </Text>
-                        <FontAwesome name="angle-right" size={18} color="#5f6e66" />
-                    </Pressable>
+                    </View>
                 </View>
-
-                <Text className="mt-3 text-center text-sm leading-5 text-muted-foreground">
-                    By continuing, you agree to our Terms and Privacy Policy.
-                </Text>
-            </View>
+            </ScrollView>
         </SafeAreaView>
-    )
+    );
 }
