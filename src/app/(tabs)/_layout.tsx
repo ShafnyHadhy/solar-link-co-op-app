@@ -12,7 +12,7 @@ export default function TabsLayout() {
 
     const { colorScheme } = useColorScheme();
     const isDark = colorScheme === "dark";
-    const tabTincolor = isDark ? "hsl(142 70% 54%)" : "hsl(147 75% 33%)"
+    const tabTincolor = isDark ? "hsl(45 90% 60%)" : "hsl(45 97% 62%)"
 
     if (!isLoaded) {
         return null

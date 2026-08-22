@@ -1,18 +1,23 @@
+import TabScreenBackground from '@/components/shared/TabScreenBackground';
+import React from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
 const SavingScreen = () => {
     return (
-        <ScrollView className='flex-1 bg-background py-4'
+        <ScrollView 
+            className='flex-1 bg-background'
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ padding: 20, gap: 14 }}
+            contentContainerStyle={{ flexGrow: 1, padding: 20 }}
         >
-            <View className='justify-center items-center h-40 mt-20 w-full rounded-2xl'>
-                <Text className='text-xl text-white'>
-                    SavingScreen
+            <TabScreenBackground />
+
+            <View className='flex-1 justify-center items-center py-20'>
+                <Text className='text-2xl font-bold text-foreground'>
+                    Savings Screen
                 </Text>
             </View>
         </ScrollView>
-    )
-}
+    );
+};
 
 export default SavingScreen;
