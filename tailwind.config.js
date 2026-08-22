@@ -1,9 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-    // NOTE: Update this to include the paths to all files that contain Nativewind classes.
     content: ["./src/**/*.{js,jsx,ts,tsx}"],
     presets: [require("nativewind/preset")],
-    darkMode: "media", // this tell tailwind/Nativewind to follow the device color 
+    darkMode: "media", // this tells tailwind/Nativewind to follow the device color
     theme: {
         extend: {
             colors: {
