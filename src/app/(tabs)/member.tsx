@@ -2,7 +2,7 @@ import TabScreenBackground from '@/components/shared/TabScreenBackground';
 import React from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
-const AlertsScreen = () => {
+const MemberScreen = () => {
     return (
         <ScrollView 
             className='flex-1 bg-background'
@@ -13,11 +13,11 @@ const AlertsScreen = () => {
 
             <View className='flex-1 justify-center items-center py-20'>
                 <Text className='text-2xl font-bold text-foreground'>
-                    Alerts Screen
+                    Members Screen
                 </Text>
             </View>
         </ScrollView>
     );
 };
 
-export default AlertsScreen;
+export default MemberScreen;
