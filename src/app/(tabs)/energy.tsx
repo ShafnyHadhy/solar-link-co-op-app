@@ -1,23 +1,44 @@
-import TabScreenBackground from '@/components/shared/TabScreenBackground';
+import HouseholdEnergy from '@/components/household/energy/HouseholdEnergy';
+import ManagerEnergyRequests from '@/components/manager/energy/ManagerEnergyRequests';
+import WaitUntilRoleAssigned from '@/components/shared/WaitUntilRoleAssigned';
+import SolarOwnerEnergy from '@/components/solar-owner/energy/SolarOwnerEnergy';
+import TechnicianEnergy from '@/components/technician/energy/TechnicianEnergy';
+import { getUserRole } from '@/lib/getUserRole';
+import { useUser } from '@clerk/expo';
+import { Redirect } from 'expo-router';
 import React from 'react';
-import { ScrollView, Text, View } from 'react-native';
 
 const EnergyScreen = () => {
-    return (
-        <ScrollView 
-            className='flex-1 bg-background'
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ flexGrow: 1, padding: 20 }}
-        >
-            <TabScreenBackground />
 
-            <View className='flex-1 justify-center items-center py-20'>
-                <Text className='text-2xl font-bold text-foreground'>
-                    Energy Screen
-                </Text>
-            </View>
-        </ScrollView>
-    );
+    const { user, isLoaded, isSignedIn } = useUser();
+
+    if (!isLoaded) {
+        return null;
+    }
+
+    if (!isSignedIn || !user) {
+        return <Redirect href="/sign-in" />;
+    }
+
+    const role = getUserRole(user?.publicMetadata?.role);
+
+    switch (role) {
+        case "manager":
+            return <ManagerEnergyRequests />
+
+        case "solar_owner":
+            return <SolarOwnerEnergy />
+
+        case "household":
+            return <HouseholdEnergy />
+
+        case "technician":
+            return <TechnicianEnergy />
+
+        default:
+            return <WaitUntilRoleAssigned />;
+    }
+
 };
 
 export default EnergyScreen;
