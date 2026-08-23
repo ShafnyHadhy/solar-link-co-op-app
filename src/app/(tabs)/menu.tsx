@@ -75,7 +75,7 @@ const MenuScreen = () => {
         <View className='flex-1 bg-background'>
             <TabScreenBackground />
 
-            <ScrollView 
+            <ScrollView
                 className='flex-1'
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}
@@ -97,7 +97,7 @@ const MenuScreen = () => {
                 </View>
 
                 {/* User Profile Card */}
-                <View className='rounded-[28px] border border-border/70 bg-card/80 dark:bg-card/40 p-4 mb-6 shadow-sm'>
+                <View className='rounded-[24px] border border-border/70 bg-card/80 dark:bg-card/40 p-4 mb-6 shadow-sm'>
                     <View className='flex-row items-center'>
                         <View className='h-14 w-14 items-center justify-center rounded-2xl bg-primary border border-border/50 shadow-sm'>
                             <Text className='text-xl font-extrabold text-primary-foreground'>
@@ -112,7 +112,7 @@ const MenuScreen = () => {
                             <Text className='text-xs text-muted-foreground'>
                                 {user?.primaryEmailAddress?.emailAddress || 'user@solarlink.local'}
                             </Text>
-                            
+
                             <View className='self-start rounded-full bg-secondary px-2.5 py-0.5 mt-1.5'>
                                 <Text className='text-[10px] font-bold uppercase tracking-wider text-secondary-foreground'>
                                     {getRoleTitle(role)}
