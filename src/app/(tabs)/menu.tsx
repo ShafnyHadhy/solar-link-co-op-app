@@ -1,4 +1,5 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
+import SolarOwnerMenu from '@/components/solar-owner/menu/SolarOwnerMenu';
 import { getUserRole } from '@/lib/getUserRole';
 import { useAuth, useUser } from '@clerk/expo';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -60,6 +61,10 @@ const MenuScreen = () => {
     const { user } = useUser();
 
     const role = getUserRole(user?.publicMetadata?.role as string | undefined);
+
+    if (role === 'solar_owner') {
+        return <SolarOwnerMenu />;
+    }
 
     const getRoleTitle = (r?: string | null) => {
         switch (r) {
