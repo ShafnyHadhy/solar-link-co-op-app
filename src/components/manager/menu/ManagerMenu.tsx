@@ -1,8 +1,9 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
-import { useAuth, useUser } from '@clerk/expo';
+import { useClerk, useUser } from '@clerk/expo';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import React from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 
 interface MenuItemProps {
     icon: React.ReactNode;
@@ -86,18 +87,23 @@ const MenuItem = ({
 );
 
 export const ManagerMenu = () => {
-    const { signOut } = useAuth();
+    const { signOut } = useClerk();
     const { user } = useUser();
+    const router = useRouter();
 
-    const handleSignOut = () => {
-        Alert.alert('Sign Out', 'Are you sure you want to sign out of your account?', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Sign Out',
-                style: 'destructive',
-                onPress: () => signOut(),
-            },
-        ]);
+    const [signOutModalVisible, setSignOutModalVisible] = useState(false);
+    const [isSigningOut, setIsSigningOut] = useState(false);
+
+    const handleConfirmSignOut = async () => {
+        try {
+            setIsSigningOut(true);
+            await signOut();
+            setSignOutModalVisible(false);
+            router.replace('/(auth)/sign-in');
+        } catch (error) {
+            console.error('Error during sign out:', error);
+            setIsSigningOut(false);
+        }
     };
 
     return (
@@ -162,12 +168,6 @@ export const ManagerMenu = () => {
                         title="Community Energy Allocation"
                         subtitle="Sharing quotas, reserve thresholds & pool cap"
                         badge={{ label: 'Active', type: 'success' }}
-                        onPress={() =>
-                            Alert.alert(
-                                'Allocation Policy',
-                                'Community solar sharing reserve is set to 45 kWh available.'
-                            )
-                        }
                     />
                     <MenuItem
                         icon={<MaterialCommunityIcons name="transmission-tower" size={18} color="#F59E0B" />}
@@ -228,7 +228,7 @@ export const ManagerMenu = () => {
 
                 {/* Sign Out Button */}
                 <Pressable
-                    onPress={handleSignOut}
+                    onPress={() => setSignOutModalVisible(true)}
                     className='rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 flex-row items-center justify-center active:opacity-80 mb-6 shadow-sm'
                 >
                     <Feather name="log-out" size={16} color="#EF4444" style={{ marginRight: 8 }} />
@@ -244,6 +244,51 @@ export const ManagerMenu = () => {
                     </Text>
                 </View>
             </ScrollView>
+
+            {/* Custom Sign Out Confirmation Modal */}
+            <Modal
+                visible={signOutModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => !isSigningOut && setSignOutModalVisible(false)}
+            >
+                <View className='flex-1 bg-black/60 items-center justify-center p-4'>
+                    <View className='w-full max-w-sm rounded-2xl border border-border/60 bg-card p-5 shadow-lg'>
+                        <View className='h-12 w-12 rounded-2xl bg-destructive/15 items-center justify-center mb-3 self-center border border-destructive/30'>
+                            <Feather name="log-out" size={22} color="#EF4444" />
+                        </View>
+
+                        <Text className='text-lg font-bold text-foreground text-center mb-1'>
+                            Sign Out
+                        </Text>
+                        <Text className='text-xs text-muted-foreground text-center mb-5 leading-relaxed'>
+                            Are you sure you want to sign out of your Solar-Link manager account?
+                        </Text>
+
+                        <View className='flex-row gap-3'>
+                            <Pressable
+                                disabled={isSigningOut}
+                                onPress={() => setSignOutModalVisible(false)}
+                                className='flex-1 py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
+                            >
+                                <Text className='text-xs font-bold text-foreground'>
+                                    Cancel
+                                </Text>
+                            </Pressable>
+
+                            <Pressable
+                                disabled={isSigningOut}
+                                onPress={handleConfirmSignOut}
+                                className='flex-1 py-2.5 items-center justify-center rounded-xl bg-destructive border border-destructive/40 active:opacity-80 shadow-sm'
+                            >
+                                <Text className='text-xs font-bold text-destructive-foreground'>
+                                    {isSigningOut ? 'Signing out...' : 'Sign Out'}
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
