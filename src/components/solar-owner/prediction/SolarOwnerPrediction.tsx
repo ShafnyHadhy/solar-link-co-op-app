@@ -36,24 +36,24 @@ export const SolarOwnerPrediction = () => {
 
                 {/* 1. WEATHER & EXPECTED GENERATION HERO */}
                 <View className="rounded-[28px] border-2 border-amber-500/40 bg-card/90 dark:bg-card/60 p-5 mb-5 shadow-lg relative overflow-hidden">
-                    <View className="flex-row items-center justify-between mb-3">
-                        <View className="flex-row items-center">
-                            <View className="h-10 w-10 rounded-2xl bg-amber-500/20 items-center justify-center mr-3 border border-amber-500/30">
+                    <View className="flex-row items-center justify-between mb-3 gap-2">
+                        <View className="flex-row items-center flex-1 mr-2 min-w-0">
+                            <View className="h-10 w-10 rounded-2xl bg-amber-500/20 items-center justify-center mr-3 border border-amber-500/30 flex-shrink-0">
                                 <MaterialCommunityIcons name="weather-sunny" size={24} color="#F59E0B" />
                             </View>
-                            <View>
-                                <Text className="text-base font-bold text-foreground">
+                            <View className="flex-1 min-w-0">
+                                <Text className="text-base font-bold text-foreground" numberOfLines={1}>
                                     Today's Solar Outlook
                                 </Text>
-                                <Text className="text-xs text-muted-foreground font-medium">
+                                <Text className="text-xs text-muted-foreground font-medium" numberOfLines={1}>
                                     {weather.conditionText}
                                 </Text>
                             </View>
                         </View>
 
                         {/* Expected Generation Level Badge */}
-                        <View className="bg-emerald-500/20 border border-emerald-500/40 px-3 py-1 rounded-full">
-                            <Text className="text-xs font-black text-emerald-500 uppercase tracking-wide">
+                        <View className="bg-emerald-500/20 border border-emerald-500/40 px-2.5 py-1 rounded-full flex-shrink-0">
+                            <Text className="text-[10px] font-black text-emerald-500 uppercase tracking-wide">
                                 {weather.expectedSolarLevel} Generation
                             </Text>
                         </View>
