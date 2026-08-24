@@ -42,7 +42,7 @@ export const QuickShareModal: React.FC<QuickShareModalProps> = ({ visible, onClo
                                     Share Excess Solar
                                 </Text>
                                 <Text className="text-xs text-muted-foreground font-medium">
-                                    Instant Community Export
+                                    Routed via Co-Op Manager
                                 </Text>
                             </View>
                         </View>
@@ -99,9 +99,9 @@ export const QuickShareModal: React.FC<QuickShareModalProps> = ({ visible, onClo
 
                     {/* Pool Type Selection */}
                     <Text className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                        Sharing Destination
+                        Target Allocation Pool
                     </Text>
-                    <View className="gap-2 mb-5">
+                    <View className="gap-2 mb-4">
                         {[
                             { name: 'Co-Op Community Pool', desc: 'Mutual aid for local households ($0.14/kWh credit)' },
                             { name: 'Emergency Medical Reserve', desc: 'High-priority backup for local clinic' },
@@ -129,13 +129,21 @@ export const QuickShareModal: React.FC<QuickShareModalProps> = ({ visible, onClo
                         ))}
                     </View>
 
+                    {/* Manager Dispatch Notice */}
+                    <View className="flex-row items-center rounded-xl bg-blue-500/10 border border-blue-500/20 px-3 py-2 mb-4">
+                        <Feather name="shield" size={14} color="#3B82F6" style={{ marginRight: 6 }} />
+                        <Text className="text-[11px] text-blue-500 font-medium flex-1">
+                            Offer is sent to Co-Op Manager for grid verification & distribution.
+                        </Text>
+                    </View>
+
                     {/* Share Button */}
                     <Pressable
                         onPress={handleShare}
                         className="w-full rounded-2xl bg-primary py-4 items-center justify-center shadow-lg active:opacity-90 active:scale-98"
                     >
                         <Text className="text-base font-black text-primary-foreground">
-                            Confirm & Share Energy
+                            Submit Offer to Manager
                         </Text>
                     </Pressable>
                 </View>

@@ -457,13 +457,21 @@ export const SolarOwnerShare = () => {
                             ))}
                         </View>
 
+                        {/* Manager Routing Notice */}
+                        <View className="flex-row items-center rounded-xl bg-blue-500/10 border border-blue-500/20 px-3 py-2 mb-4">
+                            <Feather name="shield" size={14} color="#3B82F6" style={{ marginRight: 6 }} />
+                            <Text className="text-[11px] text-blue-500 font-medium flex-1">
+                                Share offers are reviewed and dispatched by the Co-Op Manager.
+                            </Text>
+                        </View>
+
                         {/* Confirm Share Button */}
                         <Pressable
                             onPress={handleShareSubmit}
                             className="w-full rounded-2xl bg-primary py-4 items-center justify-center shadow-lg active:opacity-90 mb-4"
                         >
                             <Text className="text-base font-black text-primary-foreground">
-                                Confirm & Share {shareAmountInput} kWh
+                                Submit Offer to Manager ({shareAmountInput} kWh)
                             </Text>
                         </Pressable>
                     </View>
