@@ -79,8 +79,16 @@ const HouseholdConsumerMenu = () => {
   const { user } = useUser();
   const router = useRouter();
   const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
   const role = getUserRole(user?.publicMetadata?.role as string | undefined);
+
+  // Theme-based colors
+  const theme = {
+    text: isDark ? 'text-white' : 'text-gray-900',
+    textSecondary: isDark ? 'text-zinc-300' : 'text-gray-600',
+    textMuted: isDark ? 'text-zinc-400' : 'text-gray-500',
+  };
 
   const getRoleTitle = (r?: string | null) => {
     switch (r) {
@@ -147,20 +155,18 @@ const HouseholdConsumerMenu = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingHorizontal: 20,
-          paddingTop: 50,
+          paddingTop: 55,
           paddingBottom: 40,
         }}
       >
-        {/* Screen Title */}
-        <View className="flex-row items-center justify-between mb-6">
-          <View>
-            <Text className="text-2xl font-extrabold text-foreground">
-              Menu
-            </Text>
-            <Text className="text-xs text-muted-foreground mt-0.5">
-              Manage energy requests, savings & account
-            </Text>
-          </View>
+        {/* Header - Updated to match Savings Dashboard style */}
+        <View className="mb-8">
+          <Text className={`text-4xl font-bold ${theme.text}`}>
+            Menu
+          </Text>
+          <Text className={`mt-1 text-base ${theme.textSecondary}`}>
+            Manage energy requests, savings & account
+          </Text>
         </View>
 
         {/* User Profile Section */}
@@ -278,12 +284,12 @@ const HouseholdConsumerMenu = () => {
           <Feather
             name="log-out"
             size={18}
-            color="#EF4444" // Same color as text
+            color="#EF4444"
             style={{ marginRight: 8 }}
           />
           <Text
             className="text-base font-bold"
-            style={{ color: "#EF4444" }} // Same color as icon
+            style={{ color: "#EF4444" }}
           >
             Sign Out
           </Text>
