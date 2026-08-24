@@ -1,7 +1,7 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SolarToast } from '../shared/SolarToast';
 import { ViewHeader } from '../shared/ViewHeader';
 import { useSolarOwnerStore } from '../store/useSolarOwnerStore';
@@ -19,19 +19,30 @@ export const SolarOwnerShare = () => {
         shareEnergyWithCommunity,
     } = useSolarOwnerStore();
 
-    const [shareAmount, setShareAmount] = useState<string>('4.0');
+    const [shareModalOpen, setShareModalOpen] = useState(false);
+    const [shareAmountInput, setShareAmountInput] = useState<string>('3.5');
     const [selectedPool, setSelectedPool] = useState<string>('Co-Op Community Pool');
 
+    const enteredVal = parseFloat(shareAmountInput) || 0;
+    const remainingAfterShare = Math.max(0, metrics.dailyExcessKWh - enteredVal);
+
     const handleShareSubmit = () => {
-        const val = parseFloat(shareAmount);
-        if (isNaN(val) || val <= 0) return;
-        shareEnergyWithCommunity(val, selectedPool);
+        if (enteredVal <= 0 || enteredVal > metrics.dailyExcessKWh) return;
+        const success = shareEnergyWithCommunity(enteredVal, selectedPool);
+        if (success) {
+            setShareModalOpen(false);
+        }
     };
 
     const handlePreset = (fraction: number) => {
         const val = (metrics.dailyExcessKWh * fraction).toFixed(1);
-        setShareAmount(val);
+        setShareAmountInput(val);
     };
+
+    // Calculate transparency aggregates
+    const totalSharedKWh = sharingHistory.reduce((acc, curr) => acc + curr.amountKWh, 0);
+    const totalCreditsEarned = sharingHistory.reduce((acc, curr) => acc + curr.creditsEarnedUSD, 0);
+    const uniqueHouseholdsSupported = new Set(sharingHistory.map((s) => s.recipientName)).size;
 
     return (
         <View className="flex-1 bg-background">
@@ -46,19 +57,19 @@ export const SolarOwnerShare = () => {
                 {/* Header */}
                 <ViewHeader
                     title="Energy Sharing"
-                    subtitle="Share clean solar power with your community"
+                    subtitle="Manage community requests & share excess solar"
                     showBack={false}
                 />
 
-                {/* 1. AVAILABLE EXCESS ENERGY HERO */}
+                {/* 1. MAIN CARD: AVAILABLE TO SHARE & PRIMARY SHARE BUTTON */}
                 <View className="rounded-[28px] border-2 border-amber-500/50 bg-card/90 dark:bg-card/60 p-5 mb-5 shadow-lg relative overflow-hidden">
                     <View className="flex-row items-center justify-between mb-2">
                         <View className="flex-row items-center">
                             <View className="h-8 w-8 rounded-xl bg-amber-500/20 items-center justify-center mr-2">
-                                <MaterialCommunityIcons name="solar-power-variant" size={18} color="#F59E0B" />
+                                <MaterialCommunityIcons name="lightning-bolt" size={18} color="#F59E0B" />
                             </View>
                             <Text className="text-xs font-bold uppercase tracking-wider text-amber-500">
-                                Available Excess Energy
+                                Available to Share
                             </Text>
                         </View>
                         <Text className="text-xs font-semibold text-muted-foreground">
@@ -71,15 +82,28 @@ export const SolarOwnerShare = () => {
                             {metrics.dailyExcessKWh.toFixed(1)}
                         </Text>
                         <Text className="text-lg font-bold text-amber-500 ml-2">
-                            kWh Ready to Share
+                            kWh
                         </Text>
                     </View>
-                    <Text className="text-xs text-muted-foreground">
-                        Your home is 100% self-powered. All surplus power can be shared or exported.
+                    <Text className="text-xs text-muted-foreground mb-4">
+                        Calculated automatically after household consumption and battery safety reserve.
                     </Text>
 
+                    {/* Primary [ SHARE ENERGY ] Button */}
+                    <Pressable
+                        onPress={() => setShareModalOpen(true)}
+                        className="w-full rounded-2xl bg-primary py-4 items-center justify-center shadow-md active:opacity-90 active:scale-98 mb-3"
+                    >
+                        <View className="flex-row items-center">
+                            <Feather name="share-2" size={18} color="#1E293B" style={{ marginRight: 8 }} />
+                            <Text className="text-base font-black text-primary-foreground">
+                                SHARE ENERGY
+                            </Text>
+                        </View>
+                    </Pressable>
+
                     {/* Auto-Sharing Switcher */}
-                    <View className="mt-4 pt-3.5 border-t border-border/50 flex-row items-center justify-between">
+                    <View className="pt-3 border-t border-border/50 flex-row items-center justify-between">
                         <View className="flex-row items-center flex-1 mr-3">
                             <Feather name="zap" size={16} color="#10B981" />
                             <View className="ml-2">
@@ -111,126 +135,53 @@ export const SolarOwnerShare = () => {
                     </View>
                 </View>
 
-                {/* 2. CHOOSE AMOUNT TO SHARE CARD */}
-                <View className="rounded-[28px] border border-border/70 bg-card/85 dark:bg-card/50 p-5 mb-5 shadow-sm">
-                    <Text className="text-base font-bold text-foreground mb-1">
-                        Share Energy with Community
+                {/* 2. TRANSPARENCY & COMMUNITY IMPACT METRICS */}
+                <View className="rounded-[28px] border border-border/70 bg-card/85 dark:bg-card/50 p-4 mb-5 shadow-sm">
+                    <Text className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2.5">
+                        Transparency & Contribution Record
                     </Text>
-                    <Text className="text-xs text-muted-foreground mb-4">
-                        Choose the amount you want to contribute to the Co-Op pool
-                    </Text>
-
-                    {/* Amount Input */}
-                    <Text className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
-                        Amount to Share (kWh)
-                    </Text>
-                    <View className="flex-row items-center rounded-2xl bg-secondary/80 border border-border/80 px-4 py-2 mb-3">
-                        <TextInput
-                            keyboardType="numeric"
-                            value={shareAmount}
-                            onChangeText={setShareAmount}
-                            className="flex-1 text-2xl font-black text-foreground py-1"
-                            placeholder="0.0"
-                            placeholderTextColor="#9CA3AF"
-                        />
-                        <Text className="text-sm font-black text-amber-500 ml-2">
-                            kWh
-                        </Text>
-                    </View>
-
-                    {/* Preset buttons */}
-                    <View className="flex-row items-center justify-between gap-2 mb-4">
-                        {[
-                            { label: '25%', frac: 0.25 },
-                            { label: '50%', frac: 0.5 },
-                            { label: '75%', frac: 0.75 },
-                            { label: 'All Excess', frac: 1.0 },
-                        ].map((item) => (
-                            <Pressable
-                                key={item.label}
-                                onPress={() => handlePreset(item.frac)}
-                                className="flex-1 py-2 rounded-xl bg-secondary border border-border/60 items-center active:opacity-80"
-                            >
-                                <Text className="text-xs font-bold text-foreground">
-                                    {item.label}
-                                </Text>
-                            </Pressable>
-                        ))}
-                    </View>
-
-                    {/* Destination Selection */}
-                    <Text className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                        Target Pool
-                    </Text>
-                    <View className="gap-2 mb-5">
-                        {[
-                            {
-                                id: 'Co-Op Community Pool',
-                                title: 'Co-Op Community Pool',
-                                rate: '$0.14 / kWh credit',
-                                desc: 'Shared among neighborhood households in need',
-                            },
-                            {
-                                id: 'Emergency Medical Reserve',
-                                title: 'Emergency Clinic Reserve',
-                                rate: 'Priority Community Aid',
-                                desc: 'Dedicated reserve for local health clinics and oxygen units',
-                            },
-                        ].map((pool) => (
-                            <Pressable
-                                key={pool.id}
-                                onPress={() => setSelectedPool(pool.id)}
-                                className={`rounded-2xl p-3.5 border ${
-                                    selectedPool === pool.id
-                                        ? 'bg-amber-500/10 border-amber-500'
-                                        : 'bg-secondary/40 border-border/50'
-                                }`}
-                            >
-                                <View className="flex-row justify-between items-center">
-                                    <Text
-                                        className={`text-xs font-bold ${
-                                            selectedPool === pool.id ? 'text-amber-500' : 'text-foreground'
-                                        }`}
-                                    >
-                                        {pool.title}
-                                    </Text>
-                                    <Text className="text-[11px] font-bold text-emerald-500">
-                                        {pool.rate}
-                                    </Text>
-                                </View>
-                                <Text className="text-[10px] text-muted-foreground mt-0.5">
-                                    {pool.desc}
-                                </Text>
-                            </Pressable>
-                        ))}
-                    </View>
-
-                    {/* Submit Share Button */}
-                    <Pressable
-                        onPress={handleShareSubmit}
-                        className="w-full rounded-2xl bg-primary py-4 items-center justify-center shadow-md active:opacity-90"
-                    >
-                        <View className="flex-row items-center">
-                            <Feather name="send" size={16} color="#1E293B" style={{ marginRight: 8 }} />
-                            <Text className="text-base font-black text-primary-foreground">
-                                Share {shareAmount} kWh with Community
+                    <View className="flex-row items-center justify-between">
+                        <View className="items-center flex-1">
+                            <Text className="text-[10px] font-bold uppercase text-muted-foreground">
+                                Total Shared
+                            </Text>
+                            <Text className="text-base font-black text-amber-500 mt-0.5">
+                                {totalSharedKWh.toFixed(1)} kWh
                             </Text>
                         </View>
-                    </Pressable>
+
+                        <View className="items-center flex-1 border-x border-border/40">
+                            <Text className="text-[10px] font-bold uppercase text-muted-foreground">
+                                Households
+                            </Text>
+                            <Text className="text-base font-black text-foreground mt-0.5">
+                                {uniqueHouseholdsSupported} Supported
+                            </Text>
+                        </View>
+
+                        <View className="items-center flex-1">
+                            <Text className="text-[10px] font-bold uppercase text-muted-foreground">
+                                Total Credits
+                            </Text>
+                            <Text className="text-base font-black text-emerald-500 mt-0.5">
+                                +${totalCreditsEarned.toFixed(2)}
+                            </Text>
+                        </View>
+                    </View>
                 </View>
 
-                {/* 3. INCOMING COMMUNITY REQUESTS */}
+                {/* 3. INCOMING COMMUNITY ENERGY REQUESTS */}
                 <View className="rounded-[28px] border border-border/70 bg-card/85 dark:bg-card/50 p-5 mb-5 shadow-sm">
                     <View className="flex-row items-center justify-between mb-4">
                         <View>
                             <Text className="text-base font-bold text-foreground">
-                                Community Requests
+                                Incoming Requests
                             </Text>
                             <Text className="text-xs text-muted-foreground font-medium">
-                                Direct energy requests from neighbors
+                                Requests from neighborhood households
                             </Text>
                         </View>
-                        <View className="bg-amber-500/20 px-2 py-0.5 rounded-full">
+                        <View className="bg-amber-500/20 px-2.5 py-0.5 rounded-full">
                             <Text className="text-[10px] font-black text-amber-500">
                                 {communityRequests.filter((r) => r.status === 'pending').length} Pending
                             </Text>
@@ -262,7 +213,7 @@ export const SolarOwnerShare = () => {
                                                 {req.requesterName}
                                             </Text>
                                             <Text className="text-[10px] text-muted-foreground">
-                                                {req.requesterAddress} • {req.timestamp}
+                                                {req.requesterAddress}
                                             </Text>
                                         </View>
                                     </View>
@@ -276,12 +227,10 @@ export const SolarOwnerShare = () => {
                                     )}
                                 </View>
 
-                                {/* Request Purpose */}
                                 <Text className="text-xs text-foreground/90 font-medium mb-3">
                                     "{req.purpose}"
                                 </Text>
 
-                                {/* Request Details & Status */}
                                 <View className="flex-row items-center justify-between py-2 border-t border-border/40">
                                     <View>
                                         <Text className="text-[10px] uppercase font-bold text-muted-foreground">
@@ -294,10 +243,10 @@ export const SolarOwnerShare = () => {
 
                                     <View>
                                         <Text className="text-[10px] uppercase font-bold text-muted-foreground">
-                                            Rate Offered
+                                            Date
                                         </Text>
-                                        <Text className="text-xs font-bold text-emerald-500">
-                                            ${req.offeredRateUSDPerKWh} / kWh
+                                        <Text className="text-xs font-bold text-foreground">
+                                            Today
                                         </Text>
                                     </View>
 
@@ -319,7 +268,6 @@ export const SolarOwnerShare = () => {
                                     </View>
                                 </View>
 
-                                {/* Actions for Pending Request */}
                                 {isPending && (
                                     <View className="flex-row gap-2 mt-3 pt-2 border-t border-border/40">
                                         <Pressable
@@ -327,7 +275,7 @@ export const SolarOwnerShare = () => {
                                             className="flex-1 rounded-xl bg-destructive/15 border border-destructive/30 py-2.5 items-center active:opacity-70"
                                         >
                                             <Text className="text-xs font-bold text-destructive">
-                                                Decline
+                                                Reject
                                             </Text>
                                         </Pressable>
 
@@ -336,7 +284,7 @@ export const SolarOwnerShare = () => {
                                             className="flex-1 rounded-xl bg-emerald-500 py-2.5 items-center active:opacity-90 shadow-sm"
                                         >
                                             <Text className="text-xs font-bold text-white">
-                                                Accept & Transfer
+                                                Accept
                                             </Text>
                                         </Pressable>
                                     </View>
@@ -372,14 +320,14 @@ export const SolarOwnerShare = () => {
                                             {item.recipientName}
                                         </Text>
                                         <Text className="text-[10px] text-muted-foreground">
-                                            {item.date} at {item.time} • {item.co2SavedKg} kg CO2 saved
+                                            {item.date} at {item.time} • Completed
                                         </Text>
                                     </View>
                                 </View>
 
                                 <View className="items-end">
                                     <Text className="text-xs font-black text-amber-500">
-                                        +{item.amountKWh} kWh
+                                        {item.amountKWh} kWh
                                     </Text>
                                     <Text className="text-[10px] font-bold text-emerald-500">
                                         +${item.creditsEarnedUSD.toFixed(2)}
@@ -390,6 +338,137 @@ export const SolarOwnerShare = () => {
                     </View>
                 </View>
             </ScrollView>
+
+            {/* --- MODAL: SHARE ENERGY FLOW --- */}
+            <Modal visible={shareModalOpen} transparent animationType="slide">
+                <View className="flex-1 bg-black/60 justify-end">
+                    <View className="rounded-t-[36px] bg-card border-t border-border p-6 max-h-[85%]">
+                        {/* Modal Header */}
+                        <View className="flex-row items-center justify-between mb-4">
+                            <View className="flex-row items-center">
+                                <View className="h-10 w-10 rounded-2xl bg-amber-500/20 items-center justify-center mr-3 border border-amber-500/30">
+                                    <MaterialCommunityIcons name="solar-power-variant" size={22} color="#F59E0B" />
+                                </View>
+                                <View>
+                                    <Text className="text-xl font-black text-foreground">
+                                        Share Energy
+                                    </Text>
+                                    <Text className="text-xs text-muted-foreground">
+                                        Enter amount to share with community
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <Pressable
+                                onPress={() => setShareModalOpen(false)}
+                                className="h-8 w-8 rounded-full bg-secondary items-center justify-center active:opacity-70"
+                            >
+                                <Feather name="x" size={18} color="#9CA3AF" />
+                            </Pressable>
+                        </View>
+
+                        {/* Step 1: Available Excess Display */}
+                        <View className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-3.5 mb-4">
+                            <Text className="text-xs font-bold text-amber-500 uppercase tracking-wider">
+                                Available Excess Energy
+                            </Text>
+                            <Text className="text-2xl font-black text-foreground mt-0.5">
+                                {metrics.dailyExcessKWh.toFixed(1)} kWh
+                            </Text>
+                        </View>
+
+                        {/* Step 2: Enter Amount to Share */}
+                        <Text className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+                            Amount to Share (kWh)
+                        </Text>
+                        <View className="flex-row items-center rounded-2xl bg-secondary/80 border border-border/80 px-4 py-2 mb-2">
+                            <TextInput
+                                keyboardType="numeric"
+                                value={shareAmountInput}
+                                onChangeText={setShareAmountInput}
+                                className="flex-1 text-2xl font-black text-foreground py-1"
+                                placeholder="0.0"
+                                placeholderTextColor="#9CA3AF"
+                            />
+                            <Text className="text-sm font-black text-amber-500 ml-2">
+                                kWh
+                            </Text>
+                        </View>
+
+                        {/* Quick Presets */}
+                        <View className="flex-row items-center justify-between gap-2 mb-4">
+                            {[
+                                { label: '25%', frac: 0.25 },
+                                { label: '50%', frac: 0.5 },
+                                { label: '75%', frac: 0.75 },
+                                { label: 'All', frac: 1.0 },
+                            ].map((preset) => (
+                                <Pressable
+                                    key={preset.label}
+                                    onPress={() => handlePreset(preset.frac)}
+                                    className="flex-1 py-1.5 rounded-xl bg-secondary border border-border/60 items-center active:opacity-80"
+                                >
+                                    <Text className="text-xs font-bold text-foreground">
+                                        {preset.label}
+                                    </Text>
+                                </Pressable>
+                            ))}
+                        </View>
+
+                        {/* Step 3: Show Remaining Energy */}
+                        <View className="rounded-2xl bg-secondary/40 p-3 border border-border/60 mb-4 flex-row items-center justify-between">
+                            <Text className="text-xs text-muted-foreground">
+                                Remaining Home Reserve:
+                            </Text>
+                            <Text className="text-xs font-bold text-foreground">
+                                {remainingAfterShare.toFixed(1)} kWh
+                            </Text>
+                        </View>
+
+                        {/* Target Pool */}
+                        <Text className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                            Recipient / Pool
+                        </Text>
+                        <View className="gap-2 mb-5">
+                            {[
+                                { name: 'Co-Op Community Pool', desc: 'Mutual aid for neighboring households ($0.14/kWh credit)' },
+                                { name: 'Emergency Clinic Reserve', desc: 'Priority medical backup power aid' },
+                            ].map((pool) => (
+                                <Pressable
+                                    key={pool.name}
+                                    onPress={() => setSelectedPool(pool.name)}
+                                    className={`rounded-2xl p-3 border ${
+                                        selectedPool === pool.name
+                                            ? 'bg-amber-500/10 border-amber-500'
+                                            : 'bg-secondary/40 border-border/50'
+                                    }`}
+                                >
+                                    <Text
+                                        className={`text-xs font-bold ${
+                                            selectedPool === pool.name ? 'text-amber-500' : 'text-foreground'
+                                        }`}
+                                    >
+                                        {pool.name}
+                                    </Text>
+                                    <Text className="text-[10px] text-muted-foreground mt-0.5">
+                                        {pool.desc}
+                                    </Text>
+                                </Pressable>
+                            ))}
+                        </View>
+
+                        {/* Confirm Share Button */}
+                        <Pressable
+                            onPress={handleShareSubmit}
+                            className="w-full rounded-2xl bg-primary py-4 items-center justify-center shadow-lg active:opacity-90 mb-4"
+                        >
+                            <Text className="text-base font-black text-primary-foreground">
+                                Confirm & Share {shareAmountInput} kWh
+                            </Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
