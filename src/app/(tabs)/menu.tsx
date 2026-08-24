@@ -1,6 +1,6 @@
+import HouseholdConsumerMenu from '@/components/household/menu/HouseholdConsumerMenu';
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
 import SolarOwnerMenu from '@/components/solar-owner/menu/SolarOwnerMenu';
-import HouseholdConsumerMenu from '@/components/household/menu/HouseholdConsumerMenu';
 import { getUserRole } from '@/lib/getUserRole';
 import { useAuth, useUser } from '@clerk/expo';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -88,7 +88,7 @@ const MenuScreen = () => {
             <ScrollView
                 className='flex-1'
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}
+                contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 60, paddingBottom: 40 }}
             >
                 {/* Screen Title */}
                 <View className='flex-row items-center justify-between mb-6'>
