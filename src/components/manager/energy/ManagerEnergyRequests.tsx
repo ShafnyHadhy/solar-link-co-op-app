@@ -2,7 +2,7 @@ import TabScreenBackground from '@/components/shared/TabScreenBackground';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 interface EnergyRequestItem {
     id: string;
@@ -77,66 +77,41 @@ const ManagerEnergyRequests = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedFilter, setSelectedFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
+    // Modals State
+    const [selectedRequest, setSelectedRequest] = useState<EnergyRequestItem | null>(null);
+    const [reviewModalVisible, setReviewModalVisible] = useState(false);
+    const [approveModalVisible, setApproveModalVisible] = useState(false);
+
     const pendingCount = requests.filter((r) => r.status === 'pending').length;
     const approvedCount = requests.filter((r) => r.status === 'approved').length;
     const rejectedCount = requests.filter((r) => r.status === 'rejected').length;
     const availableEnergy = 45;
 
-    const handleApprove = (id: string, householdName: string) => {
-        Alert.alert(
-            'Approve Energy Request',
-            `Are you sure you want to approve energy allocation for ${householdName}?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Approve',
-                    onPress: () => {
-                        setRequests((prev) =>
-                            prev.map((item) =>
-                                item.id === id ? { ...item, status: 'approved' } : item
-                            )
-                        );
-                    },
-                },
-            ]
-        );
+    const openReviewModal = (item: EnergyRequestItem) => {
+        setSelectedRequest(item);
+        setReviewModalVisible(true);
     };
 
-    const handleReject = (id: string, householdName: string) => {
-        Alert.alert(
-            'Reject Energy Request',
-            `Are you sure you want to reject energy allocation for ${householdName}?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Reject',
-                    style: 'destructive',
-                    onPress: () => {
-                        setRequests((prev) =>
-                            prev.map((item) =>
-                                item.id === id ? { ...item, status: 'rejected' } : item
-                            )
-                        );
-                    },
-                },
-            ]
-        );
+    const openApproveModal = (item: EnergyRequestItem) => {
+        setSelectedRequest(item);
+        setApproveModalVisible(true);
     };
 
-    const handleReview = (request: EnergyRequestItem) => {
-        Alert.alert(
-            `${request.household} - Request Details`,
-            `Current Usage: ${request.currentUsage} kWh\nPrevious Allocation: ${request.previousAllocation} kWh\nRequested Energy: ${request.requestedAmount} kWh\nStatus: ${request.status.toUpperCase()}\nSubmitted: ${request.requestedAt}`,
-            [
-                { text: 'Close', style: 'default' },
-                request.status === 'pending'
-                    ? {
-                        text: 'Reject Request',
-                        style: 'destructive',
-                        onPress: () => handleReject(request.id, request.household),
-                    }
-                    : { text: 'OK' },
-            ]
+    const confirmApproval = () => {
+        if (!selectedRequest) return;
+        setRequests((prev) =>
+            prev.map((item) =>
+                item.id === selectedRequest.id ? { ...item, status: 'approved' } : item
+            )
+        );
+        setApproveModalVisible(false);
+    };
+
+    const confirmRejection = (id: string) => {
+        setRequests((prev) =>
+            prev.map((item) =>
+                item.id === id ? { ...item, status: 'rejected' } : item
+            )
         );
     };
 
@@ -374,7 +349,7 @@ const ManagerEnergyRequests = () => {
                                 {isPending ? (
                                     <View className='flex-row items-center justify-end gap-2.5 pt-1'>
                                         <Pressable
-                                            onPress={() => handleReview(item)}
+                                            onPress={() => openReviewModal(item)}
                                             className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
                                         >
                                             <Text className='text-xs font-bold text-foreground'>
@@ -383,7 +358,7 @@ const ManagerEnergyRequests = () => {
                                         </Pressable>
 
                                         <Pressable
-                                            onPress={() => handleApprove(item.id, item.household)}
+                                            onPress={() => openApproveModal(item)}
                                             className='px-3.5 py-1.5 rounded-lg bg-primary border border-primary/40 active:opacity-80 shadow-sm'
                                         >
                                             <Text className='text-xs font-bold text-primary-foreground'>
@@ -397,7 +372,7 @@ const ManagerEnergyRequests = () => {
                                             Allocation approved ({item.requestedAmount} kWh)
                                         </Text>
                                         <Pressable
-                                            onPress={() => handleReview(item)}
+                                            onPress={() => openReviewModal(item)}
                                             className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
                                         >
                                             <Text className='text-xs font-bold text-foreground'>
@@ -411,7 +386,7 @@ const ManagerEnergyRequests = () => {
                                             Request rejected
                                         </Text>
                                         <Pressable
-                                            onPress={() => handleApprove(item.id, item.household)}
+                                            onPress={() => openApproveModal(item)}
                                             className='px-3.5 py-1.5 rounded-lg bg-primary border border-primary/40 active:opacity-80 shadow-sm'
                                         >
                                             <Text className='text-xs font-bold text-primary-foreground'>
@@ -439,6 +414,208 @@ const ManagerEnergyRequests = () => {
                     )}
                 </View>
             </ScrollView>
+
+            {/* 1. Review Details Modal */}
+            <Modal
+                visible={reviewModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setReviewModalVisible(false)}
+            >
+                <View className='flex-1 bg-black/60 items-center justify-center p-4'>
+                    <View className='w-full max-w-sm rounded-2xl border border-border/60 bg-card p-5 shadow-lg'>
+                        {/* Header */}
+                        <View className='flex-row items-center justify-between mb-4'>
+                            <View>
+                                <Text className='text-lg font-bold text-foreground'>
+                                    Request Details
+                                </Text>
+                                <Text className='text-xs text-muted-foreground'>
+                                    {selectedRequest?.household} • {selectedRequest?.requestedAt}
+                                </Text>
+                            </View>
+                            <Pressable
+                                onPress={() => setReviewModalVisible(false)}
+                                className='h-8 w-8 items-center justify-center rounded-full bg-secondary active:opacity-70'
+                            >
+                                <Feather name="x" size={18} color="#9CA3AF" />
+                            </Pressable>
+                        </View>
+
+                        {/* Power Requested Highlight */}
+                        <View className='rounded-xl bg-secondary/60 border border-border/40 p-4 mb-4 items-center'>
+                            <Text className='text-xs font-semibold text-muted-foreground'>
+                                Requested Solar Allocation
+                            </Text>
+                            <Text className='text-3xl font-extrabold text-foreground mt-1'>
+                                {selectedRequest?.requestedAmount}{' '}
+                                <Text className='text-base font-bold text-muted-foreground'>kWh</Text>
+                            </Text>
+                        </View>
+
+                        {/* Usage Metrics Breakdown */}
+                        <View className='flex-row items-center justify-between rounded-xl bg-secondary/40 border border-border/30 p-3 mb-4'>
+                            <View className='flex-1'>
+                                <Text className='text-[11px] font-semibold text-muted-foreground'>
+                                    Current Usage
+                                </Text>
+                                <Text className='text-sm font-extrabold text-foreground mt-0.5'>
+                                    {selectedRequest?.currentUsage} kWh
+                                </Text>
+                            </View>
+                            <View className='h-7 w-[1px] bg-border/60 mx-2' />
+                            <View className='flex-1 pl-2'>
+                                <Text className='text-[11px] font-semibold text-muted-foreground'>
+                                    Prev Allocation
+                                </Text>
+                                <Text className='text-sm font-extrabold text-foreground mt-0.5'>
+                                    {selectedRequest?.previousAllocation} kWh
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Status Line */}
+                        <View className='flex-row items-center justify-between mb-5 px-1'>
+                            <Text className='text-xs font-semibold text-muted-foreground'>
+                                Current Status
+                            </Text>
+                            <View
+                                className={`px-2.5 py-0.5 rounded-full border ${
+                                    selectedRequest?.status === 'pending'
+                                        ? 'bg-yellow-500/15 border-yellow-500/40'
+                                        : selectedRequest?.status === 'approved'
+                                        ? 'bg-emerald-500/15 border-emerald-500/40'
+                                        : 'bg-zinc-500/15 border-zinc-500/40'
+                                }`}
+                            >
+                                <Text
+                                    className={`text-[10px] font-bold uppercase ${
+                                        selectedRequest?.status === 'pending'
+                                            ? 'text-[#F59E0B]'
+                                            : selectedRequest?.status === 'approved'
+                                            ? 'text-[#10B981]'
+                                            : 'text-[#6B7280]'
+                                    }`}
+                                >
+                                    {selectedRequest?.status}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Modal Action Buttons */}
+                        {selectedRequest?.status === 'pending' ? (
+                            <View className='flex-row gap-3'>
+                                <Pressable
+                                    onPress={() => {
+                                        setReviewModalVisible(false);
+                                        if (selectedRequest) confirmRejection(selectedRequest.id);
+                                    }}
+                                    className='flex-1 py-2.5 items-center justify-center rounded-xl bg-red-500/10 border border-red-500/30 active:opacity-75'
+                                >
+                                    <Text className='text-xs font-bold text-[#EF4444]'>
+                                        Reject Request
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    onPress={() => {
+                                        setReviewModalVisible(false);
+                                        setApproveModalVisible(true);
+                                    }}
+                                    className='flex-1 py-2.5 items-center justify-center rounded-xl bg-primary border border-primary/40 active:opacity-80 shadow-sm'
+                                >
+                                    <Text className='text-xs font-bold text-primary-foreground'>
+                                        Approve
+                                    </Text>
+                                </Pressable>
+                            </View>
+                        ) : (
+                            <Pressable
+                                onPress={() => setReviewModalVisible(false)}
+                                className='w-full py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
+                            >
+                                <Text className='text-xs font-bold text-foreground'>
+                                    Close
+                                </Text>
+                            </Pressable>
+                        )}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* 2. Approve Confirmation Modal */}
+            <Modal
+                visible={approveModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setApproveModalVisible(false)}
+            >
+                <View className='flex-1 bg-black/60 items-center justify-center p-4'>
+                    <View className='w-full max-w-sm rounded-2xl border border-border/60 bg-card p-5 shadow-lg'>
+                        {/* Header */}
+                        <View className='flex-row items-center justify-between mb-3'>
+                            <Text className='text-lg font-bold text-foreground'>
+                                Confirm Allocation
+                            </Text>
+                            <Pressable
+                                onPress={() => setApproveModalVisible(false)}
+                                className='h-8 w-8 items-center justify-center rounded-full bg-secondary active:opacity-70'
+                            >
+                                <Feather name="x" size={18} color="#9CA3AF" />
+                            </Pressable>
+                        </View>
+
+                        <Text className='text-xs text-muted-foreground mb-4 leading-relaxed'>
+                            Are you sure you want to approve energy allocation for{' '}
+                            <Text className='font-bold text-foreground'>
+                                {selectedRequest?.household}
+                            </Text>
+                            ?
+                        </Text>
+
+                        {/* Impact Overview Box */}
+                        <View className='rounded-xl bg-secondary/60 border border-border/40 p-3.5 mb-5'>
+                            <View className='flex-row items-center justify-between mb-2'>
+                                <Text className='text-xs text-muted-foreground'>
+                                    Allocation Amount
+                                </Text>
+                                <Text className='text-xs font-bold text-foreground'>
+                                    +{selectedRequest?.requestedAmount} kWh
+                                </Text>
+                            </View>
+                            <View className='flex-row items-center justify-between'>
+                                <Text className='text-xs text-muted-foreground'>
+                                    Remaining Pool
+                                </Text>
+                                <Text className='text-xs font-bold text-[#10B981]'>
+                                    {availableEnergy - (selectedRequest?.requestedAmount ?? 0)} kWh
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Action Buttons */}
+                        <View className='flex-row gap-3'>
+                            <Pressable
+                                onPress={() => setApproveModalVisible(false)}
+                                className='flex-1 py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
+                            >
+                                <Text className='text-xs font-bold text-foreground'>
+                                    Cancel
+                                </Text>
+                            </Pressable>
+
+                            <Pressable
+                                onPress={confirmApproval}
+                                className='flex-1 py-2.5 items-center justify-center rounded-xl bg-primary border border-primary/40 active:opacity-80 shadow-sm'
+                            >
+                                <Text className='text-xs font-bold text-primary-foreground'>
+                                    Confirm Approval
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
