@@ -15,26 +15,33 @@ import {
     View,
 } from 'react-native';
 
-const ROLE_LABELS: Record<UserRole, { label: string; desc: string; badgeColor: string }> = {
+const ROLE_LABELS: Record<
+    UserRole,
+    { label: string; desc: string; badgeBg: string; textColor: string }
+> = {
     household: {
         label: 'Household',
         desc: 'Consumes community solar allocation',
-        badgeColor: 'text-sky-500 bg-sky-500/10 border-sky-500/30',
+        badgeBg: 'bg-sky-500/15 border-sky-500/30',
+        textColor: 'text-sky-500',
     },
     solar_owner: {
         label: 'Solar Owner',
         desc: 'Contributes solar power & rooftop capacity',
-        badgeColor: 'text-amber-500 bg-amber-500/10 border-amber-500/30',
+        badgeBg: 'bg-amber-500/15 border-amber-500/30',
+        textColor: 'text-[#F59E0B]',
     },
     technician: {
         label: 'Technician',
         desc: 'Maintains inverters, meters & grid hardware',
-        badgeColor: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/30',
+        badgeBg: 'bg-emerald-500/15 border-emerald-500/30',
+        textColor: 'text-[#10B981]',
     },
     manager: {
         label: 'Grid Manager',
         desc: 'Full administration & energy quota control',
-        badgeColor: 'text-purple-500 bg-purple-500/10 border-purple-500/30',
+        badgeBg: 'bg-purple-500/15 border-purple-500/30',
+        textColor: 'text-purple-500',
     },
 };
 
@@ -425,9 +432,9 @@ const ManagerMembers = () => {
                                 <View className='flex-row items-center justify-between pt-1'>
                                     {/* Role Pill */}
                                     <View
-                                        className={`px-3 py-1 rounded-lg border ${roleInfo.badgeColor}`}
+                                        className={`px-3 py-1 rounded-lg border ${roleInfo.badgeBg}`}
                                     >
-                                        <Text className='text-xs font-bold'>
+                                        <Text className={`text-xs font-bold ${roleInfo.textColor}`}>
                                             {roleInfo.label}
                                         </Text>
                                     </View>
