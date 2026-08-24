@@ -1,23 +1,30 @@
-import TabScreenBackground from '@/components/shared/TabScreenBackground';
+import ManagerMembers from '@/components/manager/members/ManagerMembers';
+import WaitUntilRoleAssigned from '@/components/shared/WaitUntilRoleAssigned';
+import { getUserRole } from '@/lib/getUserRole';
+import { useUser } from '@clerk/expo';
+import { Redirect } from 'expo-router';
 import React from 'react';
-import { ScrollView, Text, View } from 'react-native';
 
 const MemberScreen = () => {
-    return (
-        <ScrollView 
-            className='flex-1 bg-background'
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ flexGrow: 1, padding: 20 }}
-        >
-            <TabScreenBackground />
+    const { user, isLoaded, isSignedIn } = useUser();
 
-            <View className='flex-1 justify-center items-center py-20'>
-                <Text className='text-2xl font-bold text-foreground'>
-                    Members Screen
-                </Text>
-            </View>
-        </ScrollView>
-    );
+    if (!isLoaded) {
+        return null;
+    }
+
+    if (!isSignedIn || !user) {
+        return <Redirect href="/sign-in" />;
+    }
+
+    const role = getUserRole(user?.publicMetadata?.role);
+
+    switch (role) {
+        case "manager":
+            return <ManagerMembers />;
+
+        default:
+            return <ManagerMembers />;
+    }
 };
 
 export default MemberScreen;
