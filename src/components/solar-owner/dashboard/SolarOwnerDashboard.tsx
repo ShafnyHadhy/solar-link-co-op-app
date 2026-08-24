@@ -4,6 +4,7 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SolarOwnerAlertsModal } from '../alerts/SolarOwnerAlertsModal';
 import { SolarToast } from '../shared/SolarToast';
 import { useSolarOwnerStore } from '../store/useSolarOwnerStore';
@@ -13,6 +14,7 @@ import { PowerFlowDiagram } from './PowerFlowDiagram';
 import { QuickShareModal } from './QuickShareModal';
 
 export const SolarOwnerDashboard = () => {
+    const insets = useSafeAreaInsets();
     const { user } = useUser();
     const router = useRouter();
     const { metrics, battery, alerts, weather } = useSolarOwnerStore();
@@ -41,7 +43,11 @@ export const SolarOwnerDashboard = () => {
             <ScrollView
                 className="flex-1"
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}
+                contentContainerStyle={{
+                    paddingHorizontal: 20,
+                    paddingTop: insets.top > 0 ? insets.top + 10 : 24,
+                    paddingBottom: 40,
+                }}
             >
                 {/* 1. HEADER: Greeting, Weather pill, Notification Icon */}
                 <View className="flex-row items-center justify-between mb-4">
