@@ -81,62 +81,62 @@ export const SolarOwnerMenu = () => {
                 <View className="rounded-[24px] border border-border/70 bg-card/85 dark:bg-card/50 overflow-hidden mb-5 shadow-sm divide-y divide-border/40">
                     <Pressable
                         onPress={() => setHardwareModalVisible(true)}
-                        className="flex-row items-center justify-between p-4 active:bg-secondary/40"
+                        className="flex-row items-center justify-between p-4 active:bg-secondary/40 gap-2"
                     >
-                        <View className="flex-row items-center flex-1 mr-2">
-                            <View className="h-9 w-9 rounded-xl bg-amber-500/15 items-center justify-center mr-3 border border-amber-500/30">
+                        <View className="flex-row items-center flex-1 mr-2 min-w-0">
+                            <View className="h-9 w-9 rounded-xl bg-amber-500/15 items-center justify-center mr-3 border border-amber-500/30 flex-shrink-0">
                                 <MaterialCommunityIcons name="solar-panel" size={18} color="#F59E0B" />
                             </View>
-                            <View>
-                                <Text className="text-sm font-bold text-foreground">
+                            <View className="flex-1 min-w-0">
+                                <Text className="text-sm font-bold text-foreground" numberOfLines={1}>
                                     Solar Panels & Inverter Specs
                                 </Text>
-                                <Text className="text-xs text-muted-foreground">
+                                <Text className="text-xs text-muted-foreground" numberOfLines={1}>
                                     6.0 kWp • 12 SunPower panels • 98.4% Eff.
                                 </Text>
                             </View>
                         </View>
-                        <Feather name="chevron-right" size={18} color="#9CA3AF" />
+                        <Feather name="chevron-right" size={18} color="#9CA3AF" style={{ flexShrink: 0 }} />
                     </Pressable>
 
                     <Pressable
                         onPress={() => setMaintenanceModalVisible(true)}
-                        className="flex-row items-center justify-between p-4 active:bg-secondary/40"
+                        className="flex-row items-center justify-between p-4 active:bg-secondary/40 gap-2"
                     >
-                        <View className="flex-row items-center flex-1 mr-2">
-                            <View className="h-9 w-9 rounded-xl bg-emerald-500/15 items-center justify-center mr-3 border border-emerald-500/30">
+                        <View className="flex-row items-center flex-1 mr-2 min-w-0">
+                            <View className="h-9 w-9 rounded-xl bg-emerald-500/15 items-center justify-center mr-3 border border-emerald-500/30 flex-shrink-0">
                                 <Feather name="tool" size={16} color="#10B981" />
                             </View>
-                            <View>
-                                <Text className="text-sm font-bold text-foreground">
-                                    Maintenance & Health Check
+                            <View className="flex-1 min-w-0">
+                                <Text className="text-sm font-bold text-foreground" numberOfLines={1}>
+                                    System Maintenance & Inspection
                                 </Text>
-                                <Text className="text-xs text-muted-foreground">
-                                    Next service due: Jul 15, 2026
+                                <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                                    Last cleaned 14 days ago • Inverter optimal
                                 </Text>
                             </View>
                         </View>
-                        <Feather name="chevron-right" size={18} color="#9CA3AF" />
+                        <Feather name="chevron-right" size={18} color="#9CA3AF" style={{ flexShrink: 0 }} />
                     </Pressable>
 
                     <Pressable
                         onPress={() => setTipsModalVisible(true)}
-                        className="flex-row items-center justify-between p-4 active:bg-secondary/40"
+                        className="flex-row items-center justify-between p-4 active:bg-secondary/40 gap-2"
                     >
-                        <View className="flex-row items-center flex-1 mr-2">
-                            <View className="h-9 w-9 rounded-xl bg-purple-500/15 items-center justify-center mr-3 border border-purple-500/30">
-                                <Feather name="zap" size={16} color="#A855F7" />
+                        <View className="flex-row items-center flex-1 mr-2 min-w-0">
+                            <View className="h-9 w-9 rounded-xl bg-purple-500/15 items-center justify-center mr-3 border border-purple-500/30 flex-shrink-0">
+                                <Feather name="book-open" size={16} color="#A855F7" />
                             </View>
-                            <View>
-                                <Text className="text-sm font-bold text-foreground">
-                                    Energy Efficiency Suggestions
+                            <View className="flex-1 min-w-0">
+                                <Text className="text-sm font-bold text-foreground" numberOfLines={1}>
+                                    Solar Optimization Tips
                                 </Text>
-                                <Text className="text-xs text-muted-foreground">
-                                    Actionable tips to maximize solar savings
+                                <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                                    5 recommendations to maximize yield
                                 </Text>
                             </View>
                         </View>
-                        <Feather name="chevron-right" size={18} color="#9CA3AF" />
+                        <Feather name="chevron-right" size={18} color="#9CA3AF" style={{ flexShrink: 0 }} />
                     </Pressable>
                 </View>
 
