@@ -16,23 +16,23 @@ export const ExcessEnergyCard: React.FC<ExcessEnergyCardProps> = ({ onQuickShare
             <View className="absolute -right-10 -bottom-10 h-32 w-32 rounded-full bg-primary/20 blur-xl" />
 
             {/* Header / Badge */}
-            <View className="flex-row items-center justify-between mb-3">
-                <View className="flex-row items-center">
-                    <View className="h-9 w-9 rounded-xl bg-amber-500/20 items-center justify-center mr-2.5 border border-amber-500/30">
+            <View className="flex-row items-center justify-between mb-3 gap-2">
+                <View className="flex-row items-center flex-1 mr-2">
+                    <View className="h-9 w-9 rounded-xl bg-amber-500/20 items-center justify-center mr-2.5 border border-amber-500/30 flex-shrink-0">
                         <MaterialCommunityIcons name="lightning-bolt" size={20} color="#F59E0B" />
                     </View>
-                    <View>
-                        <Text className="text-xs font-bold uppercase tracking-wider text-amber-500">
+                    <View className="flex-1">
+                        <Text className="text-xs font-bold uppercase tracking-wider text-amber-500" numberOfLines={1}>
                             Available Excess Energy
                         </Text>
-                        <Text className="text-[11px] text-muted-foreground font-medium">
-                            Calculated automatically in real-time
+                        <Text className="text-[11px] text-muted-foreground font-medium" numberOfLines={1}>
+                            Calculated in real-time
                         </Text>
                     </View>
                 </View>
 
                 {autoShareEnabled && (
-                    <View className="flex-row items-center rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1">
+                    <View className="flex-row items-center rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 flex-shrink-0">
                         <View className="h-2 w-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
                         <Text className="text-[10px] font-bold text-emerald-500 uppercase">
                             Auto-Share Active
@@ -42,8 +42,8 @@ export const ExcessEnergyCard: React.FC<ExcessEnergyCardProps> = ({ onQuickShare
             </View>
 
             {/* Big Value Section */}
-            <View className="flex-row items-baseline justify-between my-2">
-                <View>
+            <View className="flex-row items-center justify-between my-2 gap-2">
+                <View className="flex-1 mr-2">
                     <View className="flex-row items-baseline">
                         <Text className="text-4xl font-black text-foreground tracking-tight">
                             {metrics.excessKW.toFixed(1)}
@@ -52,14 +52,14 @@ export const ExcessEnergyCard: React.FC<ExcessEnergyCardProps> = ({ onQuickShare
                             kW Live
                         </Text>
                     </View>
-                    <Text className="text-xs font-semibold text-muted-foreground mt-0.5">
-                        +{metrics.dailyExcessKWh.toFixed(1)} kWh total surplus generated today
+                    <Text className="text-xs font-semibold text-muted-foreground mt-0.5" numberOfLines={2}>
+                        +{metrics.dailyExcessKWh.toFixed(1)} kWh surplus generated today
                     </Text>
                 </View>
 
                 <Pressable
                     onPress={onQuickSharePress}
-                    className="rounded-2xl bg-primary px-4 py-3 flex-row items-center shadow-md active:opacity-90 active:scale-95"
+                    className="rounded-2xl bg-primary px-4 py-3 flex-row items-center shadow-md active:opacity-90 active:scale-95 flex-shrink-0"
                 >
                     <Feather name="share-2" size={16} color="#1E293B" style={{ marginRight: 6 }} />
                     <Text className="text-xs font-black text-primary-foreground uppercase tracking-wide">
