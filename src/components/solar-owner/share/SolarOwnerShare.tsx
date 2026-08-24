@@ -2,11 +2,13 @@ import TabScreenBackground from '@/components/shared/TabScreenBackground';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SolarToast } from '../shared/SolarToast';
 import { ViewHeader } from '../shared/ViewHeader';
 import { useSolarOwnerStore } from '../store/useSolarOwnerStore';
 
 export const SolarOwnerShare = () => {
+    const insets = useSafeAreaInsets();
     const {
         metrics,
         battery,
@@ -52,7 +54,11 @@ export const SolarOwnerShare = () => {
             <ScrollView
                 className="flex-1"
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}
+                contentContainerStyle={{
+                    paddingHorizontal: 20,
+                    paddingTop: insets.top > 0 ? insets.top + 10 : 24,
+                    paddingBottom: 40,
+                }}
             >
                 {/* Header */}
                 <ViewHeader
