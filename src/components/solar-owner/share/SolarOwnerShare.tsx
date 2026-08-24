@@ -2,11 +2,13 @@ import TabScreenBackground from '@/components/shared/TabScreenBackground';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SolarToast } from '../shared/SolarToast';
 import { ViewHeader } from '../shared/ViewHeader';
 import { useSolarOwnerStore } from '../store/useSolarOwnerStore';
 
 export const SolarOwnerShare = () => {
+    const insets = useSafeAreaInsets();
     const {
         metrics,
         battery,
@@ -52,7 +54,11 @@ export const SolarOwnerShare = () => {
             <ScrollView
                 className="flex-1"
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}
+                contentContainerStyle={{
+                    paddingHorizontal: 20,
+                    paddingTop: insets.top > 0 ? insets.top + 10 : 24,
+                    paddingBottom: 40,
+                }}
             >
                 {/* Header */}
                 <ViewHeader
@@ -63,16 +69,16 @@ export const SolarOwnerShare = () => {
 
                 {/* 1. MAIN CARD: AVAILABLE TO SHARE & PRIMARY SHARE BUTTON */}
                 <View className="rounded-[28px] border-2 border-amber-500/50 bg-card/90 dark:bg-card/60 p-5 mb-5 shadow-lg relative overflow-hidden">
-                    <View className="flex-row items-center justify-between mb-2">
-                        <View className="flex-row items-center">
-                            <View className="h-8 w-8 rounded-xl bg-amber-500/20 items-center justify-center mr-2">
+                    <View className="flex-row items-center justify-between mb-2 gap-2">
+                        <View className="flex-row items-center flex-1 mr-2 min-w-0">
+                            <View className="h-8 w-8 rounded-xl bg-amber-500/20 items-center justify-center mr-2 flex-shrink-0">
                                 <MaterialCommunityIcons name="lightning-bolt" size={18} color="#F59E0B" />
                             </View>
-                            <Text className="text-xs font-bold uppercase tracking-wider text-amber-500">
+                            <Text className="text-xs font-bold uppercase tracking-wider text-amber-500" numberOfLines={1}>
                                 Available to Share
                             </Text>
                         </View>
-                        <Text className="text-xs font-semibold text-muted-foreground">
+                        <Text className="text-xs font-semibold text-muted-foreground flex-shrink-0">
                             Battery: {battery.percentage}%
                         </Text>
                     </View>
@@ -103,14 +109,14 @@ export const SolarOwnerShare = () => {
                     </Pressable>
 
                     {/* Auto-Sharing Switcher */}
-                    <View className="pt-3 border-t border-border/50 flex-row items-center justify-between">
-                        <View className="flex-row items-center flex-1 mr-3">
-                            <Feather name="zap" size={16} color="#10B981" />
-                            <View className="ml-2">
-                                <Text className="text-xs font-bold text-foreground">
+                    <View className="pt-3 border-t border-border/50 flex-row items-center justify-between gap-2">
+                        <View className="flex-row items-center flex-1 mr-2 min-w-0">
+                            <Feather name="zap" size={16} color="#10B981" style={{ flexShrink: 0 }} />
+                            <View className="ml-2 flex-1 min-w-0">
+                                <Text className="text-xs font-bold text-foreground" numberOfLines={1}>
                                     Auto-Share Excess
                                 </Text>
-                                <Text className="text-[10px] text-muted-foreground">
+                                <Text className="text-[10px] text-muted-foreground" numberOfLines={1}>
                                     Export surplus when battery &gt; 75%
                                 </Text>
                             </View>
@@ -118,18 +124,18 @@ export const SolarOwnerShare = () => {
 
                         <Pressable
                             onPress={toggleAutoShare}
-                            className={`px-3 py-1.5 rounded-full border ${
+                            className={`px-3 py-1.5 rounded-full border flex-shrink-0 ${
                                 autoShareEnabled
                                     ? 'bg-emerald-500 border-emerald-600'
                                     : 'bg-secondary border-border'
                             }`}
                         >
                             <Text
-                                className={`text-[11px] font-bold ${
-                                    autoShareEnabled ? 'text-white' : 'text-muted-foreground'
+                                className={`text-xs font-bold ${
+                                    autoShareEnabled ? 'text-white' : 'text-foreground'
                                 }`}
                             >
-                                {autoShareEnabled ? 'Active' : 'Disabled'}
+                                {autoShareEnabled ? 'Active' : 'Off'}
                             </Text>
                         </Pressable>
                     </View>
@@ -137,33 +143,33 @@ export const SolarOwnerShare = () => {
 
                 {/* 2. TRANSPARENCY & COMMUNITY IMPACT METRICS */}
                 <View className="rounded-[28px] border border-border/70 bg-card/85 dark:bg-card/50 p-4 mb-5 shadow-sm">
-                    <Text className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2.5">
+                    <Text className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2.5" numberOfLines={1}>
                         Transparency & Contribution Record
                     </Text>
-                    <View className="flex-row items-center justify-between">
-                        <View className="items-center flex-1">
-                            <Text className="text-[10px] font-bold uppercase text-muted-foreground">
+                    <View className="flex-row items-center justify-between gap-1">
+                        <View className="items-center flex-1 min-w-0">
+                            <Text className="text-[10px] font-bold uppercase text-muted-foreground" numberOfLines={1}>
                                 Total Shared
                             </Text>
-                            <Text className="text-base font-black text-amber-500 mt-0.5">
+                            <Text className="text-base font-black text-amber-500 mt-0.5" numberOfLines={1}>
                                 {totalSharedKWh.toFixed(1)} kWh
                             </Text>
                         </View>
 
-                        <View className="items-center flex-1 border-x border-border/40">
-                            <Text className="text-[10px] font-bold uppercase text-muted-foreground">
+                        <View className="items-center flex-1 min-w-0 border-x border-border/40 px-1">
+                            <Text className="text-[10px] font-bold uppercase text-muted-foreground" numberOfLines={1}>
                                 Households
                             </Text>
-                            <Text className="text-base font-black text-foreground mt-0.5">
-                                {uniqueHouseholdsSupported} Supported
+                            <Text className="text-base font-black text-foreground mt-0.5" numberOfLines={1}>
+                                {uniqueHouseholdsSupported} Supp.
                             </Text>
                         </View>
 
-                        <View className="items-center flex-1">
-                            <Text className="text-[10px] font-bold uppercase text-muted-foreground">
+                        <View className="items-center flex-1 min-w-0">
+                            <Text className="text-[10px] font-bold uppercase text-muted-foreground" numberOfLines={1}>
                                 Total Credits
                             </Text>
-                            <Text className="text-base font-black text-emerald-500 mt-0.5">
+                            <Text className="text-base font-black text-emerald-500 mt-0.5" numberOfLines={1}>
                                 +${totalCreditsEarned.toFixed(2)}
                             </Text>
                         </View>
@@ -172,16 +178,16 @@ export const SolarOwnerShare = () => {
 
                 {/* 3. INCOMING COMMUNITY ENERGY REQUESTS */}
                 <View className="rounded-[28px] border border-border/70 bg-card/85 dark:bg-card/50 p-5 mb-5 shadow-sm">
-                    <View className="flex-row items-center justify-between mb-4">
-                        <View>
-                            <Text className="text-base font-bold text-foreground">
+                    <View className="flex-row items-center justify-between mb-4 gap-2">
+                        <View className="flex-1 mr-2 min-w-0">
+                            <Text className="text-base font-bold text-foreground" numberOfLines={1}>
                                 Incoming Requests
                             </Text>
-                            <Text className="text-xs text-muted-foreground font-medium">
+                            <Text className="text-xs text-muted-foreground font-medium" numberOfLines={1}>
                                 Requests from neighborhood households
                             </Text>
                         </View>
-                        <View className="bg-amber-500/20 px-2.5 py-0.5 rounded-full">
+                        <View className="bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-500/30 flex-shrink-0">
                             <Text className="text-[10px] font-black text-amber-500">
                                 {communityRequests.filter((r) => r.status === 'pending').length} Pending
                             </Text>

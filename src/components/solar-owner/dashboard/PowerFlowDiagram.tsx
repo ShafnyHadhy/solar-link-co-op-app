@@ -8,16 +8,16 @@ export const PowerFlowDiagram = () => {
 
     return (
         <View className="rounded-[28px] border border-border/70 bg-card/85 dark:bg-card/50 p-5 mb-5 shadow-sm">
-            <View className="flex-row items-center justify-between mb-4">
-                <View>
-                    <Text className="text-base font-bold text-foreground">
+            <View className="flex-row items-center justify-between mb-4 gap-2">
+                <View className="flex-1 mr-2 min-w-0">
+                    <Text className="text-base font-bold text-foreground" numberOfLines={1}>
                         Live Power Flow
                     </Text>
-                    <Text className="text-xs text-muted-foreground font-medium">
+                    <Text className="text-xs text-muted-foreground font-medium" numberOfLines={1}>
                         Real-time energy distribution across microgrid
                     </Text>
                 </View>
-                <View className="flex-row items-center bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 rounded-full">
+                <View className="flex-row items-center bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 rounded-full flex-shrink-0">
                     <View className="h-2 w-2 rounded-full bg-emerald-500 mr-1.5 animate-ping" />
                     <Text className="text-[10px] font-black text-emerald-500 uppercase">
                         Active Flow
