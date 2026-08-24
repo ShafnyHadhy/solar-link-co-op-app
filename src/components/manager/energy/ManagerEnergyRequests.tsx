@@ -147,14 +147,15 @@ const ManagerEnergyRequests = () => {
     });
 
     return (
-        <View className='flex-1'>
+        <View className='flex-1 bg-background'>
             <TabScreenBackground />
 
             <ScrollView
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ flexGrow: 1, padding: 20, paddingBottom: 60 }}
+                contentContainerStyle={{ flexGrow: 1, padding: 20, paddingVertical: 60 }}
                 className='flex-1'
             >
+                {/* Header */}
                 <View className='flex-row items-center justify-between mb-6'>
                     <View className='flex-row items-center gap-2'>
                         <Pressable
@@ -179,36 +180,30 @@ const ManagerEnergyRequests = () => {
                     </View>
                 </View>
 
-                <View className='flex-row gap-4 mb-5 w-full'>
+                {/* Top KPI Analytics Overview */}
+                <View className='flex-row gap-3 mb-5 w-full'>
+                    {/* Pending Requests */}
                     <View className='flex-1 flex-col justify-between rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'>
-                        <View className='flex-row items-center justify-between'>
-                            <Text className='text-3xl font-extrabold text-foreground'>
-                                {pendingCount}
-                            </Text>
-                            <View className='h-8 w-8 items-center justify-center rounded-lg bg-yellow-500/15 border border-yellow-500/30'>
-                                <Feather name="clock" size={16} color="#F59E0B" />
-                            </View>
-                        </View>
-                        <Text className='text-xs font-semibold text-muted-foreground mt-2'>
+                        <Text className='text-3xl font-extrabold text-foreground'>
+                            {pendingCount}
+                        </Text>
+                        <Text className='text-xs font-semibold text-muted-foreground mt-1'>
                             Pending Requests
                         </Text>
                     </View>
 
+                    {/* Available Energy */}
                     <View className='flex-1 flex-col justify-between rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'>
-                        <View className='flex-row items-center justify-between'>
-                            <Text className='text-3xl font-extrabold text-foreground'>
-                                {availableEnergy} <Text className='text-lg font-bold text-muted-foreground'>kWh</Text>
-                            </Text>
-                            <View className='h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 border border-emerald-500/30'>
-                                <Feather name="zap" size={16} color="#10B981" />
-                            </View>
-                        </View>
-                        <Text className='text-xs font-semibold text-muted-foreground mt-2'>
+                        <Text className='text-3xl font-extrabold text-foreground'>
+                            {availableEnergy} <Text className='text-base font-bold text-muted-foreground'>kWh</Text>
+                        </Text>
+                        <Text className='text-xs font-semibold text-muted-foreground mt-1'>
                             Available Energy
                         </Text>
                     </View>
                 </View>
 
+                {/* Search Bar */}
                 <View className='flex-row items-center bg-secondary/60 border border-border/60 rounded-full px-4 py-2.5 mb-4 shadow-sm'>
                     <Feather name="search" size={18} color="#9CA3AF" />
                     <TextInput
@@ -225,15 +220,16 @@ const ManagerEnergyRequests = () => {
                     )}
                 </View>
 
+                {/* Filter Tabs */}
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ gap: 10 }}
+                    contentContainerStyle={{ gap: 8 }}
                     className='mb-5'
                 >
                     <Pressable
                         onPress={() => setSelectedFilter('all')}
-                        className={`px-5 py-2.5 rounded-full border ${selectedFilter === 'all'
+                        className={`px-4 py-2 rounded-full border ${selectedFilter === 'all'
                             ? 'bg-primary border-primary shadow-sm'
                             : 'bg-secondary/60 border-border/60 active:bg-secondary'
                             }`}
@@ -250,7 +246,7 @@ const ManagerEnergyRequests = () => {
 
                     <Pressable
                         onPress={() => setSelectedFilter('pending')}
-                        className={`px-5 py-2.5 rounded-full border ${selectedFilter === 'pending'
+                        className={`px-4 py-2 rounded-full border ${selectedFilter === 'pending'
                             ? 'bg-primary border-primary shadow-sm'
                             : 'bg-secondary/60 border-border/60 active:bg-secondary'
                             }`}
@@ -267,7 +263,7 @@ const ManagerEnergyRequests = () => {
 
                     <Pressable
                         onPress={() => setSelectedFilter('approved')}
-                        className={`px-5 py-2.5 rounded-full border ${selectedFilter === 'approved'
+                        className={`px-4 py-2 rounded-full border ${selectedFilter === 'approved'
                             ? 'bg-primary border-primary shadow-sm'
                             : 'bg-secondary/60 border-border/60 active:bg-secondary'
                             }`}
@@ -284,7 +280,7 @@ const ManagerEnergyRequests = () => {
 
                     <Pressable
                         onPress={() => setSelectedFilter('rejected')}
-                        className={`px-5 py-2.5 rounded-full border ${selectedFilter === 'rejected'
+                        className={`px-4 py-2 rounded-full border ${selectedFilter === 'rejected'
                             ? 'bg-primary border-primary shadow-sm'
                             : 'bg-secondary/60 border-border/60 active:bg-secondary'
                             }`}
@@ -300,41 +296,48 @@ const ManagerEnergyRequests = () => {
                     </Pressable>
                 </ScrollView>
 
+                {/* Household Requests List */}
                 <View className='flex-col gap-4'>
                     {filteredRequests.map((item) => {
                         const isPending = item.status === 'pending';
                         const isApproved = item.status === 'approved';
-                        const isRejected = item.status === 'rejected';
 
                         return (
                             <View
                                 key={item.id}
                                 className='rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'
                             >
-                                <View className='flex-row items-center justify-between mb-3.5'>
-                                    <View className='flex-row items-center gap-2'>
-                                        <View className='h-8 w-8 items-center justify-center rounded-lg bg-card border border-border/50'>
-                                            <Feather name="home" size={15} color="#F59E0B" />
+                                {/* Household Header & Status Pill */}
+                                <View className='flex-row items-center justify-between mb-3'>
+                                    <View className='flex-row items-center gap-3 flex-1 mr-2'>
+                                        <View className='h-10 w-10 items-center justify-center rounded-xl bg-card border border-border/60'>
+                                            <Feather name="home" size={16} color="#F59E0B" />
                                         </View>
-                                        <Text className='text-base font-bold text-foreground'>
-                                            {item.household}
-                                        </Text>
+                                        <View className='flex-1'>
+                                            <Text className='text-base font-bold text-foreground' numberOfLines={1}>
+                                                {item.household}
+                                            </Text>
+                                            <Text className='text-xs text-muted-foreground' numberOfLines={1}>
+                                                {item.requestedAt}
+                                            </Text>
+                                        </View>
                                     </View>
 
+                                    {/* Status Badge */}
                                     <View
-                                        className={`px-3 py-1 rounded-full border ${isPending
+                                        className={`px-2.5 py-0.5 rounded-full border ${isPending
                                             ? 'bg-yellow-500/15 border-yellow-500/40'
                                             : isApproved
                                                 ? 'bg-emerald-500/15 border-emerald-500/40'
-                                                : 'bg-red-500/15 border-red-500/40'
+                                                : 'bg-zinc-500/15 border-zinc-500/40'
                                             }`}
                                     >
                                         <Text
-                                            className={`text-[11px] font-bold capitalize ${isPending
+                                            className={`text-[10px] font-bold uppercase ${isPending
                                                 ? 'text-[#F59E0B]'
                                                 : isApproved
                                                     ? 'text-[#10B981]'
-                                                    : 'text-[#EF4444]'
+                                                    : 'text-[#6B7280]'
                                                 }`}
                                         >
                                             {item.status}
@@ -342,61 +345,60 @@ const ManagerEnergyRequests = () => {
                                     </View>
                                 </View>
 
-                                <View className='flex-row items-center justify-between rounded-xl bg-card/70 border border-border/30 p-3 mb-4'>
+                                {/* Metrics Section (Usage vs Previous Allocation) */}
+                                <View className='flex-row items-center justify-between rounded-xl bg-card/70 border border-border/30 p-3 mb-3'>
                                     <View className='flex-1'>
-                                        <Text className='text-xs font-semibold text-muted-foreground'>
+                                        <Text className='text-[11px] font-semibold text-muted-foreground'>
                                             Current Usage
                                         </Text>
-                                        <Text className='text-lg font-extrabold text-foreground mt-0.5'>
-                                            {item.currentUsage} <Text className='text-xs font-bold text-muted-foreground'>kWh</Text>
+                                        <Text className='text-sm font-extrabold text-foreground mt-0.5'>
+                                            {item.currentUsage} <Text className='text-[11px] font-bold text-muted-foreground'>kWh</Text>
                                         </Text>
                                     </View>
 
                                     {/* Divider */}
-                                    <View className='h-8 w-[1px] bg-border/60 mx-2' />
+                                    <View className='h-7 w-[1px] bg-border/60 mx-2' />
 
                                     {/* Previous Allocation */}
                                     <View className='flex-1 pl-2'>
-                                        <Text className='text-xs font-semibold text-muted-foreground'>
+                                        <Text className='text-[11px] font-semibold text-muted-foreground'>
                                             Previous Allocation
                                         </Text>
-                                        <Text className='text-lg font-extrabold text-foreground mt-0.5'>
-                                            {item.previousAllocation} <Text className='text-xs font-bold text-muted-foreground'>kWh</Text>
+                                        <Text className='text-sm font-extrabold text-foreground mt-0.5'>
+                                            {item.previousAllocation} <Text className='text-[11px] font-bold text-muted-foreground'>kWh</Text>
                                         </Text>
                                     </View>
                                 </View>
 
+                                {/* Action Buttons */}
                                 {isPending ? (
-                                    <View className='flex-row gap-3 w-full'>
+                                    <View className='flex-row items-center justify-end gap-2.5 pt-1'>
                                         <Pressable
                                             onPress={() => handleReview(item)}
-                                            className='flex-1 items-center justify-center rounded-xl bg-card border border-border/80 py-2.5 active:bg-secondary/70 shadow-sm'
+                                            className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
                                         >
-                                            <Text className='text-sm font-bold text-foreground'>
+                                            <Text className='text-xs font-bold text-foreground'>
                                                 Review
                                             </Text>
                                         </Pressable>
 
                                         <Pressable
                                             onPress={() => handleApprove(item.id, item.household)}
-                                            className='flex-1 items-center justify-center rounded-xl bg-primary border border-primary/40 py-2.5 active:opacity-80 shadow-sm'
+                                            className='px-3.5 py-1.5 rounded-lg bg-primary border border-primary/40 active:opacity-80 shadow-sm'
                                         >
-                                            <Text className='text-sm font-bold text-primary-foreground'>
+                                            <Text className='text-xs font-bold text-primary-foreground'>
                                                 Approve
                                             </Text>
                                         </Pressable>
                                     </View>
                                 ) : isApproved ? (
                                     <View className='flex-row items-center justify-between pt-1'>
-                                        <View className='flex-row items-center gap-1.5'>
-                                            <Feather name="check-circle" size={14} color="#10B981" />
-                                            <Text className='text-xs font-semibold text-[#10B981]'>
-                                                Allocation approved ({item.requestedAmount} kWh)
-                                            </Text>
-                                        </View>
+                                        <Text className='text-xs font-semibold text-[#10B981]'>
+                                            Allocation approved ({item.requestedAmount} kWh)
+                                        </Text>
                                         <Pressable
                                             onPress={() => handleReview(item)}
-                                            className='px-3 py-1 rounded-lg bg-card border border-border/50 active:bg-secondary'
+                                            className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
                                         >
                                             <Text className='text-xs font-bold text-foreground'>
                                                 Details
@@ -405,17 +407,14 @@ const ManagerEnergyRequests = () => {
                                     </View>
                                 ) : (
                                     <View className='flex-row items-center justify-between pt-1'>
-                                        <View className='flex-row items-center gap-1.5'>
-                                            <Feather name="x-circle" size={14} color="#EF4444" />
-                                            <Text className='text-xs font-semibold text-[#EF4444]'>
-                                                Request rejected
-                                            </Text>
-                                        </View>
+                                        <Text className='text-xs font-semibold text-[#EF4444]'>
+                                            Request rejected
+                                        </Text>
                                         <Pressable
                                             onPress={() => handleApprove(item.id, item.household)}
-                                            className='px-3 py-1 rounded-lg bg-primary/20 border border-primary/40 active:opacity-75'
+                                            className='px-3.5 py-1.5 rounded-lg bg-primary border border-primary/40 active:opacity-80 shadow-sm'
                                         >
-                                            <Text className='text-xs font-bold text-foreground'>
+                                            <Text className='text-xs font-bold text-primary-foreground'>
                                                 Reconsider
                                             </Text>
                                         </Pressable>
@@ -425,11 +424,9 @@ const ManagerEnergyRequests = () => {
                         );
                     })}
 
+                    {/* Empty State */}
                     {filteredRequests.length === 0 && (
                         <View className='items-center justify-center py-12 px-4'>
-                            <View className='h-14 w-14 items-center justify-center rounded-full bg-secondary/80 border border-border/60 mb-3'>
-                                <Feather name="inbox" size={24} color="#9CA3AF" />
-                            </View>
                             <Text className='text-base font-bold text-foreground'>
                                 No requests found
                             </Text>
