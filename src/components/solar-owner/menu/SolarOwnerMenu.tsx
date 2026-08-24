@@ -3,11 +3,13 @@ import { useAuth, useUser } from '@clerk/expo';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Modal, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SolarToast } from '../shared/SolarToast';
 import { ViewHeader } from '../shared/ViewHeader';
 import { useSolarOwnerStore } from '../store/useSolarOwnerStore';
 
 export const SolarOwnerMenu = () => {
+    const insets = useSafeAreaInsets();
     const { signOut } = useAuth();
     const { user } = useUser();
     const {
@@ -30,7 +32,11 @@ export const SolarOwnerMenu = () => {
             <ScrollView
                 className="flex-1"
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}
+                contentContainerStyle={{
+                    paddingHorizontal: 20,
+                    paddingTop: insets.top > 0 ? insets.top + 10 : 24,
+                    paddingBottom: 40,
+                }}
             >
                 {/* Header */}
                 <ViewHeader
