@@ -2,25 +2,22 @@ import HouseholdEnergy from '@/components/household/energy/HouseholdEnergy';
 import ManagerEnergyRequests from '@/components/manager/energy/ManagerEnergyRequests';
 import WaitUntilRoleAssigned from '@/components/shared/WaitUntilRoleAssigned';
 import SolarOwnerEnergy from '@/components/solar-owner/energy/SolarOwnerEnergy';
-import TechnicianEnergy from '@/components/technician/energy/TechnicianEnergy';
+import TechnicianEnergyScreen from '@/components/technician/energy/TechnicianEnergyScreen';
 import { getUserRole } from '@/lib/getUserRole';
 import { useUser } from '@clerk/expo';
-import { Redirect } from 'expo-router';
+
 import React from 'react';
 
 const EnergyScreen = () => {
-
-    const { user, isLoaded, isSignedIn } = useUser();
+    const { user, isLoaded } = useUser();
 
     if (!isLoaded) {
         return null;
     }
 
-    if (!isSignedIn || !user) {
-        return <Redirect href="/sign-in" />;
-    }
-
-    const role = getUserRole(user?.publicMetadata?.role);
+    const role = getUserRole(
+        user?.publicMetadata?.role
+    );
 
     switch (role) {
         case "manager":
@@ -33,12 +30,11 @@ const EnergyScreen = () => {
             return <HouseholdEnergy />
 
         case "technician":
-            return <TechnicianEnergy />
+            return <TechnicianEnergyScreen />
 
         default:
             return <WaitUntilRoleAssigned />;
     }
-
 };
 
 export default EnergyScreen;
