@@ -1,11 +1,13 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
 import { useUser } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 const ManagementDashboard = () => {
     const { user } = useUser();
+    const router = useRouter();
 
     return (
         <View className='flex-1'>
@@ -25,8 +27,8 @@ const ManagementDashboard = () => {
                         </Text>
                     </View>
 
-                    <View className='h-12 w-12 items-center justify-center rounded-full bg-secondary border border-border/60'>
-                        <Feather name="bell" size={24} color="#F59E0B" />
+                    <View className='h-10 w-10 items-center justify-center rounded-2xl bg-secondary border border-border/60'>
+                        <Feather name="bell" size={20} color="#F59E0B" />
                     </View>
                 </View>
 
@@ -100,7 +102,10 @@ const ManagementDashboard = () => {
                         </Text>
                     </View>
                     <View className='items-center justify-center'>
-                        <Pressable className='items-center justify-center rounded-md bg-secondary border border-border/60 px-4 py-2'>
+                        <Pressable
+                            onPress={() => router.push('/energy')}
+                            className='items-center justify-center rounded-md bg-secondary border border-border/60 px-4 py-2 active:opacity-75'
+                        >
                             <Text className='text-md font-semibold text-[#F59E0B]'>
                                 View Requests
                             </Text>
