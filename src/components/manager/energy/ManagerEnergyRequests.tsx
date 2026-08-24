@@ -1,447 +1,567 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
-import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { useManagerStore } from '../store/useManagerStore';
+import { HouseholdDemandRequest, SolarShareOffer } from '../types/manager.types';
 
-interface EnergyRequestItem {
-    id: string;
-    household: string;
-    currentUsage: number;
-    previousAllocation: number;
-    requestedAmount: number;
-    status: 'pending' | 'approved' | 'rejected';
-    requestedAt: string;
-}
+type FilterType = 'all' | 'offers' | 'demands' | 'history';
 
-const INITIAL_REQUESTS: EnergyRequestItem[] = [
-    {
-        id: '1',
-        household: 'Household A',
-        currentUsage: 35,
-        previousAllocation: 10,
-        requestedAmount: 15,
-        status: 'pending',
-        requestedAt: '10 mins ago',
-    },
-    {
-        id: '2',
-        household: 'Household B',
-        currentUsage: 42,
-        previousAllocation: 5,
-        requestedAmount: 12,
-        status: 'pending',
-        requestedAt: '35 mins ago',
-    },
-    {
-        id: '3',
-        household: 'Household C',
-        currentUsage: 28,
-        previousAllocation: 17,
-        requestedAmount: 8,
-        status: 'pending',
-        requestedAt: '1 hour ago',
-    },
-    {
-        id: '4',
-        household: 'Household D',
-        currentUsage: 20,
-        previousAllocation: 12,
-        requestedAmount: 10,
-        status: 'approved',
-        requestedAt: 'Yesterday',
-    },
-    {
-        id: '5',
-        household: 'Household E',
-        currentUsage: 18,
-        previousAllocation: 6,
-        requestedAmount: 9,
-        status: 'rejected',
-        requestedAt: '2 days ago',
-    },
-    {
-        id: '6',
-        household: 'Household F',
-        currentUsage: 45,
-        previousAllocation: 18,
-        requestedAmount: 14,
-        status: 'approved',
-        requestedAt: '1 hour ago',
-    },
-];
+export const ManagerEnergyRequests = () => {
+    const {
+        metrics,
+        solarOffers,
+        householdRequests,
+        dispatchHistory,
+        toastMessage,
+        toastType,
+        hideToast,
+        approveOffer,
+        rejectOffer,
+        dispatchSolarToRequest,
+        rejectHouseholdRequest,
+    } = useManagerStore();
 
-const ManagerEnergyRequests = () => {
-    const router = useRouter();
-    const [requests, setRequests] = useState<EnergyRequestItem[]>(INITIAL_REQUESTS);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedFilter, setSelectedFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+    const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+    const [selectedDemandForDispatch, setSelectedDemandForDispatch] = useState<HouseholdDemandRequest | null>(null);
 
-    const pendingCount = requests.filter((r) => r.status === 'pending').length;
-    const approvedCount = requests.filter((r) => r.status === 'approved').length;
-    const rejectedCount = requests.filter((r) => r.status === 'rejected').length;
-    const availableEnergy = 45;
+    const pendingOffers = solarOffers.filter((o) => o.status === 'pending_approval');
+    const pendingDemands = householdRequests.filter((d) => d.status === 'pending');
 
-    const handleApprove = (id: string, householdName: string) => {
-        Alert.alert(
-            'Approve Energy Request',
-            `Are you sure you want to approve energy allocation for ${householdName}?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Approve',
-                    onPress: () => {
-                        setRequests((prev) =>
-                            prev.map((item) =>
-                                item.id === id ? { ...item, status: 'approved' } : item
-                            )
-                        );
-                    },
-                },
-            ]
-        );
+    const handleQuickDispatch = (demand: HouseholdDemandRequest) => {
+        dispatchSolarToRequest(demand.id);
+        setSelectedDemandForDispatch(null);
     };
 
-    const handleReject = (id: string, householdName: string) => {
-        Alert.alert(
-            'Reject Energy Request',
-            `Are you sure you want to reject energy allocation for ${householdName}?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Reject',
-                    style: 'destructive',
-                    onPress: () => {
-                        setRequests((prev) =>
-                            prev.map((item) =>
-                                item.id === id ? { ...item, status: 'rejected' } : item
-                            )
-                        );
-                    },
-                },
-            ]
-        );
+    const handleOfferBasedDispatch = (demandId: string, offerId: string) => {
+        dispatchSolarToRequest(demandId, offerId);
+        setSelectedDemandForDispatch(null);
     };
-
-    const handleReview = (request: EnergyRequestItem) => {
-        Alert.alert(
-            `${request.household} - Request Details`,
-            `Current Usage: ${request.currentUsage} kWh\nPrevious Allocation: ${request.previousAllocation} kWh\nRequested Energy: ${request.requestedAmount} kWh\nStatus: ${request.status.toUpperCase()}\nSubmitted: ${request.requestedAt}`,
-            [
-                { text: 'Close', style: 'default' },
-                request.status === 'pending'
-                    ? {
-                        text: 'Reject Request',
-                        style: 'destructive',
-                        onPress: () => handleReject(request.id, request.household),
-                    }
-                    : { text: 'OK' },
-            ]
-        );
-    };
-
-    const filteredRequests = requests.filter((req) => {
-        const matchesSearch = req.household.toLowerCase().includes(searchQuery.toLowerCase());
-        if (selectedFilter === 'all') return matchesSearch;
-        return matchesSearch && req.status === selectedFilter;
-    });
 
     return (
-        <View className='flex-1'>
+        <View className="flex-1 bg-background">
             <TabScreenBackground />
 
+            {/* Custom Toast */}
+            {toastMessage && (
+                <View className="absolute top-12 left-5 right-5 z-50">
+                    <View
+                        className={`flex-row items-center justify-between p-4 rounded-2xl border shadow-xl ${
+                            toastType === 'success'
+                                ? 'bg-emerald-950/90 border-emerald-500/50'
+                                : toastType === 'warning'
+                                ? 'bg-amber-950/90 border-amber-500/50'
+                                : 'bg-slate-900/90 border-blue-500/50'
+                        }`}
+                    >
+                        <View className="flex-row items-center flex-1 mr-2">
+                            <Feather
+                                name={toastType === 'success' ? 'check-circle' : 'info'}
+                                size={20}
+                                color={toastType === 'success' ? '#10B981' : '#38BDF8'}
+                            />
+                            <Text className="ml-3 text-sm font-semibold text-white flex-1">
+                                {toastMessage}
+                            </Text>
+                        </View>
+                        <Pressable onPress={hideToast} className="p-1">
+                            <Feather name="x" size={18} color="#94A3B8" />
+                        </Pressable>
+                    </View>
+                </View>
+            )}
+
             <ScrollView
+                className="flex-1"
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ flexGrow: 1, padding: 20, paddingBottom: 60 }}
-                className='flex-1'
+                contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}
             >
-                <View className='flex-row items-center justify-between mb-6'>
-                    <View className='flex-row items-center gap-2'>
-                        <Pressable
-                            onPress={() => router.canGoBack() && router.back()}
-                            className='h-10 w-10 items-center justify-center rounded-xl bg-secondary/80 border border-border/60 active:opacity-70 mr-1'
-                        >
-                            <Feather name="chevron-left" size={22} color="#F59E0B" />
-                        </Pressable>
-
+                {/* Header */}
+                <View className="mb-5">
+                    <View className="flex-row items-center justify-between">
                         <View>
-                            <Text className='text-2xl font-extrabold text-foreground tracking-tight'>
-                                Energy Requests
+                            <Text className="text-2xl font-black text-foreground">
+                                Energy Management Hub
                             </Text>
-                            <Text className='text-xs text-muted-foreground mt-0.5'>
-                                Review & allocate community solar power
+                            <Text className="text-xs text-muted-foreground font-medium mt-0.5">
+                                Review solar offers, balance grid & dispatch power
                             </Text>
                         </View>
-                    </View>
-
-                    <View className='h-10 w-10 items-center justify-center rounded-2xl bg-secondary border border-border/60 shadow-sm'>
-                        <Feather name="bell" size={20} color="#F59E0B" />
+                        <View className="h-10 w-10 rounded-2xl bg-primary/20 items-center justify-center border border-primary/30">
+                            <MaterialCommunityIcons name="transmission-tower" size={22} color="#F59E0B" />
+                        </View>
                     </View>
                 </View>
 
-                <View className='flex-row gap-4 mb-5 w-full'>
-                    <View className='flex-1 flex-col justify-between rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'>
-                        <View className='flex-row items-center justify-between'>
-                            <Text className='text-3xl font-extrabold text-foreground'>
-                                {pendingCount}
+                {/* 1. GRID STATUS & SUPPLY VS DEMAND METRICS */}
+                <View className="rounded-[28px] border-2 border-primary/40 bg-card/90 dark:bg-card/60 p-5 mb-5 shadow-lg">
+                    <View className="flex-row items-center justify-between mb-3">
+                        <View className="flex-row items-center">
+                            <View className="h-3 w-3 rounded-full bg-emerald-500 mr-2" />
+                            <Text className="text-xs font-bold uppercase tracking-wider text-emerald-500">
+                                Microgrid Balanced • {metrics.gridStabilityScore}% Stability
                             </Text>
-                            <View className='h-8 w-8 items-center justify-center rounded-lg bg-yellow-500/15 border border-yellow-500/30'>
-                                <Feather name="clock" size={16} color="#F59E0B" />
-                            </View>
                         </View>
-                        <Text className='text-xs font-semibold text-muted-foreground mt-2'>
-                            Pending Requests
+                        <Text className="text-xs font-semibold text-muted-foreground">
+                            CO₂ Saved: {metrics.co2OffsetTodayKg}kg
                         </Text>
                     </View>
 
-                    <View className='flex-1 flex-col justify-between rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'>
-                        <View className='flex-row items-center justify-between'>
-                            <Text className='text-3xl font-extrabold text-foreground'>
-                                {availableEnergy} <Text className='text-lg font-bold text-muted-foreground'>kWh</Text>
+                    <View className="flex-row items-center justify-between gap-3 mb-3">
+                        <View className="flex-1 rounded-2xl bg-amber-500/10 border border-amber-500/20 p-3">
+                            <Text className="text-[11px] font-bold text-amber-500 uppercase">
+                                Solar Inflow
                             </Text>
-                            <View className='h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 border border-emerald-500/30'>
-                                <Feather name="zap" size={16} color="#10B981" />
-                            </View>
+                            <Text className="text-xl font-black text-foreground mt-0.5">
+                                {metrics.totalSolarInflowKWh} <Text className="text-xs font-bold text-amber-500">kWh</Text>
+                            </Text>
+                            <Text className="text-[10px] text-muted-foreground mt-1">
+                                {solarOffers.length} Active Solar Offers
+                            </Text>
                         </View>
-                        <Text className='text-xs font-semibold text-muted-foreground mt-2'>
-                            Available Energy
-                        </Text>
+
+                        <View className="flex-1 rounded-2xl bg-blue-500/10 border border-blue-500/20 p-3">
+                            <Text className="text-[11px] font-bold text-blue-500 uppercase">
+                                Active Reserve
+                            </Text>
+                            <Text className="text-xl font-black text-foreground mt-0.5">
+                                {metrics.communityReserveKWh} <Text className="text-xs font-bold text-blue-500">kWh</Text>
+                            </Text>
+                            <Text className="text-[10px] text-muted-foreground mt-1">
+                                Ready for allocation
+                            </Text>
+                        </View>
+
+                        <View className="flex-1 rounded-2xl bg-purple-500/10 border border-purple-500/20 p-3">
+                            <Text className="text-[11px] font-bold text-purple-500 uppercase">
+                                Allocated
+                            </Text>
+                            <Text className="text-xl font-black text-foreground mt-0.5">
+                                {metrics.totalAllocatedKWh} <Text className="text-xs font-bold text-purple-500">kWh</Text>
+                            </Text>
+                            <Text className="text-[10px] text-muted-foreground mt-1">
+                                Dispatched to needs
+                            </Text>
+                        </View>
                     </View>
                 </View>
 
-                <View className='flex-row items-center bg-secondary/60 border border-border/60 rounded-full px-4 py-2.5 mb-4 shadow-sm'>
-                    <Feather name="search" size={18} color="#9CA3AF" />
-                    <TextInput
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        placeholder="Search Request..."
-                        placeholderTextColor="#9CA3AF"
-                        className='flex-1 ml-2.5 text-sm font-medium text-foreground py-0.5'
-                    />
-                    {searchQuery.length > 0 && (
-                        <Pressable onPress={() => setSearchQuery('')} className='p-1'>
-                            <Feather name="x" size={16} color="#9CA3AF" />
-                        </Pressable>
-                    )}
-                </View>
-
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ gap: 10 }}
-                    className='mb-5'
-                >
-                    <Pressable
-                        onPress={() => setSelectedFilter('all')}
-                        className={`px-5 py-2.5 rounded-full border ${selectedFilter === 'all'
-                            ? 'bg-primary border-primary shadow-sm'
-                            : 'bg-secondary/60 border-border/60 active:bg-secondary'
+                {/* 2. FILTER TABS */}
+                <View className="flex-row items-center justify-between bg-secondary/50 p-1.5 rounded-2xl border border-border/60 mb-5">
+                    {[
+                        { key: 'all', label: 'All', count: pendingOffers.length + pendingDemands.length },
+                        { key: 'offers', label: 'Solar Offers', count: pendingOffers.length },
+                        { key: 'demands', label: 'Demands', count: pendingDemands.length },
+                        { key: 'history', label: 'Dispatched', count: dispatchHistory.length },
+                    ].map((tab) => (
+                        <Pressable
+                            key={tab.key}
+                            onPress={() => setActiveFilter(tab.key as FilterType)}
+                            className={`flex-1 py-2 rounded-xl items-center flex-row justify-center ${
+                                activeFilter === tab.key
+                                    ? 'bg-primary shadow-sm'
+                                    : 'bg-transparent'
                             }`}
-                    >
-                        <Text
-                            className={`text-xs font-bold ${selectedFilter === 'all'
-                                ? 'text-primary-foreground'
-                                : 'text-muted-foreground'
-                                }`}
                         >
-                            All ({requests.length})
-                        </Text>
-                    </Pressable>
-
-                    <Pressable
-                        onPress={() => setSelectedFilter('pending')}
-                        className={`px-5 py-2.5 rounded-full border ${selectedFilter === 'pending'
-                            ? 'bg-primary border-primary shadow-sm'
-                            : 'bg-secondary/60 border-border/60 active:bg-secondary'
-                            }`}
-                    >
-                        <Text
-                            className={`text-xs font-bold ${selectedFilter === 'pending'
-                                ? 'text-primary-foreground'
-                                : 'text-muted-foreground'
+                            <Text
+                                className={`text-xs font-bold ${
+                                    activeFilter === tab.key
+                                        ? 'text-primary-foreground'
+                                        : 'text-muted-foreground'
                                 }`}
-                        >
-                            Pending ({pendingCount})
-                        </Text>
-                    </Pressable>
-
-                    <Pressable
-                        onPress={() => setSelectedFilter('approved')}
-                        className={`px-5 py-2.5 rounded-full border ${selectedFilter === 'approved'
-                            ? 'bg-primary border-primary shadow-sm'
-                            : 'bg-secondary/60 border-border/60 active:bg-secondary'
-                            }`}
-                    >
-                        <Text
-                            className={`text-xs font-bold ${selectedFilter === 'approved'
-                                ? 'text-primary-foreground'
-                                : 'text-muted-foreground'
-                                }`}
-                        >
-                            Approved ({approvedCount})
-                        </Text>
-                    </Pressable>
-
-                    <Pressable
-                        onPress={() => setSelectedFilter('rejected')}
-                        className={`px-5 py-2.5 rounded-full border ${selectedFilter === 'rejected'
-                            ? 'bg-primary border-primary shadow-sm'
-                            : 'bg-secondary/60 border-border/60 active:bg-secondary'
-                            }`}
-                    >
-                        <Text
-                            className={`text-xs font-bold ${selectedFilter === 'rejected'
-                                ? 'text-primary-foreground'
-                                : 'text-muted-foreground'
-                                }`}
-                        >
-                            Rejected ({rejectedCount})
-                        </Text>
-                    </Pressable>
-                </ScrollView>
-
-                <View className='flex-col gap-4'>
-                    {filteredRequests.map((item) => {
-                        const isPending = item.status === 'pending';
-                        const isApproved = item.status === 'approved';
-                        const isRejected = item.status === 'rejected';
-
-                        return (
-                            <View
-                                key={item.id}
-                                className='rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'
                             >
-                                <View className='flex-row items-center justify-between mb-3.5'>
-                                    <View className='flex-row items-center gap-2'>
-                                        <View className='h-8 w-8 items-center justify-center rounded-lg bg-card border border-border/50'>
-                                            <Feather name="home" size={15} color="#F59E0B" />
+                                {tab.label}
+                            </Text>
+                            {tab.count > 0 && (
+                                <View
+                                    className={`ml-1 px-1.5 py-0.2 rounded-full ${
+                                        activeFilter === tab.key
+                                            ? 'bg-primary-foreground/20'
+                                            : 'bg-primary/20'
+                                    }`}
+                                >
+                                    <Text
+                                        className={`text-[10px] font-black ${
+                                            activeFilter === tab.key
+                                                ? 'text-primary-foreground'
+                                                : 'text-primary'
+                                        }`}
+                                    >
+                                        {tab.count}
+                                    </Text>
+                                </View>
+                            )}
+                        </Pressable>
+                    ))}
+                </View>
+
+                {/* 3. SOLAR SHARE OFFERS (SUPPLY) */}
+                {(activeFilter === 'all' || activeFilter === 'offers') && (
+                    <View className="mb-6">
+                        <View className="flex-row items-center justify-between mb-3">
+                            <View className="flex-row items-center">
+                                <MaterialCommunityIcons name="solar-power" size={18} color="#F59E0B" />
+                                <Text className="text-sm font-black uppercase tracking-wider text-foreground ml-2">
+                                    Solar Share Offers ({solarOffers.length})
+                                </Text>
+                            </View>
+                            <Text className="text-xs text-amber-500 font-bold">
+                                {pendingOffers.length} Pending Approval
+                            </Text>
+                        </View>
+
+                        {solarOffers.map((offer) => (
+                            <View
+                                key={offer.id}
+                                className="rounded-2xl border border-border/80 bg-card p-4 mb-3 shadow-sm"
+                            >
+                                <View className="flex-row items-start justify-between mb-2">
+                                    <View className="flex-1 mr-2">
+                                        <View className="flex-row items-center">
+                                            <Text className="text-sm font-bold text-foreground">
+                                                {offer.solarOwnerName}
+                                            </Text>
+                                            <View className="ml-2 px-2 py-0.5 rounded-full bg-secondary">
+                                                <Text className="text-[10px] text-muted-foreground font-semibold">
+                                                    Battery: {offer.batteryLevelPercent}%
+                                                </Text>
+                                            </View>
                                         </View>
-                                        <Text className='text-base font-bold text-foreground'>
-                                            {item.household}
+                                        <Text className="text-xs text-muted-foreground mt-0.5">
+                                            {offer.solarOwnerAddress}
                                         </Text>
                                     </View>
 
+                                    {/* Status Badge */}
                                     <View
-                                        className={`px-3 py-1 rounded-full border ${isPending
-                                            ? 'bg-yellow-500/15 border-yellow-500/40'
-                                            : isApproved
-                                                ? 'bg-emerald-500/15 border-emerald-500/40'
-                                                : 'bg-red-500/15 border-red-500/40'
-                                            }`}
+                                        className={`px-2.5 py-1 rounded-xl ${
+                                            offer.status === 'pending_approval'
+                                                ? 'bg-amber-500/20 border border-amber-500/30'
+                                                : offer.status === 'approved'
+                                                ? 'bg-emerald-500/20 border border-emerald-500/30'
+                                                : offer.status === 'allocated'
+                                                ? 'bg-blue-500/20 border border-blue-500/30'
+                                                : 'bg-rose-500/20 border border-rose-500/30'
+                                        }`}
                                     >
                                         <Text
-                                            className={`text-[11px] font-bold capitalize ${isPending
-                                                ? 'text-[#F59E0B]'
-                                                : isApproved
-                                                    ? 'text-[#10B981]'
-                                                    : 'text-[#EF4444]'
-                                                }`}
+                                            className={`text-[10px] font-bold uppercase ${
+                                                offer.status === 'pending_approval'
+                                                    ? 'text-amber-500'
+                                                    : offer.status === 'approved'
+                                                    ? 'text-emerald-500'
+                                                    : offer.status === 'allocated'
+                                                    ? 'text-blue-500'
+                                                    : 'text-rose-500'
+                                            }`}
                                         >
-                                            {item.status}
+                                            {offer.status === 'pending_approval'
+                                                ? 'Pending Review'
+                                                : offer.status === 'approved'
+                                                ? 'In Reserve Pool'
+                                                : offer.status === 'allocated'
+                                                ? 'Allocated'
+                                                : 'Declined'}
                                         </Text>
                                     </View>
                                 </View>
 
-                                <View className='flex-row items-center justify-between rounded-xl bg-card/70 border border-border/30 p-3 mb-4'>
-                                    <View className='flex-1'>
-                                        <Text className='text-xs font-semibold text-muted-foreground'>
-                                            Current Usage
+                                {/* Pool Target & Energy Offer */}
+                                <View className="rounded-xl bg-secondary/60 p-2.5 my-2 flex-row items-center justify-between">
+                                    <View>
+                                        <Text className="text-[10px] uppercase font-bold text-muted-foreground">
+                                            Destination Pool
                                         </Text>
-                                        <Text className='text-lg font-extrabold text-foreground mt-0.5'>
-                                            {item.currentUsage} <Text className='text-xs font-bold text-muted-foreground'>kWh</Text>
+                                        <Text className="text-xs font-bold text-foreground">
+                                            {offer.destinationPool}
                                         </Text>
                                     </View>
-
-                                    {/* Divider */}
-                                    <View className='h-8 w-[1px] bg-border/60 mx-2' />
-
-                                    {/* Previous Allocation */}
-                                    <View className='flex-1 pl-2'>
-                                        <Text className='text-xs font-semibold text-muted-foreground'>
-                                            Previous Allocation
+                                    <View className="items-end">
+                                        <Text className="text-[10px] uppercase font-bold text-muted-foreground">
+                                            Offered Surplus
                                         </Text>
-                                        <Text className='text-lg font-extrabold text-foreground mt-0.5'>
-                                            {item.previousAllocation} <Text className='text-xs font-bold text-muted-foreground'>kWh</Text>
+                                        <Text className="text-sm font-black text-amber-500">
+                                            {offer.amountKWh} kWh (${offer.offeredRateUSDPerKWh}/kWh)
                                         </Text>
                                     </View>
                                 </View>
 
-                                {isPending ? (
-                                    <View className='flex-row gap-3 w-full'>
-                                        <Pressable
-                                            onPress={() => handleReview(item)}
-                                            className='flex-1 items-center justify-center rounded-xl bg-card border border-border/80 py-2.5 active:bg-secondary/70 shadow-sm'
-                                        >
-                                            <Text className='text-sm font-bold text-foreground'>
-                                                Review
-                                            </Text>
-                                        </Pressable>
+                                {offer.notes && (
+                                    <Text className="text-xs text-muted-foreground italic mb-3">
+                                        "{offer.notes}"
+                                    </Text>
+                                )}
 
+                                {/* Action Buttons */}
+                                {offer.status === 'pending_approval' && (
+                                    <View className="flex-row items-center gap-2 pt-2 border-t border-border/40">
                                         <Pressable
-                                            onPress={() => handleApprove(item.id, item.household)}
-                                            className='flex-1 items-center justify-center rounded-xl bg-primary border border-primary/40 py-2.5 active:opacity-80 shadow-sm'
+                                            onPress={() => approveOffer(offer.id)}
+                                            className="flex-1 py-2.5 rounded-xl bg-emerald-600 items-center active:opacity-80 flex-row justify-center"
                                         >
-                                            <Text className='text-sm font-bold text-primary-foreground'>
-                                                Approve
+                                            <Feather name="check" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                                            <Text className="text-xs font-black text-white">
+                                                Approve & Add to Pool
                                             </Text>
                                         </Pressable>
-                                    </View>
-                                ) : isApproved ? (
-                                    <View className='flex-row items-center justify-between pt-1'>
-                                        <View className='flex-row items-center gap-1.5'>
-                                            <Feather name="check-circle" size={14} color="#10B981" />
-                                            <Text className='text-xs font-semibold text-[#10B981]'>
-                                                Allocation approved ({item.requestedAmount} kWh)
-                                            </Text>
-                                        </View>
                                         <Pressable
-                                            onPress={() => handleReview(item)}
-                                            className='px-3 py-1 rounded-lg bg-card border border-border/50 active:bg-secondary'
+                                            onPress={() => rejectOffer(offer.id)}
+                                            className="px-3 py-2.5 rounded-xl bg-secondary border border-border/80 items-center active:opacity-80"
                                         >
-                                            <Text className='text-xs font-bold text-foreground'>
-                                                Details
-                                            </Text>
-                                        </Pressable>
-                                    </View>
-                                ) : (
-                                    <View className='flex-row items-center justify-between pt-1'>
-                                        <View className='flex-row items-center gap-1.5'>
-                                            <Feather name="x-circle" size={14} color="#EF4444" />
-                                            <Text className='text-xs font-semibold text-[#EF4444]'>
-                                                Request rejected
-                                            </Text>
-                                        </View>
-                                        <Pressable
-                                            onPress={() => handleApprove(item.id, item.household)}
-                                            className='px-3 py-1 rounded-lg bg-primary/20 border border-primary/40 active:opacity-75'
-                                        >
-                                            <Text className='text-xs font-bold text-foreground'>
-                                                Reconsider
-                                            </Text>
+                                            <Feather name="x" size={14} color="#EF4444" />
                                         </Pressable>
                                     </View>
                                 )}
                             </View>
-                        );
-                    })}
+                        ))}
+                    </View>
+                )}
 
-                    {filteredRequests.length === 0 && (
-                        <View className='items-center justify-center py-12 px-4'>
-                            <View className='h-14 w-14 items-center justify-center rounded-full bg-secondary/80 border border-border/60 mb-3'>
-                                <Feather name="inbox" size={24} color="#9CA3AF" />
+                {/* 4. HOUSEHOLD DEMANDS (DEMAND) */}
+                {(activeFilter === 'all' || activeFilter === 'demands') && (
+                    <View className="mb-6">
+                        <View className="flex-row items-center justify-between mb-3">
+                            <View className="flex-row items-center">
+                                <MaterialCommunityIcons name="home-lightning-bolt" size={18} color="#3B82F6" />
+                                <Text className="text-sm font-black uppercase tracking-wider text-foreground ml-2">
+                                    Community Energy Demands ({householdRequests.length})
+                                </Text>
                             </View>
-                            <Text className='text-base font-bold text-foreground'>
-                                No requests found
-                            </Text>
-                            <Text className='text-xs text-muted-foreground text-center mt-1'>
-                                {searchQuery
-                                    ? `No requests match "${searchQuery}"`
-                                    : 'There are currently no requests in this category.'}
+                            <Text className="text-xs text-blue-500 font-bold">
+                                {pendingDemands.length} Pending Dispatch
                             </Text>
                         </View>
-                    )}
-                </View>
+
+                        {householdRequests.map((demand) => (
+                            <View
+                                key={demand.id}
+                                className={`rounded-2xl border bg-card p-4 mb-3 shadow-sm ${
+                                    demand.urgency === 'critical'
+                                        ? 'border-rose-500/60 bg-rose-500/5'
+                                        : 'border-border/80'
+                                }`}
+                            >
+                                <View className="flex-row items-start justify-between mb-2">
+                                    <View className="flex-1 mr-2">
+                                        <View className="flex-row items-center">
+                                            <Text className="text-sm font-bold text-foreground">
+                                                {demand.requesterName}
+                                            </Text>
+                                            {demand.urgency === 'critical' && (
+                                                <View className="ml-2 px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40">
+                                                    <Text className="text-[10px] text-rose-500 font-black uppercase">
+                                                        Critical Medical
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                        <Text className="text-xs text-muted-foreground mt-0.5">
+                                            {demand.requesterAddress}
+                                        </Text>
+                                    </View>
+
+                                    <View
+                                        className={`px-2.5 py-1 rounded-xl ${
+                                            demand.status === 'pending'
+                                                ? 'bg-amber-500/20 border border-amber-500/30'
+                                                : demand.status === 'dispatched'
+                                                ? 'bg-emerald-500/20 border border-emerald-500/30'
+                                                : 'bg-slate-500/20'
+                                        }`}
+                                    >
+                                        <Text
+                                            className={`text-[10px] font-bold uppercase ${
+                                                demand.status === 'pending'
+                                                    ? 'text-amber-500'
+                                                    : demand.status === 'dispatched'
+                                                    ? 'text-emerald-500'
+                                                    : 'text-slate-400'
+                                            }`}
+                                        >
+                                            {demand.status === 'pending' ? 'Needs Solar' : 'Dispatched ✓'}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <Text className="text-xs font-semibold text-foreground/80 mb-2">
+                                    Purpose: {demand.purpose}
+                                </Text>
+
+                                <View className="rounded-xl bg-secondary/60 p-2.5 my-1 flex-row items-center justify-between">
+                                    <Text className="text-xs font-bold text-muted-foreground">
+                                        Requested Amount:
+                                    </Text>
+                                    <Text className="text-sm font-black text-blue-500">
+                                        {demand.amountKWh} kWh (${demand.offeredRateUSDPerKWh}/kWh)
+                                    </Text>
+                                </View>
+
+                                {/* Dispatch Action */}
+                                {demand.status === 'pending' && (
+                                    <View className="flex-row items-center gap-2 pt-3 border-t border-border/40 mt-2">
+                                        <Pressable
+                                            onPress={() => setSelectedDemandForDispatch(demand)}
+                                            className="flex-1 py-2.5 rounded-xl bg-primary items-center active:opacity-90 flex-row justify-center shadow-sm"
+                                        >
+                                            <MaterialCommunityIcons name="lightning-bolt" size={16} color="#1E293B" style={{ marginRight: 6 }} />
+                                            <Text className="text-xs font-black text-primary-foreground">
+                                                Match & Dispatch Solar
+                                            </Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={() => rejectHouseholdRequest(demand.id)}
+                                            className="px-3 py-2.5 rounded-xl bg-secondary border border-border/80 items-center active:opacity-80"
+                                        >
+                                            <Feather name="x" size={14} color="#EF4444" />
+                                        </Pressable>
+                                    </View>
+                                )}
+                            </View>
+                        ))}
+                    </View>
+                )}
+
+                {/* 5. RECENT DISPATCH AUDIT LOG */}
+                {(activeFilter === 'all' || activeFilter === 'history') && (
+                    <View className="mb-6">
+                        <View className="flex-row items-center justify-between mb-3">
+                            <View className="flex-row items-center">
+                                <Feather name="activity" size={18} color="#10B981" />
+                                <Text className="text-sm font-black uppercase tracking-wider text-foreground ml-2">
+                                    Manager Dispatch Ledger ({dispatchHistory.length})
+                                </Text>
+                            </View>
+                        </View>
+
+                        {dispatchHistory.map((record) => (
+                            <View
+                                key={record.id}
+                                className="rounded-2xl border border-border/70 bg-card p-3.5 mb-2.5 flex-row items-center justify-between shadow-sm"
+                            >
+                                <View className="flex-row items-center flex-1 mr-2">
+                                    <View className="h-9 w-9 rounded-xl bg-emerald-500/10 items-center justify-center mr-3 border border-emerald-500/20">
+                                        <Feather name="check" size={16} color="#10B981" />
+                                    </View>
+                                    <View className="flex-1">
+                                        <Text className="text-xs font-bold text-foreground">
+                                            {record.sourceName} ➔ {record.recipientName}
+                                        </Text>
+                                        <Text className="text-[10px] text-muted-foreground">
+                                            {record.poolType} • {record.date} at {record.timestamp}
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View className="items-end">
+                                    <Text className="text-xs font-black text-emerald-500">
+                                        {record.amountKWh} kWh
+                                    </Text>
+                                    <Text className="text-[10px] font-semibold text-muted-foreground">
+                                        +${record.totalAmountUSD.toFixed(2)}
+                                    </Text>
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+                )}
             </ScrollView>
+
+            {/* DISPATCH SELECTION MODAL */}
+            {selectedDemandForDispatch && (
+                <Modal visible={true} transparent animationType="slide">
+                    <View className="flex-1 bg-black/60 justify-end">
+                        <View className="bg-card rounded-t-[36px] border-t border-border p-6 shadow-2xl">
+                            <View className="flex-row items-center justify-between mb-4">
+                                <View>
+                                    <Text className="text-lg font-black text-foreground">
+                                        Dispatch Solar Energy
+                                    </Text>
+                                    <Text className="text-xs text-muted-foreground">
+                                        Fulfilling {selectedDemandForDispatch.amountKWh} kWh for {selectedDemandForDispatch.requesterName}
+                                    </Text>
+                                </View>
+                                <Pressable
+                                    onPress={() => setSelectedDemandForDispatch(null)}
+                                    className="h-8 w-8 rounded-full bg-secondary items-center justify-center"
+                                >
+                                    <Feather name="x" size={18} color="#9CA3AF" />
+                                </Pressable>
+                            </View>
+
+                            <Text className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
+                                Select Power Source
+                            </Text>
+
+                            {/* Quick Option 1: Community Reserve */}
+                            <Pressable
+                                onPress={() => handleQuickDispatch(selectedDemandForDispatch)}
+                                className="rounded-2xl border-2 border-primary/50 bg-primary/10 p-3.5 mb-3 active:opacity-90"
+                            >
+                                <View className="flex-row items-center justify-between">
+                                    <View className="flex-row items-center">
+                                        <MaterialCommunityIcons name="battery-charging-high" size={20} color="#F59E0B" />
+                                        <View className="ml-2">
+                                            <Text className="text-xs font-black text-foreground">
+                                                Co-Op Community Reserve Pool
+                                            </Text>
+                                            <Text className="text-[10px] text-muted-foreground">
+                                                Available: {metrics.communityReserveKWh} kWh
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <Text className="text-xs font-bold text-primary">
+                                        Instant Dispatch ➔
+                                    </Text>
+                                </View>
+                            </Pressable>
+
+                            {/* Option 2: Specific Available Solar Offers */}
+                            <Text className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                                Or Match Direct Solar Offer:
+                            </Text>
+
+                            <ScrollView style={{ maxHeight: 180 }} className="mb-4">
+                                {solarOffers
+                                    .filter((o) => o.status === 'approved' || o.status === 'pending_approval')
+                                    .map((offer) => (
+                                        <Pressable
+                                            key={offer.id}
+                                            onPress={() =>
+                                                handleOfferBasedDispatch(selectedDemandForDispatch.id, offer.id)
+                                            }
+                                            className="rounded-xl border border-border/80 bg-secondary/50 p-3 mb-2 active:opacity-80 flex-row items-center justify-between"
+                                        >
+                                            <View className="flex-1 mr-2">
+                                                <Text className="text-xs font-bold text-foreground">
+                                                    {offer.solarOwnerName}
+                                                </Text>
+                                                <Text className="text-[10px] text-muted-foreground">
+                                                    {offer.destinationPool} • Battery: {offer.batteryLevelPercent}%
+                                                </Text>
+                                            </View>
+                                            <View className="items-end">
+                                                <Text className="text-xs font-black text-amber-500">
+                                                    {offer.amountKWh} kWh
+                                                </Text>
+                                                <Text className="text-[10px] text-emerald-500 font-bold">
+                                                    Select ➔
+                                                </Text>
+                                            </View>
+                                        </Pressable>
+                                    ))}
+                            </ScrollView>
+
+                            <Pressable
+                                onPress={() => setSelectedDemandForDispatch(null)}
+                                className="w-full py-3.5 rounded-2xl bg-secondary items-center justify-center"
+                            >
+                                <Text className="text-xs font-bold text-muted-foreground">
+                                    Cancel
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </Modal>
+            )}
         </View>
     );
 };
