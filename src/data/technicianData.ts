@@ -263,3 +263,80 @@ export const faultDetails: FaultDetail[] = [
             'Perform a battery health inspection and check charging cycles, temperature and connection status.',
     },
 ];
+
+export type SystemHealthStatus =
+    | 'Normal'
+    | 'Warning'
+    | 'Critical'
+    | 'Maintenance';
+
+export interface TechnicianSystem {
+    id: string;
+    requestId?: string;
+    systemName: string;
+    location: string;
+    currentGeneration: number;
+    expectedGeneration: number;
+    performance: number;
+    equipmentStatus: string;
+    status: SystemHealthStatus;
+    lastUpdated: string;
+}
+
+export const technicianEnergySummary = {
+    totalGeneration: 12.7,
+    expectedGeneration: 16.2,
+    averagePerformance: 78,
+    onlineSystems: 4,
+};
+
+export const technicianSystems: TechnicianSystem[] = [
+    {
+        id: 'SYS-001',
+        requestId: 'SR-001',
+        systemName: 'Sunny Valley Solar',
+        location: 'Kandy',
+        currentGeneration: 1.8,
+        expectedGeneration: 4.2,
+        performance: 43,
+        equipmentStatus: 'Inverter Fault',
+        status: 'Critical',
+        lastUpdated: '2 min ago',
+    },
+    {
+        id: 'SYS-002',
+        requestId: 'SR-002',
+        systemName: 'EcoGrid Community',
+        location: 'Peradeniya',
+        currentGeneration: 2.6,
+        expectedGeneration: 4.0,
+        performance: 65,
+        equipmentStatus: 'Low Panel Output',
+        status: 'Warning',
+        lastUpdated: '4 min ago',
+    },
+    {
+        id: 'SYS-003',
+        requestId: 'SR-003',
+        systemName: 'GreenHome Solar',
+        location: 'Katugastota',
+        currentGeneration: 4.1,
+        expectedGeneration: 4.0,
+        performance: 100,
+        equipmentStatus: 'All Equipment Normal',
+        status: 'Normal',
+        lastUpdated: '1 min ago',
+    },
+    {
+        id: 'SYS-004',
+        requestId: 'SR-004',
+        systemName: 'LakeView Solar',
+        location: 'Kundasale',
+        currentGeneration: 4.2,
+        expectedGeneration: 4.0,
+        performance: 96,
+        equipmentStatus: 'Battery Inspection Due',
+        status: 'Maintenance',
+        lastUpdated: '5 min ago',
+    },
+];
