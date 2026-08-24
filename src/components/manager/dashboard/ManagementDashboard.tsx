@@ -14,7 +14,7 @@ const ManagementDashboard = () => {
             <TabScreenBackground />
             <ScrollView
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ flexGrow: 1, padding: 20 }}
+                contentContainerStyle={{ flexGrow: 1, padding: 20, paddingTop: 60 }}
                 className='flex-1'
             >
                 <View className='flex-row items-center justify-between mb-6'>
