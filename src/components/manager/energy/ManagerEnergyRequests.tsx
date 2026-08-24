@@ -159,20 +159,30 @@ const ManagerEnergyRequests = () => {
                 <View className='flex-row gap-3 mb-5 w-full'>
                     {/* Pending Requests */}
                     <View className='flex-1 flex-col justify-between rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'>
-                        <Text className='text-3xl font-extrabold text-foreground'>
-                            {pendingCount}
-                        </Text>
-                        <Text className='text-xs font-semibold text-muted-foreground mt-1'>
+                        <View className='flex-row items-center justify-between'>
+                            <Text className='text-3xl font-extrabold text-foreground'>
+                                {pendingCount}
+                            </Text>
+                            <View className='h-8 w-8 items-center justify-center rounded-lg bg-yellow-500/15 border border-yellow-500/30'>
+                                <Feather name="clock" size={16} color="#F59E0B" />
+                            </View>
+                        </View>
+                        <Text className='text-xs font-semibold text-muted-foreground mt-2'>
                             Pending Requests
                         </Text>
                     </View>
 
                     {/* Available Energy */}
                     <View className='flex-1 flex-col justify-between rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'>
-                        <Text className='text-3xl font-extrabold text-foreground'>
-                            {availableEnergy} <Text className='text-base font-bold text-muted-foreground'>kWh</Text>
-                        </Text>
-                        <Text className='text-xs font-semibold text-muted-foreground mt-1'>
+                        <View className='flex-row items-center justify-between'>
+                            <Text className='text-3xl font-extrabold text-foreground'>
+                                {availableEnergy} <Text className='text-base font-bold text-muted-foreground'>kWh</Text>
+                            </Text>
+                            <View className='h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 border border-emerald-500/30'>
+                                <Feather name="zap" size={16} color="#10B981" />
+                            </View>
+                        </View>
+                        <Text className='text-xs font-semibold text-muted-foreground mt-2'>
                             Available Energy
                         </Text>
                     </View>

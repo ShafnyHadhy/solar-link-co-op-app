@@ -130,30 +130,45 @@ const ManagerMembers = () => {
                 <View className='flex-row gap-3 mb-5 w-full'>
                     {/* Total Members */}
                     <View className='flex-1 flex-col justify-between rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'>
-                        <Text className='text-3xl font-extrabold text-foreground'>
-                            {analytics.totalMembers}
-                        </Text>
-                        <Text className='text-xs font-semibold text-muted-foreground mt-1'>
+                        <View className='flex-row items-center justify-between'>
+                            <Text className='text-3xl font-extrabold text-foreground'>
+                                {analytics.totalMembers}
+                            </Text>
+                            <View className='h-8 w-8 items-center justify-center rounded-lg bg-yellow-500/15 border border-yellow-500/30'>
+                                <Feather name="users" size={16} color="#F59E0B" />
+                            </View>
+                        </View>
+                        <Text className='text-xs font-semibold text-muted-foreground mt-2'>
                             Total Members
                         </Text>
                     </View>
 
                     {/* Active Members */}
                     <View className='flex-1 flex-col justify-between rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'>
-                        <Text className='text-3xl font-extrabold text-foreground'>
-                            {analytics.activeMembers}
-                        </Text>
-                        <Text className='text-xs font-semibold text-muted-foreground mt-1'>
+                        <View className='flex-row items-center justify-between'>
+                            <Text className='text-3xl font-extrabold text-foreground'>
+                                {analytics.activeMembers}
+                            </Text>
+                            <View className='h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 border border-emerald-500/30'>
+                                <Feather name="zap" size={16} color="#10B981" />
+                            </View>
+                        </View>
+                        <Text className='text-xs font-semibold text-muted-foreground mt-2'>
                             Active Co-op
                         </Text>
                     </View>
 
                     {/* Pending Members */}
                     <View className='flex-1 flex-col justify-between rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'>
-                        <Text className='text-3xl font-extrabold text-foreground'>
-                            {analytics.pendingMembers}
-                        </Text>
-                        <Text className='text-xs font-semibold text-muted-foreground mt-1'>
+                        <View className='flex-row items-center justify-between'>
+                            <Text className='text-3xl font-extrabold text-foreground'>
+                                {analytics.pendingMembers}
+                            </Text>
+                            <View className='h-8 w-8 items-center justify-center rounded-lg bg-yellow-500/15 border border-yellow-500/30'>
+                                <Feather name="clock" size={16} color="#F59E0B" />
+                            </View>
+                        </View>
+                        <Text className='text-xs font-semibold text-muted-foreground mt-2'>
                             Pending Roles
                         </Text>
                     </View>
