@@ -8,22 +8,22 @@ export const BatteryCard = () => {
 
     return (
         <View className="rounded-[28px] border border-border/70 bg-card/85 dark:bg-card/50 p-5 mb-5 shadow-sm">
-            <View className="flex-row items-center justify-between mb-3">
-                <View className="flex-row items-center">
-                    <View className="h-9 w-9 rounded-xl bg-emerald-500/20 items-center justify-center mr-2.5 border border-emerald-500/30">
+            <View className="flex-row items-center justify-between mb-3 gap-2">
+                <View className="flex-row items-center flex-1 mr-2">
+                    <View className="h-9 w-9 rounded-xl bg-emerald-500/20 items-center justify-center mr-2.5 border border-emerald-500/30 flex-shrink-0">
                         <MaterialCommunityIcons name="battery-high" size={22} color="#10B981" />
                     </View>
-                    <View>
-                        <Text className="text-base font-bold text-foreground">
+                    <View className="flex-1">
+                        <Text className="text-base font-bold text-foreground" numberOfLines={1}>
                             Home Battery Storage
                         </Text>
-                        <Text className="text-xs text-muted-foreground font-medium">
+                        <Text className="text-xs text-muted-foreground font-medium" numberOfLines={1}>
                             10 kWh Lithium Iron Phosphate (LFP)
                         </Text>
                     </View>
                 </View>
 
-                <View className="bg-emerald-500/20 px-2.5 py-1 rounded-full border border-emerald-500/40">
+                <View className="bg-emerald-500/20 px-2.5 py-1 rounded-full border border-emerald-500/40 flex-shrink-0">
                     <Text className="text-xs font-black text-emerald-500">
                         {battery.percentage}% Charged
                     </Text>

@@ -2,11 +2,13 @@ import TabScreenBackground from '@/components/shared/TabScreenBackground';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SolarToast } from '../shared/SolarToast';
 import { ViewHeader } from '../shared/ViewHeader';
 import { useSolarOwnerStore } from '../store/useSolarOwnerStore';
 
 export const SolarOwnerEnergy = () => {
+    const insets = useSafeAreaInsets();
     const { metrics, battery, weather, suggestions, monthlyReports, showToast } = useSolarOwnerStore();
     const [timeframe, setTimeframe] = useState<'today' | 'week' | 'month'>('today');
 
@@ -45,7 +47,11 @@ export const SolarOwnerEnergy = () => {
             <ScrollView
                 className="flex-1"
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}
+                contentContainerStyle={{
+                    paddingHorizontal: 20,
+                    paddingTop: insets.top > 0 ? insets.top + 10 : 24,
+                    paddingBottom: 40,
+                }}
             >
                 {/* Header */}
                 <ViewHeader
@@ -59,86 +65,86 @@ export const SolarOwnerEnergy = () => {
                 />
 
                 {/* 1. REAL-TIME MONITORING 4-STAT GRID */}
-                <View className="flex-row flex-wrap justify-between gap-3 mb-5">
+                <View className="flex-row flex-wrap justify-between gap-2.5 mb-5">
                     {/* Real-Time Generation */}
                     <View className="w-[48%] rounded-2xl border border-amber-500/30 bg-card/85 p-3.5 shadow-sm">
                         <View className="flex-row items-center justify-between mb-1">
-                            <Text className="text-[11px] font-bold text-muted-foreground uppercase">
+                            <Text className="text-[11px] font-bold text-muted-foreground uppercase" numberOfLines={1}>
                                 Current Gen
                             </Text>
                             <Feather name="sun" size={14} color="#F59E0B" />
                         </View>
-                        <Text className="text-2xl font-black text-foreground">
-                            {metrics.generationKW.toFixed(1)} <Text className="text-xs text-amber-500">kW</Text>
+                        <Text className="text-2xl font-black text-foreground" numberOfLines={1}>
+                            {metrics.generationKW.toFixed(1)} <Text className="text-xs font-bold text-amber-500">kW</Text>
                         </Text>
-                        <Text className="text-[10px] text-muted-foreground mt-0.5">
-                            {metrics.dailyGenerationKWh.toFixed(1)} kWh produced today
+                        <Text className="text-[10px] text-muted-foreground mt-0.5" numberOfLines={1}>
+                            {metrics.dailyGenerationKWh.toFixed(1)} kWh today
                         </Text>
                     </View>
 
                     {/* Real-Time Consumption */}
                     <View className="w-[48%] rounded-2xl border border-sky-500/30 bg-card/85 p-3.5 shadow-sm">
                         <View className="flex-row items-center justify-between mb-1">
-                            <Text className="text-[11px] font-bold text-muted-foreground uppercase">
+                            <Text className="text-[11px] font-bold text-muted-foreground uppercase" numberOfLines={1}>
                                 Current Usage
                             </Text>
                             <Feather name="home" size={14} color="#0EA5E9" />
                         </View>
-                        <Text className="text-2xl font-black text-foreground">
-                            {metrics.consumptionKW.toFixed(1)} <Text className="text-xs text-sky-500">kW</Text>
+                        <Text className="text-2xl font-black text-foreground" numberOfLines={1}>
+                            {metrics.consumptionKW.toFixed(1)} <Text className="text-xs font-bold text-sky-500">kW</Text>
                         </Text>
-                        <Text className="text-[10px] text-muted-foreground mt-0.5">
-                            {metrics.dailyConsumptionKWh.toFixed(1)} kWh used today
+                        <Text className="text-[10px] text-muted-foreground mt-0.5" numberOfLines={1}>
+                            {metrics.dailyConsumptionKWh.toFixed(1)} kWh today
                         </Text>
                     </View>
 
                     {/* Current Excess Energy */}
                     <View className="w-[48%] rounded-2xl border border-purple-500/30 bg-card/85 p-3.5 shadow-sm">
                         <View className="flex-row items-center justify-between mb-1">
-                            <Text className="text-[11px] font-bold text-muted-foreground uppercase">
+                            <Text className="text-[11px] font-bold text-muted-foreground uppercase" numberOfLines={1}>
                                 Excess Energy
                             </Text>
                             <MaterialCommunityIcons name="lightning-bolt" size={14} color="#A855F7" />
                         </View>
-                        <Text className="text-2xl font-black text-foreground">
-                            {metrics.excessKW.toFixed(1)} <Text className="text-xs text-purple-500">kW</Text>
+                        <Text className="text-2xl font-black text-foreground" numberOfLines={1}>
+                            {metrics.excessKW.toFixed(1)} <Text className="text-xs font-bold text-purple-500">kW</Text>
                         </Text>
-                        <Text className="text-[10px] text-muted-foreground mt-0.5">
-                            {metrics.dailyExcessKWh.toFixed(1)} kWh available surplus
+                        <Text className="text-[10px] text-muted-foreground mt-0.5" numberOfLines={1}>
+                            {metrics.dailyExcessKWh.toFixed(1)} kWh surplus
                         </Text>
                     </View>
 
                     {/* Battery Status */}
                     <View className="w-[48%] rounded-2xl border border-emerald-500/30 bg-card/85 p-3.5 shadow-sm">
                         <View className="flex-row items-center justify-between mb-1">
-                            <Text className="text-[11px] font-bold text-muted-foreground uppercase">
+                            <Text className="text-[11px] font-bold text-muted-foreground uppercase" numberOfLines={1}>
                                 Battery
                             </Text>
                             <Feather name="battery-charging" size={14} color="#10B981" />
                         </View>
-                        <Text className="text-2xl font-black text-foreground">
+                        <Text className="text-2xl font-black text-foreground" numberOfLines={1}>
                             {battery.percentage}%
                         </Text>
-                        <Text className="text-[10px] text-emerald-500 mt-0.5">
-                            +{metrics.batteryPowerKW.toFixed(1)} kW charging
+                        <Text className="text-[10px] text-emerald-500 mt-0.5" numberOfLines={1}>
+                            +{metrics.batteryPowerKW.toFixed(1)} kW chg
                         </Text>
                     </View>
                 </View>
 
                 {/* 2. ANALYTICS: GENERATION VS CONSUMPTION GRAPH */}
                 <View className="rounded-[28px] border border-border/70 bg-card/85 dark:bg-card/50 p-5 mb-5 shadow-sm">
-                    <View className="flex-row items-center justify-between mb-4">
-                        <View>
-                            <Text className="text-base font-bold text-foreground">
+                    <View className="flex-row items-center justify-between mb-4 gap-2">
+                        <View className="flex-1 mr-2 min-w-0">
+                            <Text className="text-base font-bold text-foreground" numberOfLines={1}>
                                 Generation vs Consumption
                             </Text>
-                            <Text className="text-xs text-muted-foreground font-medium">
+                            <Text className="text-xs text-muted-foreground font-medium" numberOfLines={1}>
                                 Comparative energy performance curve
                             </Text>
                         </View>
 
                         {/* Timeframe Toggle */}
-                        <View className="flex-row bg-secondary rounded-xl p-1 border border-border/60">
+                        <View className="flex-row bg-secondary rounded-xl p-1 border border-border/60 flex-shrink-0">
                             {(['today', 'week', 'month'] as const).map((tab) => (
                                 <Pressable
                                     key={tab}

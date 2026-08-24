@@ -491,7 +491,7 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
         const earned = +(amountKWh * 0.14).toFixed(2);
         const newTx: SharingHistoryRecord = {
             id: `tx-${Date.now().toString().slice(-4)}`,
-            recipientName: poolType,
+            recipientName: `${poolType} (via Co-Op Manager)`,
             amountKWh: amountKWh,
             creditsEarnedUSD: earned,
             co2SavedKg: +(amountKWh * 0.75).toFixed(1),
@@ -511,8 +511,18 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
             sharingHistory: [newTx, ...get().sharingHistory],
         });
 
+        // Submit to Manager store if available
+        try {
+            const { useManagerStore } = require('../../manager/store/useManagerStore');
+            if (useManagerStore?.getState()?.submitSolarOffer) {
+                useManagerStore.getState().submitSolarOffer(amountKWh, poolType, 'Agash Jeeva (Solar Roof #12)');
+            }
+        } catch (e) {
+            // Ignore if manager store not loaded
+        }
+
         get().showToast(
-            `Shared ${amountKWh} kWh with ${poolType}! (+$${earned.toFixed(2)})`,
+            `Submitted ${amountKWh} kWh to Co-Op Manager for ${poolType} allocation! (+$${earned.toFixed(2)})`,
             'success'
         );
         return true;
