@@ -51,10 +51,10 @@ export default function TabsLayout() {
             {role === "solar_owner" && <NativeTabs.Trigger name="share">
                 <NativeTabs.Trigger.Icon
                     sf={{
-                        default: "exclamationmark.triangle",
-                        selected: "exclamationmark.triangle.fill",
+                        default: "arrow.up.right.circle",
+                        selected: "arrow.up.right.circle.fill",
                     }}
-                    md="add"
+                    md="share"
                 />
                 <NativeTabs.Trigger.Label>Share</NativeTabs.Trigger.Label>
             </NativeTabs.Trigger>}
