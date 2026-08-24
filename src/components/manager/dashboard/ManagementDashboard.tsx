@@ -30,7 +30,7 @@ const ManagementDashboard = () => {
                     </View>
                 </View>
 
-                <View className='flex-col items-start gap-2 rounded-xl border border-border/30 bg-secondary/60 p-4'>
+                <View className='flex-col items-start gap-2 rounded-xl border border-border/30 bg-secondary/60 p-4 shadow-sm'>
                     <Text className='text-sm font-semibold text-muted-foreground'>
                         Available Community Energy
                     </Text>
@@ -50,7 +50,7 @@ const ManagementDashboard = () => {
                 </View>
 
                 <View className='flex-row gap-4 my-4 w-full'>
-                    <View className='flex-1 flex-col gap-2 rounded-lg border border-border/30 bg-secondary/60 p-4'>
+                    <View className='flex-1 flex-col gap-2 rounded-lg border border-border/30 bg-secondary/60 p-4 shadow-sm'>
                         <View className='flex-row items-center justify-between'>
                             <View className='flex-row items-center gap-1.5'>
                                 <Feather name="sun" size={14} color="#10B981" />
@@ -69,7 +69,7 @@ const ManagementDashboard = () => {
                             </Text>
                         </View>
                     </View>
-                    <View className='flex-1 flex-col gap-2 rounded-lg border border-border/30 bg-secondary/60 p-4'>
+                    <View className='flex-1 flex-col gap-2 rounded-lg border border-border/30 bg-secondary/60 p-4 shadow-sm'>
                         <View className='flex-row items-center justify-between'>
                             <View className='flex-row items-center gap-1.5'>
                                 <Feather name="zap" size={14} color="#EF4444" />
@@ -90,7 +90,7 @@ const ManagementDashboard = () => {
                     </View>
                 </View>
 
-                <View className='flex-row items-center justify-between gap-4 p-4 bg-secondary/60 rounded-xl'>
+                <View className='flex-row items-center justify-between gap-4 p-4 bg-secondary/60 rounded-xl shadow-sm'>
                     <View className='flex-col gap-1'>
                         <Text className='text-lg font-semibold text-foreground'>
                             3 requests
@@ -114,8 +114,8 @@ const ManagementDashboard = () => {
                     </Text>
                 </View>
 
-                <View className="flex-col gap-4 mt-4 p-4 border border-border rounded-2xl">
-                    <Pressable className="flex-row items-center gap-4 p-4 bg-secondary/60 rounded-xl border border-border active:opacity-70">
+                <View className="flex-col gap-4 mt-4 p-4 border border-border rounded-2xl shadow-sm">
+                    <Pressable className="flex-row items-center gap-4 p-4 bg-secondary/60 rounded-xl border border-border active:opacity-70 shadow-sm">
                         <View className="h-12 w-12 items-center justify-center rounded-full bg-red-500/15 border border-red-500">
                             <Feather name="alert-triangle" size={20} color="#EF4444" />
                         </View>
@@ -130,7 +130,7 @@ const ManagementDashboard = () => {
                         <Feather name="chevron-right" size={20} color="#9CA3AF" />
                     </Pressable>
 
-                    <Pressable className="flex-row items-center gap-4 p-4 bg-secondary/60 rounded-xl border border-border active:opacity-70">
+                    <Pressable className="flex-row items-center gap-4 p-4 bg-secondary/60 rounded-xl border border-border active:opacity-70 shadow-sm">
                         <View className="h-12 w-12 items-center justify-center rounded-full bg-red-500/15 border border-red-500">
                             <Feather name="alert-triangle" size={20} color="#EF4444" />
                         </View>
@@ -145,7 +145,7 @@ const ManagementDashboard = () => {
                         <Feather name="chevron-right" size={20} color="#9CA3AF" />
                     </Pressable>
 
-                    <Pressable className="flex-row items-center gap-4 p-4 bg-secondary/60 rounded-xl border border-border active:opacity-70">
+                    <Pressable className="flex-row items-center gap-4 p-4 bg-secondary/60 rounded-xl border border-border active:opacity-70 shadow-sm">
                         <View className="h-12 w-12 items-center justify-center rounded-full bg-yellow-500/15 border border-yellow-500">
                             <Feather name="alert-triangle" size={20} color="#F59E0B" />
                         </View>
@@ -170,7 +170,7 @@ const ManagementDashboard = () => {
 
                 <View className="flex-row gap-4 mt-4 w-full">
 
-                    <View className="flex-1 flex-col gap-3 p-4 bg-secondary/60 rounded-xl border border-border/30">
+                    <View className="flex-1 flex-col gap-3 p-4 bg-secondary/60 rounded-xl border border-border/30 shadow-sm">
                         <View className="flex-row items-center justify-between">
                             <View className="flex-row items-center gap-2">
                                 <Feather name="battery-charging" size={16} color="#10B981" />
@@ -187,7 +187,7 @@ const ManagementDashboard = () => {
                         </View>
                     </View>
 
-                    <View className="flex-1 flex-col gap-3 p-4 bg-secondary/60 rounded-xl border border-border/30">
+                    <View className="flex-1 flex-col gap-3 p-4 bg-secondary/60 rounded-xl border border-border/30 shadow-sm">
                         <View className="flex-row items-center justify-between">
                             <View className="flex-row items-center gap-2">
                                 <Feather name="battery" size={16} color="#F59E0B" />
