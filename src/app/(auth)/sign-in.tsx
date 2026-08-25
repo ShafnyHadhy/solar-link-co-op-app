@@ -31,67 +31,63 @@ export default function SignInScreen() {
                 bounces={false}
                 className="flex-1"
             >
-                {/* ===== TOP SECTION: brand + hero + headline ===== */}
+                {/* ===== TOP SECTION: Minimalist CleanTech Brand & Hero ===== */}
                 <View className="px-6 pt-4">
-
-                    {/* Icon-based hero, replaces the old stock photo */}
-                    <View className="mt-8 items-center">
-                        <View className="h-28 w-28 items-center justify-center rounded-full bg-accent">
-                            <View className="h-20 w-20 items-center justify-center rounded-full bg-primary">
-                                <Feather name="sun" size={36} color={isDark ? "#1D1816" : "#231D1A"} />
+                    {/* Minimalist Brand Mark & Live Badge */}
+                    <View className="flex-row items-center justify-between">
+                        <View className="flex-row items-center gap-3">
+                            <View className="h-12 w-12 items-center justify-center rounded-2xl bg-primary shadow-md shadow-primary/30">
+                                <Feather name="sun" size={24} color={isDark ? "#1D1816" : "#231D1A"} />
                             </View>
-                        </View>
-
-                        {/* Stat chips */}
-                        <View className="mt-6 flex-row gap-2">
-                            <View className="items-center rounded-2xl border border-border bg-card/80 px-3.5 py-2.5">
-                                <View className="flex-row items-center">
-                                    <Feather name="home" size={12} color={iconColor} />
-                                    <Text className="ml-1.5 text-sm font-bold text-card-foreground">1,240</Text>
-                                </View>
-                                <Text className="mt-0.5 text-[10px] text-muted-foreground">Homes</Text>
-                            </View>
-
-                            <View className="items-center rounded-2xl border border-border bg-card/80 px-3.5 py-2.5">
-                                <View className="flex-row items-center">
-                                    <Feather name="zap" size={12} color={iconColor} />
-                                    <Text className="ml-1.5 text-sm font-bold text-card-foreground">2.4 MW</Text>
-                                </View>
-                                <Text className="mt-0.5 text-[10px] text-muted-foreground">Shared</Text>
-                            </View>
-
-                            <View className="items-center rounded-2xl border border-border bg-card/80 px-3.5 py-2.5">
-                                <View className="flex-row items-center">
-                                    <Feather name="wind" size={12} color={iconColor} />
-                                    <Text className="ml-1.5 text-sm font-bold text-card-foreground">18t</Text>
-                                </View>
-                                <Text className="mt-0.5 text-[10px] text-muted-foreground">CO₂ Saved</Text>
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Headline */}
-                    <View className="mt-9">
-                        <Text className="text-3xl font-light tracking-tight text-foreground">
-                            Smarter
-                        </Text>
-                        <View className="flex-row items-center flex-wrap gap-2 my-1">
-                            <Text className="text-4xl font-extrabold tracking-tight text-foreground">
-                                Solar
-                            </Text>
-                            <View className="rounded-xl bg-primary px-3 py-0.5">
-                                <Text className="text-4xl font-extrabold tracking-tight text-primary-foreground">
-                                    Energy
+                            <View>
+                                <Text className="text-xl font-bold tracking-tight text-foreground">
+                                    SolarLink
+                                </Text>
+                                <Text className="text-[11px] font-medium tracking-wide text-muted-foreground">
+                                    Community Solar Grid
                                 </Text>
                             </View>
                         </View>
-                        <Text className="text-3xl font-extrabold tracking-tight text-foreground">
-                            Starts With You
+
+                        <View className="flex-row items-center rounded-full border border-border/80 bg-card/80 px-3 py-1.5 shadow-sm">
+                            <View className="mr-1.5 h-2 w-2 rounded-full bg-emerald-500" />
+                            <Text className="text-xs font-semibold text-foreground">Grid Live</Text>
+                        </View>
+                    </View>
+
+                    {/* Editorial Headline */}
+                    <View className="mt-8">
+                        <Text className="text-4xl font-light tracking-tight text-foreground">
+                            Clean energy,
+                        </Text>
+                        <Text className="text-4xl font-extrabold tracking-tight text-foreground">
+                            shared locally.
                         </Text>
 
-                        <Text className="mt-2 text-sm leading-5 text-muted-foreground">
-                            Stay informed about community energy usage and improve savings with smart solar sharing.
+                        <Text className="mt-3 text-sm leading-6 text-muted-foreground">
+                            A neighborhood solar co-operative powered by shared rooftop generation and real-time smart metering.
                         </Text>
+                    </View>
+
+                    {/* Minimalist Micro-Metrics Ribbon */}
+                    <View className="mt-6 flex-row flex-wrap gap-2">
+                        <View className="flex-row items-center rounded-full border border-border/80 bg-card/70 px-3.5 py-2">
+                            <Feather name="zap" size={13} color={isDark ? "#FBBF24" : "#D97706"} />
+                            <Text className="ml-1.5 text-xs font-bold text-foreground">2.4 MW</Text>
+                            <Text className="ml-1 text-xs text-muted-foreground">Shared</Text>
+                        </View>
+
+                        <View className="flex-row items-center rounded-full border border-border/80 bg-card/70 px-3.5 py-2">
+                            <Feather name="wind" size={13} color={isDark ? "#34D399" : "#059669"} />
+                            <Text className="ml-1.5 text-xs font-bold text-foreground">18.4t</Text>
+                            <Text className="ml-1 text-xs text-muted-foreground">CO₂ Cut</Text>
+                        </View>
+
+                        <View className="flex-row items-center rounded-full border border-border/80 bg-card/70 px-3.5 py-2">
+                            <Feather name="home" size={13} color={iconColor} />
+                            <Text className="ml-1.5 text-xs font-bold text-foreground">1,240</Text>
+                            <Text className="ml-1 text-xs text-muted-foreground">Homes</Text>
+                        </View>
                     </View>
                 </View>
 
@@ -129,13 +125,13 @@ export default function SignInScreen() {
                                 className={`mt-2.5 h-13.5 flex-row items-center rounded-2xl border border-border bg-background/60 py-3 px-4 active:bg-secondary/40 ${isLoading ? "opacity-70" : ""
                                     }`}
                                 disabled={isLoading}
-                                onPress={() => handleSocialAuth("oauth_github")}
+                                onPress={() => {}}
                             >
                                 <View className="h-8 w-8 items-center justify-center rounded-full bg-card border border-border/50">
-                                    <FontAwesome name="github" size={20} color={iconColor} />
+                                    <FontAwesome name="facebook" size={20} color="#1877F2" />
                                 </View>
                                 <Text className="ml-3 flex-1 text-base font-semibold text-card-foreground">
-                                    {isGitHubClicked ? "Connecting GitHub..." : "Continue with GitHub"}
+                                    Continue with Facebook
                                 </Text>
                                 <FontAwesome name="angle-right" size={18} color={arrowColor} />
                             </Pressable>
