@@ -25,29 +25,53 @@ export default function SignInScreen() {
         <SafeAreaView className='flex-1 bg-background'>
             <TabScreenBackground />
 
-            <ScrollView 
-                contentContainerStyle={{ flexGrow: 1 }}
+            <ScrollView
+                contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between' }}
                 showsVerticalScrollIndicator={false}
+                bounces={false}
                 className="flex-1"
             >
-                <View className='px-6 pt-2 pb-6'>
-                    {/* Top Hero Image with Floating "Sun Power" Pill */}
-                    <View className="relative overflow-hidden rounded-[30px] border border-border/70 bg-card/60 dark:bg-card/40 p-2 shadow-sm">
-                        <Image
-                            source={require("../../../assets/images/auth.png")}
-                            style={{ width: "100%", height: 210 }}
-                            contentFit="contain"
-                        />
-                        <View className="absolute bottom-4 left-4 flex-row items-center rounded-full bg-card/90 border border-border/80 px-3.5 py-1.5 shadow-sm">
-                            <Feather name="sun" size={14} color="#F59E0B" />
-                            <Text className="ml-2 text-xs font-bold text-foreground">
-                                Sun Power
-                            </Text>
+                {/* ===== TOP SECTION: brand + hero + headline ===== */}
+                <View className="px-6 pt-4">
+
+                    {/* Icon-based hero, replaces the old stock photo */}
+                    <View className="mt-8 items-center">
+                        <View className="h-28 w-28 items-center justify-center rounded-full bg-accent">
+                            <View className="h-20 w-20 items-center justify-center rounded-full bg-primary">
+                                <Feather name="sun" size={36} color={isDark ? "#1D1816" : "#231D1A"} />
+                            </View>
+                        </View>
+
+                        {/* Stat chips */}
+                        <View className="mt-6 flex-row gap-2">
+                            <View className="items-center rounded-2xl border border-border bg-card/80 px-3.5 py-2.5">
+                                <View className="flex-row items-center">
+                                    <Feather name="home" size={12} color={iconColor} />
+                                    <Text className="ml-1.5 text-sm font-bold text-card-foreground">1,240</Text>
+                                </View>
+                                <Text className="mt-0.5 text-[10px] text-muted-foreground">Homes</Text>
+                            </View>
+
+                            <View className="items-center rounded-2xl border border-border bg-card/80 px-3.5 py-2.5">
+                                <View className="flex-row items-center">
+                                    <Feather name="zap" size={12} color={iconColor} />
+                                    <Text className="ml-1.5 text-sm font-bold text-card-foreground">2.4 MW</Text>
+                                </View>
+                                <Text className="mt-0.5 text-[10px] text-muted-foreground">Shared</Text>
+                            </View>
+
+                            <View className="items-center rounded-2xl border border-border bg-card/80 px-3.5 py-2.5">
+                                <View className="flex-row items-center">
+                                    <Feather name="wind" size={12} color={iconColor} />
+                                    <Text className="ml-1.5 text-sm font-bold text-card-foreground">18t</Text>
+                                </View>
+                                <Text className="mt-0.5 text-[10px] text-muted-foreground">CO₂ Saved</Text>
+                            </View>
                         </View>
                     </View>
 
-                    {/* Headline Matching UI Reference Design */}
-                    <View className="mt-5">
+                    {/* Headline */}
+                    <View className="mt-9">
                         <Text className="text-3xl font-light tracking-tight text-foreground">
                             Smarter
                         </Text>
@@ -69,9 +93,11 @@ export default function SignInScreen() {
                             Stay informed about community energy usage and improve savings with smart solar sharing.
                         </Text>
                     </View>
+                </View>
 
-                    {/* Social Logins Container */}
-                    <View className="mt-6 rounded-[28px] border border-border/70 bg-card/80 dark:bg-card/50 p-5 shadow-sm">
+                {/* ===== BOTTOM SECTION: login card, anchored to the bottom ===== */}
+                <View className="pt-8">
+                    <View className="rounded-t-[40px] border border-border/70 bg-card/80 dark:bg-card/50 p-5 shadow-sm">
                         <View className="self-center rounded-full bg-secondary px-3.5 py-1 mb-4">
                             <Text className="text-xs font-semibold uppercase tracking-[1px] text-secondary-foreground">
                                 Connect & Get Started
@@ -80,9 +106,8 @@ export default function SignInScreen() {
 
                         <View className="space-y-3">
                             <Pressable
-                                className={`h-13.5 flex-row items-center rounded-2xl border border-border bg-background/60 py-3 px-4 active:bg-secondary/40 ${
-                                    isLoading ? "opacity-70" : ""
-                                }`}
+                                className={`h-13.5 flex-row items-center rounded-2xl border border-border bg-background/60 py-3 px-4 active:bg-secondary/40 ${isLoading ? "opacity-70" : ""
+                                    }`}
                                 disabled={isLoading}
                                 onPress={() => handleSocialAuth("oauth_google")}
                             >
@@ -101,9 +126,8 @@ export default function SignInScreen() {
                             </Pressable>
 
                             <Pressable
-                                className={`mt-2.5 h-13.5 flex-row items-center rounded-2xl border border-border bg-background/60 py-3 px-4 active:bg-secondary/40 ${
-                                    isLoading ? "opacity-70" : ""
-                                }`}
+                                className={`mt-2.5 h-13.5 flex-row items-center rounded-2xl border border-border bg-background/60 py-3 px-4 active:bg-secondary/40 ${isLoading ? "opacity-70" : ""
+                                    }`}
                                 disabled={isLoading}
                                 onPress={() => handleSocialAuth("oauth_github")}
                             >
@@ -117,9 +141,8 @@ export default function SignInScreen() {
                             </Pressable>
 
                             <Pressable
-                                className={`mt-2.5 h-13.5 flex-row items-center rounded-2xl border border-border bg-background/60 py-3 px-4 active:bg-secondary/40 ${
-                                    isLoading ? "opacity-70" : ""
-                                }`}
+                                className={`mt-2.5 h-13.5 flex-row items-center rounded-2xl border border-border bg-background/60 py-3 px-4 active:bg-secondary/40 ${isLoading ? "opacity-70" : ""
+                                    }`}
                                 disabled={isLoading}
                                 onPress={() => handleSocialAuth("oauth_apple")}
                             >
