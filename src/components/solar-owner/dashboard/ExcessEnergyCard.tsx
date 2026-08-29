@@ -11,30 +11,27 @@ export const ExcessEnergyCard: React.FC<ExcessEnergyCardProps> = ({ onQuickShare
     const { metrics, autoShareEnabled } = useSolarOwnerStore();
 
     return (
-        <View className="rounded-[28px] border-2 border-amber-500/40 bg-card/90 dark:bg-card/60 p-5 mb-5 shadow-lg overflow-hidden relative">
-            {/* Background Glow Accent */}
-            <View className="absolute -right-10 -bottom-10 h-32 w-32 rounded-full bg-primary/20 blur-xl" />
-
+        <View className="rounded-xl border border-amber-500/40 bg-secondary/60 p-4 mb-5 shadow-sm overflow-hidden relative">
             {/* Header / Badge */}
-            <View className="flex-row items-center justify-between mb-3 gap-2">
+            <View className="flex-row items-center justify-between mb-2 gap-2">
                 <View className="flex-row items-center flex-1 mr-2">
-                    <View className="h-9 w-9 rounded-xl bg-amber-500/20 items-center justify-center mr-2.5 border border-amber-500/30 flex-shrink-0">
-                        <MaterialCommunityIcons name="lightning-bolt" size={20} color="#F59E0B" />
+                    <View className="h-8 w-8 rounded-lg bg-amber-500/20 items-center justify-center mr-2 border border-amber-500/30 flex-shrink-0">
+                        <MaterialCommunityIcons name="lightning-bolt" size={18} color="#F59E0B" />
                     </View>
                     <View className="flex-1">
-                        <Text className="text-xs font-bold uppercase tracking-wider text-amber-500" numberOfLines={1}>
+                        <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
                             Available Excess Energy
                         </Text>
-                        <Text className="text-[11px] text-muted-foreground font-medium" numberOfLines={1}>
+                        <Text className="text-xs text-muted-foreground" numberOfLines={1}>
                             Calculated in real-time
                         </Text>
                     </View>
                 </View>
 
                 {autoShareEnabled && (
-                    <View className="flex-row items-center rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 flex-shrink-0">
-                        <View className="h-2 w-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
-                        <Text className="text-[10px] font-bold text-emerald-500 uppercase">
+                    <View className="flex-row items-center rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 flex-shrink-0">
+                        <View className="h-1.5 w-1.5 rounded-full bg-emerald-500 mr-1.5" />
+                        <Text className="text-xs font-bold text-[#10B981]">
                             Auto-Share Active
                         </Text>
                     </View>
@@ -45,10 +42,10 @@ export const ExcessEnergyCard: React.FC<ExcessEnergyCardProps> = ({ onQuickShare
             <View className="flex-row items-center justify-between my-2 gap-2">
                 <View className="flex-1 mr-2">
                     <View className="flex-row items-baseline">
-                        <Text className="text-4xl font-black text-foreground tracking-tight">
+                        <Text className="text-3xl font-extrabold text-foreground">
                             {metrics.excessKW.toFixed(1)}
                         </Text>
-                        <Text className="text-lg font-bold text-amber-500 ml-1.5">
+                        <Text className="text-sm font-bold text-amber-500 ml-1.5">
                             kW Live
                         </Text>
                     </View>
@@ -59,45 +56,13 @@ export const ExcessEnergyCard: React.FC<ExcessEnergyCardProps> = ({ onQuickShare
 
                 <Pressable
                     onPress={onQuickSharePress}
-                    className="rounded-2xl bg-primary px-4 py-3 flex-row items-center shadow-md active:opacity-90 active:scale-95 flex-shrink-0"
+                    className="rounded-lg bg-primary px-3.5 py-2 flex-row items-center active:opacity-75 shadow-sm flex-shrink-0"
                 >
-                    <Feather name="share-2" size={16} color="#1E293B" style={{ marginRight: 6 }} />
-                    <Text className="text-xs font-black text-primary-foreground uppercase tracking-wide">
+                    <Feather name="share-2" size={14} color="#1E293B" style={{ marginRight: 6 }} />
+                    <Text className="text-xs font-bold text-primary-foreground">
                         Share Now
                     </Text>
                 </Pressable>
-            </View>
-
-            {/* Transparent Calculation Breakdown Formula */}
-            <View className="mt-4 pt-3.5 border-t border-border/60 bg-secondary/30 -mx-5 -mb-5 px-5 py-3.5">
-                <Text className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
-                    Live Calculation Formula:
-                </Text>
-                <View className="flex-row items-center justify-between flex-wrap">
-                    <View className="flex-row items-center">
-                        <Text className="text-xs font-bold text-foreground">
-                            {metrics.generationKW.toFixed(1)} kW
-                        </Text>
-                        <Text className="text-[10px] text-muted-foreground ml-1">Gen</Text>
-                    </View>
-
-                    <Text className="text-xs font-bold text-muted-foreground">−</Text>
-
-                    <View className="flex-row items-center">
-                        <Text className="text-xs font-bold text-foreground">
-                            {metrics.consumptionKW.toFixed(1)} kW
-                        </Text>
-                        <Text className="text-[10px] text-muted-foreground ml-1">Home</Text>
-                    </View>
-
-                    <Text className="text-xs font-bold text-muted-foreground">=</Text>
-
-                    <View className="flex-row items-center bg-amber-500/15 px-2 py-0.5 rounded-lg border border-amber-500/30">
-                        <Text className="text-xs font-black text-amber-500">
-                            {metrics.excessKW.toFixed(1)} kW Excess
-                        </Text>
-                    </View>
-                </View>
             </View>
         </View>
     );

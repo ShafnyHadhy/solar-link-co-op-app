@@ -8,10 +8,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SolarOwnerAlertsModal } from '../alerts/SolarOwnerAlertsModal';
 import { SolarToast } from '../shared/SolarToast';
 import { useSolarOwnerStore } from '../store/useSolarOwnerStore';
-import { BatteryCard } from './BatteryCard';
 import { ExcessEnergyCard } from './ExcessEnergyCard';
-import { PowerFlowDiagram } from './PowerFlowDiagram';
 import { QuickShareModal } from './QuickShareModal';
+import { SolarMetricDetailModal, SolarMetricDetailType } from './SolarMetricDetailModal';
 
 export const SolarOwnerDashboard = () => {
     const insets = useSafeAreaInsets();
@@ -21,12 +20,19 @@ export const SolarOwnerDashboard = () => {
 
     const [alertsModalOpen, setAlertsModalOpen] = useState(false);
     const [quickShareOpen, setQuickShareOpen] = useState(false);
+    const [detailModalOpen, setDetailModalOpen] = useState(false);
+    const [selectedMetric, setSelectedMetric] = useState<SolarMetricDetailType>('battery');
 
     const unreadAlerts = alerts.filter((a) => !a.isRead);
     const mostRecentAlert = unreadAlerts[0] || alerts[0];
 
     const handleNavigateToShareTab = () => {
         router.push('/(tabs)/share');
+    };
+
+    const handleOpenMetricDetail = (metric: SolarMetricDetailType) => {
+        setSelectedMetric(metric);
+        setDetailModalOpen(true);
     };
 
     return (
@@ -39,6 +45,11 @@ export const SolarOwnerDashboard = () => {
                 onClose={() => setAlertsModalOpen(false)}
                 onNavigateToShare={handleNavigateToShareTab}
             />
+            <SolarMetricDetailModal
+                visible={detailModalOpen}
+                initialTab={selectedMetric}
+                onClose={() => setDetailModalOpen(false)}
+            />
 
             <ScrollView
                 className="flex-1"
@@ -50,33 +61,36 @@ export const SolarOwnerDashboard = () => {
                 }}
             >
                 {/* 1. HEADER: Greeting, Weather pill, Notification Icon */}
-                <View className="flex-row items-center justify-between mb-4 gap-2">
-                    <View className="flex-1 mr-2">
-                        <View className="flex-row items-center mb-0.5 flex-wrap gap-1">
-                            <Text className="text-xs font-bold uppercase tracking-wider text-amber-500 mr-1.5">
+                <View className="flex-row items-center justify-between mb-6">
+                    <View>
+                        <View className="flex-row items-center mb-1 flex-wrap gap-1.5">
+                            <Text className="text-xs font-semibold uppercase tracking-[1px] text-amber-500">
                                 Solar Panel Owner
                             </Text>
-                            <View className="flex-row items-center bg-secondary/80 px-2 py-0.5 rounded-full border border-border/50">
-                                <Feather name="sun" size={10} color="#F59E0B" style={{ marginRight: 4 }} />
-                                <Text className="text-[10px] font-bold text-foreground">
+                            <View className="flex-row items-center bg-secondary px-2 py-0.5 rounded-full border border-border/60">
+                                <Feather name="sun" size={12} color="#F59E0B" style={{ marginRight: 4 }} />
+                                <Text className="text-xs font-semibold text-foreground">
                                     {weather.temperatureC}°C • {weather.condition === 'sunny' ? 'Sunny' : 'Clear'}
                                 </Text>
                             </View>
                         </View>
-                        <Text className="text-2xl font-black text-foreground tracking-tight">
-                            Hi, {user?.firstName || 'Deshan'} 👋
+                        <Text className="text-2xl font-extrabold text-foreground">
+                            Good morning, {user?.firstName || 'Deshan'}
+                        </Text>
+                        <Text className="text-xs text-muted-foreground mt-0.5">
+                            Manage your solar generation & sharing
                         </Text>
                     </View>
 
                     {/* Notification Bell Icon */}
                     <Pressable
                         onPress={() => setAlertsModalOpen(true)}
-                        className="h-11 w-11 items-center justify-center rounded-2xl bg-secondary/80 border border-border/70 relative active:opacity-70 shadow-sm flex-shrink-0"
+                        className="h-10 w-10 items-center justify-center rounded-2xl bg-secondary border border-border/60 relative active:opacity-70"
                     >
                         <Feather name="bell" size={20} color="#F59E0B" />
                         {unreadAlerts.length > 0 && (
                             <View className="absolute -top-1 -right-1 h-5 min-w-[20px] px-1 rounded-full bg-destructive items-center justify-center border-2 border-background">
-                                <Text className="text-[10px] font-black text-white">
+                                <Text className="text-xs font-bold text-white">
                                     {unreadAlerts.length}
                                 </Text>
                             </View>
@@ -88,115 +102,151 @@ export const SolarOwnerDashboard = () => {
                 {mostRecentAlert && (
                     <Pressable
                         onPress={() => setAlertsModalOpen(true)}
-                        className="rounded-2xl bg-amber-500/15 border border-amber-500/40 p-3 flex-row items-center justify-between mb-4 active:opacity-80 gap-2"
+                        className="flex-row items-center gap-4 p-4 bg-secondary/60 rounded-xl border border-amber-500/40 mb-4 active:opacity-70 shadow-sm"
                     >
-                        <View className="flex-row items-center flex-1 mr-1 min-w-0">
-                            <View className="h-7 w-7 rounded-lg bg-amber-500/30 items-center justify-center mr-2.5 flex-shrink-0">
-                                <Feather name="alert-circle" size={16} color="#F59E0B" />
-                            </View>
-                            <View className="flex-1 min-w-0">
-                                <Text className="text-xs font-bold text-foreground" numberOfLines={1}>
-                                    {mostRecentAlert.title}
-                                </Text>
-                                <Text className="text-[10px] text-muted-foreground" numberOfLines={1}>
-                                    {mostRecentAlert.message}
-                                </Text>
-                            </View>
+                        <View className="h-12 w-12 items-center justify-center rounded-full bg-amber-500/15 border border-amber-500 flex-shrink-0">
+                            <Feather name="alert-circle" size={20} color="#F59E0B" />
                         </View>
-                        <Feather name="chevron-right" size={16} color="#F59E0B" style={{ flexShrink: 0 }} />
+                        <View className="flex-1 flex-col">
+                            <Text className="text-lg font-semibold text-foreground" numberOfLines={1}>
+                                {mostRecentAlert.title}
+                            </Text>
+                            <Text className="text-xs font-semibold text-muted-foreground" numberOfLines={1}>
+                                {mostRecentAlert.message}
+                            </Text>
+                        </View>
+                        <Feather name="chevron-right" size={20} color="#9CA3AF" />
                     </Pressable>
                 )}
 
                 {/* 3. HERO: AVAILABLE EXCESS ENERGY (Automatic Calculation) */}
                 <ExcessEnergyCard onQuickSharePress={() => setQuickShareOpen(true)} />
 
-                {/* 4. FOUR KEY KPI TILES (Generation, Consumption, Battery, Savings) */}
-                <View className="flex-row flex-wrap justify-between gap-2.5 mb-5">
+                {/* 4. FOUR KEY KPI TILES (Generation, Consumption, Battery, Savings) - CLICKABLE */}
+                <View className="flex-row flex-wrap justify-between gap-3 mb-6">
                     {/* Solar Generation */}
-                    <View className="w-[48%] rounded-[24px] border border-amber-500/30 bg-card/85 p-3.5 shadow-sm">
-                        <View className="flex-row items-center justify-between mb-1">
-                            <Text className="text-[11px] font-bold text-muted-foreground uppercase" numberOfLines={1}>
-                                Generation
-                            </Text>
-                            <Feather name="sun" size={15} color="#F59E0B" />
+                    <Pressable
+                        onPress={() => handleOpenMetricDetail('generation')}
+                        className="w-[48%] flex-col gap-2 rounded-lg border border-border/30 bg-secondary/60 p-4 shadow-sm active:opacity-75"
+                    >
+                        <View className="flex-row items-center justify-between">
+                            <View className="flex-row items-center gap-1.5">
+                                <Feather name="sun" size={14} color="#F59E0B" />
+                                <Text className="text-sm font-semibold text-muted-foreground" numberOfLines={1}>
+                                    Generation
+                                </Text>
+                            </View>
+                            <Feather name="chevron-right" size={12} color="#9CA3AF" />
                         </View>
-                        <Text className="text-2xl font-black text-foreground" numberOfLines={1}>
-                            {metrics.generationKW.toFixed(1)} <Text className="text-xs font-bold text-amber-500">kW</Text>
+                        <Text className="text-xl font-extrabold text-foreground mt-1" numberOfLines={1}>
+                            {metrics.generationKW.toFixed(1)} kW
                         </Text>
-                        <Text className="text-[10px] text-muted-foreground font-semibold mt-0.5" numberOfLines={1}>
-                            {metrics.dailyGenerationKWh.toFixed(1)} kWh today
-                        </Text>
-                    </View>
+                        <View className="flex-row items-center gap-1">
+                            <Feather name="trending-up" size={12} color="#10B981" />
+                            <Text className="text-xs font-semibold text-[#10B981]" numberOfLines={1}>
+                                {metrics.dailyGenerationKWh.toFixed(1)} kWh today
+                            </Text>
+                        </View>
+                    </Pressable>
 
                     {/* Household Consumption */}
-                    <View className="w-[48%] rounded-[24px] border border-sky-500/30 bg-card/85 p-3.5 shadow-sm">
-                        <View className="flex-row items-center justify-between mb-1">
-                            <Text className="text-[11px] font-bold text-muted-foreground uppercase" numberOfLines={1}>
-                                Consumption
-                            </Text>
-                            <Feather name="home" size={15} color="#0EA5E9" />
+                    <Pressable
+                        onPress={() => handleOpenMetricDetail('consumption')}
+                        className="w-[48%] flex-col gap-2 rounded-lg border border-border/30 bg-secondary/60 p-4 shadow-sm active:opacity-75"
+                    >
+                        <View className="flex-row items-center justify-between">
+                            <View className="flex-row items-center gap-1.5">
+                                <Feather name="home" size={14} color="#0EA5E9" />
+                                <Text className="text-sm font-semibold text-muted-foreground" numberOfLines={1}>
+                                    Consumption
+                                </Text>
+                            </View>
+                            <Feather name="chevron-right" size={12} color="#9CA3AF" />
                         </View>
-                        <Text className="text-2xl font-black text-foreground" numberOfLines={1}>
-                            {metrics.consumptionKW.toFixed(1)} <Text className="text-xs font-bold text-sky-500">kW</Text>
+                        <Text className="text-xl font-extrabold text-foreground mt-1" numberOfLines={1}>
+                            {metrics.consumptionKW.toFixed(1)} kW
                         </Text>
-                        <Text className="text-[10px] text-muted-foreground font-semibold mt-0.5" numberOfLines={1}>
-                            {metrics.dailyConsumptionKWh.toFixed(1)} kWh today
-                        </Text>
-                    </View>
+                        <View className="flex-row items-center gap-1">
+                            <Feather name="activity" size={12} color="#0EA5E9" />
+                            <Text className="text-xs font-semibold text-[#0EA5E9]" numberOfLines={1}>
+                                {metrics.dailyConsumptionKWh.toFixed(1)} kWh today
+                            </Text>
+                        </View>
+                    </Pressable>
 
                     {/* Battery Status */}
-                    <View className="w-[48%] rounded-[24px] border border-emerald-500/30 bg-card/85 p-3.5 shadow-sm">
-                        <View className="flex-row items-center justify-between mb-1">
-                            <Text className="text-[11px] font-bold text-muted-foreground uppercase" numberOfLines={1}>
-                                Battery
-                            </Text>
-                            <Feather name="battery-charging" size={15} color="#10B981" />
+                    <Pressable
+                        onPress={() => handleOpenMetricDetail('battery')}
+                        className="w-[48%] flex-col gap-2 rounded-lg border border-border/30 bg-secondary/60 p-4 shadow-sm active:opacity-75"
+                    >
+                        <View className="flex-row items-center justify-between">
+                            <View className="flex-row items-center gap-1.5">
+                                <Feather name="battery-charging" size={14} color="#10B981" />
+                                <Text className="text-sm font-semibold text-muted-foreground" numberOfLines={1}>
+                                    Battery
+                                </Text>
+                            </View>
+                            <Feather name="chevron-right" size={12} color="#9CA3AF" />
                         </View>
-                        <Text className="text-2xl font-black text-foreground" numberOfLines={1}>
+                        <Text className="text-xl font-extrabold text-foreground mt-1" numberOfLines={1}>
                             {battery.percentage}%
                         </Text>
-                        <Text className="text-[10px] text-emerald-500 font-semibold mt-0.5" numberOfLines={1}>
-                            +{metrics.batteryPowerKW.toFixed(1)} kW chg
-                        </Text>
-                    </View>
+                        <View className="flex-row items-center gap-1">
+                            <Feather name="zap" size={12} color="#10B981" />
+                            <Text className="text-xs font-semibold text-[#10B981]" numberOfLines={1}>
+                                +{metrics.batteryPowerKW.toFixed(1)} kW chg
+                            </Text>
+                        </View>
+                    </Pressable>
 
                     {/* Monthly Savings */}
-                    <View className="w-[48%] rounded-[24px] border border-border/80 bg-card/85 p-3.5 shadow-sm">
-                        <View className="flex-row items-center justify-between mb-1">
-                            <Text className="text-[11px] font-bold text-muted-foreground uppercase" numberOfLines={1}>
-                                Savings
-                            </Text>
-                            <Feather name="dollar-sign" size={15} color="#10B981" />
+                    <Pressable
+                        onPress={() => handleOpenMetricDetail('savings')}
+                        className="w-[48%] flex-col gap-2 rounded-lg border border-border/30 bg-secondary/60 p-4 shadow-sm active:opacity-75"
+                    >
+                        <View className="flex-row items-center justify-between">
+                            <View className="flex-row items-center gap-1.5">
+                                <Feather name="dollar-sign" size={14} color="#10B981" />
+                                <Text className="text-sm font-semibold text-muted-foreground" numberOfLines={1}>
+                                    Savings
+                                </Text>
+                            </View>
+                            <Feather name="chevron-right" size={12} color="#9CA3AF" />
                         </View>
-                        <Text className="text-2xl font-black text-foreground" numberOfLines={1}>
+                        <Text className="text-xl font-extrabold text-foreground mt-1" numberOfLines={1}>
                             ${metrics.monthlySavingsUSD.toFixed(0)}
                         </Text>
-                        <Text className="text-[10px] text-emerald-500 font-semibold mt-0.5" numberOfLines={1}>
-                            +${metrics.dailySavingsUSD.toFixed(2)} today
+                        <View className="flex-row items-center gap-1">
+                            <Feather name="trending-up" size={12} color="#10B981" />
+                            <Text className="text-xs font-semibold text-[#10B981]" numberOfLines={1}>
+                                +${metrics.dailySavingsUSD.toFixed(2)} today
+                            </Text>
+                        </View>
+                    </Pressable>
+                </View>
+
+                {/* Section Header: ENERGY BALANCE */}
+                <View className="flex-row items-center justify-between mb-4">
+                    <Text className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
+                        Today's Energy Balance
+                    </Text>
+                    <View className="bg-emerald-500/15 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                        <Text className="text-xs font-bold text-[#10B981]">
+                            Zero Grid Draw
                         </Text>
                     </View>
                 </View>
 
-                {/* 5. TODAY'S ENERGY BALANCE: Generation - Consumption = Excess */}
-                <View className="rounded-[28px] border border-border/70 bg-card/85 dark:bg-card/50 p-5 mb-5 shadow-sm">
-                    <View className="flex-row items-center justify-between mb-2 gap-2">
-                        <View className="flex-1 mr-2 min-w-0">
-                            <Text className="text-base font-bold text-foreground" numberOfLines={1}>
-                                Today's Energy Balance
-                            </Text>
-                            <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-                                100% self-powered from rooftop solar
-                            </Text>
-                        </View>
-                        <View className="rounded-full bg-emerald-500/20 px-2.5 py-1 border border-emerald-500/40 flex-shrink-0">
-                            <Text className="text-[10px] font-black text-emerald-500 uppercase">
-                                Zero Grid Draw
-                            </Text>
-                        </View>
+                {/* 5. TODAY'S ENERGY BALANCE CARD */}
+                <View className="flex-col gap-3 rounded-xl border border-border/30 bg-secondary/60 p-4 shadow-sm mb-6">
+                    <View className="flex-row items-center justify-between">
+                        <Text className="text-sm font-semibold text-foreground">
+                            100% self-powered from rooftop solar
+                        </Text>
                     </View>
 
                     {/* Visual Balance Bar */}
-                    <View className="h-3.5 w-full rounded-full bg-secondary/80 flex-row overflow-hidden my-2.5">
+                    <View className="h-2 w-full rounded-full bg-secondary overflow-hidden border border-border/40 flex-row">
                         <View
                             className="h-full bg-sky-500"
                             style={{
@@ -215,60 +265,59 @@ export const SolarOwnerDashboard = () => {
                     <View className="flex-row items-center justify-between pt-2 border-t border-border/30 gap-1 flex-wrap">
                         <View className="flex-row items-center min-w-[30%] flex-1">
                             <View className="h-2 w-2 rounded-full bg-sky-500 mr-1.5 flex-shrink-0" />
-                            <Text className="text-[11px] text-muted-foreground font-medium" numberOfLines={1}>
+                            <Text className="text-xs font-semibold text-muted-foreground" numberOfLines={1}>
                                 Home: {metrics.dailyConsumptionKWh.toFixed(1)} kWh
                             </Text>
                         </View>
                         <View className="flex-row items-center min-w-[30%] flex-1 justify-center">
                             <View className="h-2 w-2 rounded-full bg-purple-500 mr-1.5 flex-shrink-0" />
-                            <Text className="text-[11px] text-muted-foreground font-medium" numberOfLines={1}>
+                            <Text className="text-xs font-semibold text-muted-foreground" numberOfLines={1}>
                                 Shared: {metrics.dailySharedKWh.toFixed(1)} kWh
                             </Text>
                         </View>
                         <View className="flex-row items-center min-w-[30%] flex-1 justify-end">
                             <View className="h-2 w-2 rounded-full bg-amber-500 mr-1.5 flex-shrink-0" />
-                            <Text className="text-[11px] text-muted-foreground font-medium" numberOfLines={1}>
+                            <Text className="text-xs font-semibold text-muted-foreground" numberOfLines={1}>
                                 Excess: {metrics.dailyExcessKWh.toFixed(1)} kWh
                             </Text>
                         </View>
                     </View>
                 </View>
 
-                {/* 6. WEATHER & TODAY'S PREDICTED SOLAR GENERATION SUMMARY */}
-                <View className="rounded-[28px] border border-border/70 bg-card/85 dark:bg-card/50 p-5 mb-5 shadow-sm">
-                    <View className="flex-row items-center justify-between mb-2 gap-2">
-                        <View className="flex-row items-center flex-1 mr-2 min-w-0">
-                            <MaterialCommunityIcons name="weather-sunny" size={22} color="#F59E0B" style={{ marginRight: 8, flexShrink: 0 }} />
-                            <Text className="text-base font-bold text-foreground flex-1" numberOfLines={1}>
-                                Weather & Solar Prediction
-                            </Text>
-                        </View>
-                        <View className="bg-emerald-500/20 px-2.5 py-0.5 rounded-full border border-emerald-500/30 flex-shrink-0">
-                            <Text className="text-[10px] font-black text-emerald-500 uppercase">
-                                {weather.expectedSolarLevel} Solar
-                            </Text>
-                        </View>
+                {/* Section Header: SOLAR FORECAST */}
+                <View className="flex-row items-center justify-between mb-4">
+                    <Text className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
+                        Weather & Solar Prediction
+                    </Text>
+                    <View className="bg-emerald-500/15 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                        <Text className="text-xs font-bold text-[#10B981]">
+                            {weather.expectedSolarLevel} Solar
+                        </Text>
                     </View>
-                    <Text className="text-xs text-muted-foreground leading-relaxed">
-                        ☀️ <Text className="font-bold text-foreground">High solar generation expected today</Text> (~32.5 kWh estimated). Peak sunlight window between 10:30 AM – 3:30 PM (UV {weather.uvIndex}).
+                </View>
+
+                {/* 6. WEATHER & PREDICTION CARD */}
+                <View className="flex-col gap-2 rounded-xl border border-border/30 bg-secondary/60 p-4 shadow-sm mb-6">
+                    <View className="flex-row items-center gap-2">
+                        <MaterialCommunityIcons name="weather-sunny" size={20} color="#F59E0B" />
+                        <Text className="text-sm font-semibold text-foreground">
+                            High solar generation expected today
+                        </Text>
+                    </View>
+                    <Text className="text-xs font-semibold text-muted-foreground leading-relaxed">
+                        Estimated ~32.5 kWh. Peak sunlight window between 10:30 AM – 3:30 PM (UV {weather.uvIndex}).
                     </Text>
                 </View>
 
-                {/* 7. LIVE POWER FLOW DIAGRAM */}
-                <PowerFlowDiagram />
-
-                {/* 8. BATTERY STATUS CARD */}
-                <BatteryCard />
-
-                {/* 9. QUICK ACTION: SHARE EXCESS ENERGY BUTTON */}
+                {/* 7. QUICK ACTION: SHARE EXCESS ENERGY BUTTON */}
                 <Pressable
                     onPress={handleNavigateToShareTab}
-                    className="w-full rounded-2xl bg-primary py-4 px-3 items-center justify-center shadow-lg active:opacity-90 active:scale-98 mb-6"
+                    className="w-full items-center justify-center rounded-xl bg-primary py-3.5 px-4 shadow-sm active:opacity-75 mb-6"
                 >
-                    <View className="flex-row items-center justify-center flex-wrap">
+                    <View className="flex-row items-center justify-center">
                         <Feather name="share-2" size={18} color="#1E293B" style={{ marginRight: 8 }} />
-                        <Text className="text-sm sm:text-base font-black text-primary-foreground text-center" numberOfLines={1}>
-                            Go to Share Tab (Manage {metrics.dailyExcessKWh.toFixed(1)} kWh Excess)
+                        <Text className="text-sm font-bold text-primary-foreground text-center">
+                            Manage & Share {metrics.dailyExcessKWh.toFixed(1)} kWh Excess Energy
                         </Text>
                     </View>
                 </Pressable>

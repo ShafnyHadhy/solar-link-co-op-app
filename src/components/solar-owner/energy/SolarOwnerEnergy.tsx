@@ -33,6 +33,28 @@ export const SolarOwnerEnergy = () => {
         { time: 'Sun', gen: 28.4, con: 12.6 },
     ];
 
+    const monthlyData = [
+        { time: 'W1', gen: 175.0, con: 78.0 },
+        { time: 'W2', gen: 192.0, con: 84.5 },
+        { time: 'W3', gen: 168.0, con: 74.0 },
+        { time: 'W4', gen: 185.0, con: 81.5 },
+        { time: 'W5', gen: 60.0, con: 22.0 },
+    ];
+
+    const chartData =
+        timeframe === 'today'
+            ? hourlyData
+            : timeframe === 'week'
+                ? weeklyData
+                : monthlyData;
+
+    const maxVal =
+        timeframe === 'today'
+            ? 6.0
+            : timeframe === 'week'
+                ? 38.0
+                : 210.0;
+
     const currentReport = monthlyReports[0];
 
     const handleDownloadReport = () => {
@@ -139,7 +161,11 @@ export const SolarOwnerEnergy = () => {
                                 Generation vs Consumption
                             </Text>
                             <Text className="text-xs text-muted-foreground font-medium" numberOfLines={1}>
-                                Comparative energy performance curve
+                                {timeframe === 'today'
+                                    ? 'Hourly performance curve (kW)'
+                                    : timeframe === 'week'
+                                    ? 'Daily 7-day energy overview (kWh)'
+                                    : 'Monthly breakdown by week (kWh)'}
                             </Text>
                         </View>
 
@@ -165,18 +191,17 @@ export const SolarOwnerEnergy = () => {
 
                     {/* Simple Bar Chart */}
                     <View className="h-44 flex-row items-end justify-between pt-4 pb-2 border-b border-border/40">
-                        {(timeframe === 'today' ? hourlyData : weeklyData).map((item, index) => {
-                            const maxVal = timeframe === 'today' ? 6.0 : 35.0;
+                        {chartData.map((item, index) => {
                             return (
                                 <View key={index} className="items-center flex-1">
                                     <View className="flex-row items-end gap-1 mb-1">
                                         <View
                                             className="w-2.5 rounded-t-sm bg-amber-500"
-                                            style={{ height: (item.gen / maxVal) * 110 }}
+                                            style={{ height: Math.min(110, (item.gen / maxVal) * 110) }}
                                         />
                                         <View
                                             className="w-2.5 rounded-t-sm bg-sky-500"
-                                            style={{ height: (item.con / maxVal) * 110 }}
+                                            style={{ height: Math.min(110, (item.con / maxVal) * 110) }}
                                         />
                                     </View>
                                     <Text className="text-[9px] font-semibold text-muted-foreground">
