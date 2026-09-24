@@ -225,6 +225,44 @@ export const dispatches = pgTable("dispatches", {
     notes: text("notes"),
 });
 
+export const serviceTickets = pgTable("service_tickets", {
+    id: text("id").primaryKey(),
+
+    assetId: text("asset_id")
+        .references(() => solarAssets.id),
+
+    reportedBy: text("reported_by")
+        .notNull()
+        .references(() => users.id),
+
+    assignedTechnicianId: text("assigned_technician_id")
+        .references(() => users.id),
+
+    title: text("title").notNull(),
+
+    description: text("description"),
+
+    priority: ticketPriorityEnum("priority")
+        .default("medium")
+        .notNull(),
+
+    status: ticketStatusEnum("status")
+        .default("open")
+        .notNull(),
+
+    location: text("location"),
+
+    createdAt: timestamp("created_at")
+        .defaultNow()
+        .notNull(),
+
+    updatedAt: timestamp("updated_at")
+        .defaultNow()
+        .notNull(),
+
+    resolvedAt: timestamp("resolved_at"),
+});
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
@@ -242,3 +280,6 @@ export type NewEnergyRequest = typeof energyRequests.$inferInsert;
 
 export type Dispatch = typeof dispatches.$inferSelect;
 export type NewDispatch = typeof dispatches.$inferInsert;
+
+export type ServiceTicket = typeof serviceTickets.$inferSelect;
+export type NewServiceTicket = typeof serviceTickets.$inferInsert;
