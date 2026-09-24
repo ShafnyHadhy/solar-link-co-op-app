@@ -138,6 +138,38 @@ export const energyReadings = pgTable("energy_readings", {
         .notNull(),
 });
 
+export const solarOffers = pgTable("solar_offers", {
+    id: text("id").primaryKey(),
+
+    ownerId: text("owner_id")
+        .notNull()
+        .references(() => users.id),
+
+    energyAmountKwh: decimal("energy_amount_kwh", {
+        precision: 10,
+        scale: 3,
+    }).notNull(),
+
+    minimumBatteryPercent: decimal("minimum_battery_percent", {
+        precision: 5,
+        scale: 2,
+    }),
+
+    status: offerStatusEnum("status")
+        .default("pending")
+        .notNull(),
+
+    offeredAt: timestamp("offered_at")
+        .defaultNow()
+        .notNull(),
+
+    expiresAt: timestamp("expires_at"),
+
+    createdAt: timestamp("created_at")
+        .defaultNow()
+        .notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
@@ -146,3 +178,6 @@ export type NewSolarAsset = typeof solarAssets.$inferInsert;
 
 export type EnergyReading = typeof energyReadings.$inferSelect;
 export type NewEnergyReading = typeof energyReadings.$inferInsert;
+
+export type SolarOffer = typeof solarOffers.$inferSelect;
+export type NewSolarOffer = typeof solarOffers.$inferInsert;
