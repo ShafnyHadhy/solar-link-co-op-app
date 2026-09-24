@@ -13,6 +13,52 @@ export const memberStatusEnum = pgEnum("member_status", [
     "inactive",
 ]);
 
+export const offerStatusEnum = pgEnum("offer_status", [
+    "pending",
+    "approved",
+    "rejected",
+    "completed",
+    "cancelled",
+]);
+
+export const requestStatusEnum = pgEnum("request_status", [
+    "pending",
+    "approved",
+    "rejected",
+    "fulfilled",
+    "cancelled",
+]);
+
+export const ticketStatusEnum = pgEnum("ticket_status", [
+    "open",
+    "assigned",
+    "in_progress",
+    "resolved",
+    "closed",
+]);
+
+export const ticketPriorityEnum = pgEnum("ticket_priority", [
+    "critical",
+    "high",
+    "medium",
+    "low",
+]);
+
+export const assetStatusEnum = pgEnum("asset_status", [
+    "active",
+    "inactive",
+    "maintenance",
+    "fault",
+]);
+
+export const notificationTypeEnum = pgEnum("notification_type", [
+    "energy",
+    "maintenance",
+    "request",
+    "system",
+    "announcement",
+]);
+
 export const users = pgTable("users", {
     id: text("id").primaryKey(), // Clerk User ID (e.g. user_2n...)
     name: text("name").notNull(),
