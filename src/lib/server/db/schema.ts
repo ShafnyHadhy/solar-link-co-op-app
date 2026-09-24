@@ -74,5 +74,42 @@ export const users = pgTable("users", {
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+
+export const solarAssets = pgTable("solar_assets", {
+    id: text("id").primaryKey(),
+
+    ownerId: text("owner_id")
+        .notNull()
+        .references(() => users.id),
+
+    assetType: text("asset_type").notNull(),
+
+    name: text("name").notNull(),
+
+    capacityKw: decimal("capacity_kw", {
+        precision: 8,
+        scale: 2,
+    }),
+
+    status: assetStatusEnum("status")
+        .default("active")
+        .notNull(),
+
+    location: text("location"),
+
+    installedAt: timestamp("installed_at"),
+
+    createdAt: timestamp("created_at")
+        .defaultNow()
+        .notNull(),
+
+    updatedAt: timestamp("updated_at")
+        .defaultNow()
+        .notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+
+export type SolarAsset = typeof solarAssets.$inferSelect;
+export type NewSolarAsset = typeof solarAssets.$inferInsert;
