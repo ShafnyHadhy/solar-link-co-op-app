@@ -1,4 +1,4 @@
-import { decimal, integer, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, decimal, integer, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 export const userRoleEnum = pgEnum("user_role", [
     "manager",
@@ -285,6 +285,29 @@ export const maintenanceRecords = pgTable("maintenance_records", {
     notes: text("notes"),
 });
 
+export const notifications = pgTable("notifications", {
+    id: text("id").primaryKey(),
+
+    userId: text("user_id")
+        .notNull()
+        .references(() => users.id),
+
+    type: notificationTypeEnum("type")
+        .notNull(),
+
+    title: text("title").notNull(),
+
+    message: text("message").notNull(),
+
+    isRead: boolean("is_read")
+        .default(false)
+        .notNull(),
+
+    createdAt: timestamp("created_at")
+        .defaultNow()
+        .notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
@@ -309,3 +332,7 @@ export type NewServiceTicket = typeof serviceTickets.$inferInsert;
 export type MaintenanceRecord = typeof maintenanceRecords.$inferSelect;
 
 export type NewMaintenanceRecord = typeof maintenanceRecords.$inferInsert;
+
+export type Notification = typeof notifications.$inferSelect;
+
+export type NewNotification = typeof notifications.$inferInsert;
