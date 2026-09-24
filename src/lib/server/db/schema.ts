@@ -198,6 +198,33 @@ export const energyRequests = pgTable("energy_requests", {
         .references(() => users.id),
 });
 
+export const dispatches = pgTable("dispatches", {
+    id: text("id").primaryKey(),
+
+    offerId: text("offer_id")
+        .notNull()
+        .references(() => solarOffers.id),
+
+    requestId: text("request_id")
+        .notNull()
+        .references(() => energyRequests.id),
+
+    managerId: text("manager_id")
+        .notNull()
+        .references(() => users.id),
+
+    dispatchedEnergyKwh: decimal("dispatched_energy_kwh", {
+        precision: 10,
+        scale: 3,
+    }).notNull(),
+
+    dispatchedAt: timestamp("dispatched_at")
+        .defaultNow()
+        .notNull(),
+
+    notes: text("notes"),
+});
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
@@ -212,3 +239,6 @@ export type NewSolarOffer = typeof solarOffers.$inferInsert;
 
 export type EnergyRequest = typeof energyRequests.$inferSelect;
 export type NewEnergyRequest = typeof energyRequests.$inferInsert;
+
+export type Dispatch = typeof dispatches.$inferSelect;
+export type NewDispatch = typeof dispatches.$inferInsert;
