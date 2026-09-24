@@ -308,6 +308,25 @@ export const notifications = pgTable("notifications", {
         .notNull(),
 });
 
+export const auditLogs = pgTable("audit_logs", {
+    id: text("id").primaryKey(),
+
+    userId: text("user_id")
+        .references(() => users.id),
+
+    action: text("action").notNull(),
+
+    entityType: text("entity_type"),
+
+    entityId: text("entity_id"),
+
+    details: text("details"),
+
+    createdAt: timestamp("created_at")
+        .defaultNow()
+        .notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
@@ -336,3 +355,7 @@ export type NewMaintenanceRecord = typeof maintenanceRecords.$inferInsert;
 export type Notification = typeof notifications.$inferSelect;
 
 export type NewNotification = typeof notifications.$inferInsert;
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+
+export type NewAuditLog = typeof auditLogs.$inferInsert;
