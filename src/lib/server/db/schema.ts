@@ -108,8 +108,41 @@ export const solarAssets = pgTable("solar_assets", {
         .notNull(),
 });
 
+export const energyReadings = pgTable("energy_readings", {
+    id: text("id").primaryKey(),
+
+    assetId: text("asset_id")
+        .notNull()
+        .references(() => solarAssets.id),
+
+    readingTime: timestamp("reading_time")
+        .notNull(),
+
+    generationKwh: decimal("generation_kwh", {
+        precision: 10,
+        scale: 3,
+    }),
+
+    consumptionKwh: decimal("consumption_kwh", {
+        precision: 10,
+        scale: 3,
+    }),
+
+    batteryLevelPercent: decimal("battery_level_percent", {
+        precision: 5,
+        scale: 2,
+    }),
+
+    createdAt: timestamp("created_at")
+        .defaultNow()
+        .notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
 export type SolarAsset = typeof solarAssets.$inferSelect;
 export type NewSolarAsset = typeof solarAssets.$inferInsert;
+
+export type EnergyReading = typeof energyReadings.$inferSelect;
+export type NewEnergyReading = typeof energyReadings.$inferInsert;
