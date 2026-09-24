@@ -263,6 +263,28 @@ export const serviceTickets = pgTable("service_tickets", {
     resolvedAt: timestamp("resolved_at"),
 });
 
+export const maintenanceRecords = pgTable("maintenance_records", {
+    id: text("id").primaryKey(),
+
+    ticketId: text("ticket_id")
+        .notNull()
+        .references(() => serviceTickets.id),
+
+    technicianId: text("technician_id")
+        .notNull()
+        .references(() => users.id),
+
+    description: text("description"),
+
+    partsUsed: text("parts_used"),
+
+    maintenanceDate: timestamp("maintenance_date")
+        .defaultNow()
+        .notNull(),
+
+    notes: text("notes"),
+});
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
@@ -283,3 +305,7 @@ export type NewDispatch = typeof dispatches.$inferInsert;
 
 export type ServiceTicket = typeof serviceTickets.$inferSelect;
 export type NewServiceTicket = typeof serviceTickets.$inferInsert;
+
+export type MaintenanceRecord = typeof maintenanceRecords.$inferSelect;
+
+export type NewMaintenanceRecord = typeof maintenanceRecords.$inferInsert;
