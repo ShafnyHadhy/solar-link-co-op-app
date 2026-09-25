@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/client";
 import { solarAssets } from "../db/schema";
 import type { NewSolarAsset } from "../db/schema";
+import { NotFoundError } from "../utils/errors";
 
 export async function getAssetsByOwner(ownerId: string) {
     return db
@@ -17,7 +18,11 @@ export async function getAssetById(assetId: string) {
         .where(eq(solarAssets.id, assetId))
         .limit(1);
 
-    return result[0] ?? null;
+    if (!result[0]) {
+        throw new NotFoundError("Solar asset not found");
+    }
+
+    return result[0];
 }
 
 export async function createAsset(asset: NewSolarAsset) {
