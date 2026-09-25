@@ -28,3 +28,19 @@ export async function createAsset(asset: NewSolarAsset) {
 
     return result[0];
 }
+
+export async function updateAsset(
+    assetId: string,
+    data: Partial<NewSolarAsset>
+) {
+    const result = await db
+        .update(solarAssets)
+        .set({
+            ...data,
+            updatedAt: new Date(),
+        })
+        .where(eq(solarAssets.id, assetId))
+        .returning();
+
+    return result[0] ?? null;
+}
