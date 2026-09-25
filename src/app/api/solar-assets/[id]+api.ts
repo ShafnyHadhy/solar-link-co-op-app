@@ -30,3 +30,38 @@ export async function GET(
         );
     }
 }
+
+export async function PUT(
+    request: Request,
+    context: { params: { id: string } }
+) {
+    try {
+        const body = await request.json();
+
+        const asset = await updateAsset(context.params.id, {
+            name: body.name,
+            assetType: body.assetType,
+            capacityKw: body.capacityKw,
+            status: body.status,
+            location: body.location,
+            installedAt: body.installedAt
+                ? new Date(body.installedAt)
+                : undefined,
+        });
+
+        if (!asset) {
+            return Response.json(
+                { success: false, error: "Solar asset not found" },
+                { status: 404 }
+            );
+        }
+
+        return Response.json({ success: true, asset });
+    } catch (error) {
+        console.error("[solar-assets/:id PUT]", error);
+        return Response.json(
+            { success: false, error: "Failed to update solar asset" },
+            { status: 500 }
+        );
+    }
+}
