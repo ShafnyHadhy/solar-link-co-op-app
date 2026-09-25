@@ -32,3 +32,23 @@ export async function fetchSolarAssetById(assetId: string): Promise<SolarAsset> 
     const data = await response.json();
     return data.data.asset;
 }
+
+/**
+ * Create a new solar asset.
+ */
+export async function createSolarAsset(
+    asset: NewSolarAsset
+): Promise<SolarAsset> {
+    const response = await fetch(getApiUrl("/api/solar-assets"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(asset),
+    });
+
+    if (!response.ok) {
+        throw new Error("Failed to create solar asset");
+    }
+
+    const data = await response.json();
+    return data.data.asset;
+}
