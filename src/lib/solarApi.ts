@@ -52,3 +52,27 @@ export async function createSolarAsset(
     const data = await response.json();
     return data.data.asset;
 }
+
+/**
+ * Update an existing solar asset by ID.
+ */
+export async function updateSolarAsset(
+    assetId: string,
+    updates: Partial<NewSolarAsset>
+): Promise<SolarAsset> {
+    const response = await fetch(
+        getApiUrl(`/api/solar-assets/${assetId}`),
+        {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updates),
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error("Failed to update solar asset");
+    }
+
+    const data = await response.json();
+    return data.data.asset;
+}
