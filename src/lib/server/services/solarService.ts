@@ -1,4 +1,1 @@
-
-export async function getSolarAssetsByOwner(ownerId: string) {
-    // Solar Owner implementation will be added in US-04.
-}
+import { db } from "../db/client";
