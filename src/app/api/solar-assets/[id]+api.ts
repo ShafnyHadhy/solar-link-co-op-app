@@ -6,6 +6,10 @@ import {
     getAssetById,
     updateAsset,
 } from "@/lib/server/services/solarService";
+import {
+    errorResponse,
+    successResponse,
+} from "@/lib/server/utils/response";
 
 export async function GET(
     _request: Request,
@@ -14,20 +18,9 @@ export async function GET(
     try {
         const asset = await getAssetById(context.params.id);
 
-        if (!asset) {
-            return Response.json(
-                { success: false, error: "Solar asset not found" },
-                { status: 404 }
-            );
-        }
-
-        return Response.json({ success: true, asset });
+        return successResponse({ asset });
     } catch (error) {
-        console.error("[solar-assets/:id GET]", error);
-        return Response.json(
-            { success: false, error: "Failed to get solar asset" },
-            { status: 500 }
-        );
+        return errorResponse(error);
     }
 }
 
@@ -56,12 +49,8 @@ export async function PUT(
             );
         }
 
-        return Response.json({ success: true, asset });
+        return successResponse({ asset });
     } catch (error) {
-        console.error("[solar-assets/:id PUT]", error);
-        return Response.json(
-            { success: false, error: "Failed to update solar asset" },
-            { status: 500 }
-        );
+        return errorResponse(error);
     }
 }
