@@ -56,7 +56,7 @@ export function useUserSync() {
                 throw new Error(data.error || 'Failed to synchronize user');
             }
 
-            setDbUser(data.user);
+            setDbUser(data.data?.user ?? data.user);
             lastSyncedUserIdRef.current = user.id;
         } catch (err: any) {
             console.error('[UserSync Error]:', err?.message || err);
