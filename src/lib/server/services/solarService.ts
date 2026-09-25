@@ -19,3 +19,12 @@ export async function getAssetById(assetId: string) {
 
     return result[0] ?? null;
 }
+
+export async function createAsset(asset: NewSolarAsset) {
+    const result = await db
+        .insert(solarAssets)
+        .values(asset)
+        .returning();
+
+    return result[0];
+}
