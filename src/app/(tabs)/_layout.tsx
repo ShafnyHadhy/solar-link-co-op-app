@@ -1,3 +1,4 @@
+import { useUserSync } from "@/hooks/useUserSync";
 import { getUserRole } from "@/lib/getUserRole";
 import { useUser } from "@clerk/expo";
 import { Redirect } from "expo-router";
@@ -5,6 +6,7 @@ import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useColorScheme } from "nativewind";
 
 export default function TabsLayout() {
+  useUserSync();
   const { user, isSignedIn, isLoaded } = useUser();
 
   const role = getUserRole(user?.publicMetadata?.role);
