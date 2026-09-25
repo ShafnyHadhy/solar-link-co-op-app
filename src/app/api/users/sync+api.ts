@@ -1,6 +1,11 @@
-import { db } from "@/lib/server/db/client";
-import { users } from "@/lib/server/db/schema";
-import { eq } from "drizzle-orm";
+import { getUserById, syncUser } from "@/lib/server/services/userService";
+import {
+    BadRequestError,
+} from "@/lib/server/utils/errors";
+import {
+    errorResponse,
+    successResponse,
+} from "@/lib/server/utils/response";
 
 interface SyncUserRequest {
     id: string;
@@ -16,77 +21,16 @@ export async function POST(request: Request) {
         const body = (await request.json()) as SyncUserRequest;
 
         if (!body.id || !body.email || !body.name) {
-            return Response.json(
-                { error: "Missing required fields: id, email, and name are required." },
-                { status: 400 }
+            throw new BadRequestError(
+                "Missing required fields: id, email, and name are required."
             );
         }
 
-        // Check if user already exists in Neon database
-        const existingUsers = await db
-            .select()
-            .from(users)
-            .where(eq(users.id, body.id))
-            .limit(1);
+        const result = await syncUser(body);
 
-        if (existingUsers.length > 0) {
-            const existing = existingUsers[0];
-
-            // Update user details while preserving assigned role & status unless specified
-            const updatePayload: Partial<typeof users.$inferInsert> = {
-                name: body.name,
-                email: body.email,
-                avatarUrl: body.avatarUrl !== undefined ? body.avatarUrl : existing.avatarUrl,
-                phone: body.phone !== undefined ? body.phone : existing.phone,
-                updatedAt: new Date(),
-            };
-
-            // If a valid role was passed from Clerk metadata and is different, update it
-            if (body.role && body.role !== existing.role) {
-                updatePayload.role = body.role;
-            }
-
-            const [updatedUser] = await db
-                .update(users)
-                .set(updatePayload)
-                .where(eq(users.id, body.id))
-                .returning();
-
-            return Response.json({
-                success: true,
-                action: "updated",
-                user: updatedUser,
-            });
-        }
-
-        // Create new user record
-        const [newUser] = await db
-            .insert(users)
-            .values({
-                id: body.id,
-                name: body.name,
-                email: body.email,
-                role: body.role ?? "household",
-                status: "active",
-                avatarUrl: body.avatarUrl ?? null,
-                phone: body.phone ?? null,
-            })
-            .returning();
-
-        return Response.json(
-            {
-                success: true,
-                action: "created",
-                user: newUser,
-            },
-            { status: 201 }
-        );
-    } catch (error: any) {
-        console.error("[API /api/users/sync Error]", error);
-        return Response.json(
-            { error: error?.message || "Failed to synchronize user" },
-            { status: 500 }
-        );
+        return successResponse(result, result.action === "created" ? 201 : 200);
+    } catch (error) {
+        return errorResponse(error);
     }
 }
 
@@ -96,28 +40,15 @@ export async function GET(request: Request) {
         const userId = searchParams.get("userId");
 
         if (!userId) {
-            return Response.json(
-                { error: "Query parameter 'userId' is required." },
-                { status: 400 }
+            throw new BadRequestError(
+                "Query parameter 'userId' is required."
             );
         }
 
-        const [user] = await db
-            .select()
-            .from(users)
-            .where(eq(users.id, userId))
-            .limit(1);
+        const user = await getUserById(userId);
 
-        if (!user) {
-            return Response.json({ error: "User not found" }, { status: 404 });
-        }
-
-        return Response.json({ success: true, user });
-    } catch (error: any) {
-        console.error("[API /api/users/sync GET Error]", error);
-        return Response.json(
-            { error: error?.message || "Internal server error" },
-            { status: 500 }
-        );
+        return successResponse({ user });
+    } catch (error) {
+        return errorResponse(error);
     }
 }
