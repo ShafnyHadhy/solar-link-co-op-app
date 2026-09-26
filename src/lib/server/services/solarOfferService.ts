@@ -28,3 +28,13 @@ export async function getOfferById(offerId: string) {
 
     return result[0] ?? null;
 }
+
+export async function cancelSolarOffer(offerId: string) {
+    const result = await db
+        .update(solarOffers)
+        .set({ status: "cancelled" })
+        .where(eq(solarOffers.id, offerId))
+        .returning();
+
+    return result[0] ?? null;
+}
