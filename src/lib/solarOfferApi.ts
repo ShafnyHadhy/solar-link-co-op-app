@@ -36,3 +36,20 @@ export async function createSolarOffer(
     const data = await response.json();
     return data.data.offer;
 }
+
+/**
+ * Cancel a pending solar offer by ID.
+ */
+export async function cancelSolarOffer(offerId: string): Promise<SolarOffer> {
+    const response = await fetch(
+        getApiUrl(`/api/solar-offers/${offerId}/cancel`),
+        { method: "PATCH" }
+    );
+
+    if (!response.ok) {
+        throw new Error("Failed to cancel solar offer");
+    }
+
+    const data = await response.json();
+    return data.data.offer;
+}
