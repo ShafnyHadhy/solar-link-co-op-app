@@ -12,3 +12,25 @@ export async function getLatestReading(assetId: string) {
 
     return result[0] ?? null;
 }
+
+export async function getAvailableSurplus(assetId: string) {
+    const reading = await getLatestReading(assetId);
+
+    if (!reading) {
+        return {
+            generationKwh: 0,
+            consumptionKwh: 0,
+            surplusKwh: 0,
+        };
+    }
+
+    const generation = Number(reading.generationKwh ?? 0);
+    const consumption = Number(reading.consumptionKwh ?? 0);
+    const surplus = Math.max(generation - consumption, 0);
+
+    return {
+        generationKwh: generation,
+        consumptionKwh: consumption,
+        surplusKwh: surplus,
+    };
+}
