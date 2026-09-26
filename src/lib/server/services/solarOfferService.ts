@@ -11,3 +11,10 @@ export async function createSolarOffer(offer: NewSolarOffer) {
 
     return result[0];
 }
+
+export async function getOffersByOwner(ownerId: string) {
+    return db
+        .select()
+        .from(solarOffers)
+        .where(eq(solarOffers.ownerId, ownerId));
+}
