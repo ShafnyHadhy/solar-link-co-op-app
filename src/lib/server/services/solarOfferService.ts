@@ -18,3 +18,13 @@ export async function getOffersByOwner(ownerId: string) {
         .from(solarOffers)
         .where(eq(solarOffers.ownerId, ownerId));
 }
+
+export async function getOfferById(offerId: string) {
+    const result = await db
+        .select()
+        .from(solarOffers)
+        .where(eq(solarOffers.id, offerId))
+        .limit(1);
+
+    return result[0] ?? null;
+}
