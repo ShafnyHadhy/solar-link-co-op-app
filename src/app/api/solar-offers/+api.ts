@@ -29,3 +29,52 @@ export async function GET(request: Request) {
         return errorResponse(error);
     }
 }
+
+export async function POST(request: Request) {
+    try {
+        const body = await request.json();
+
+        const { id, ownerId, assetId, energyAmountKwh, minimumBatteryPercent, expiresAt } = body;
+
+        if (!id || !ownerId || !assetId || energyAmountKwh === undefined) {
+            throw new BadRequestError(
+                "id, ownerId, assetId and energyAmountKwh are required"
+            );
+        }
+
+        const requestedEnergy = Number(energyAmountKwh);
+
+        if (requestedEnergy <= 0) {
+            throw new BadRequestError("Energy amount must be greater than 0");
+        }
+
+        const surplus = await getAvailableSurplus(assetId);
+
+        if (requestedEnergy > surplus.surplusKwh) {
+            return Response.json(
+                {
+                    success: false,
+                    error: "Offer amount exceeds available surplus",
+                    availableSurplusKwh: surplus.surplusKwh,
+                },
+                { status: 400 }
+            );
+        }
+
+        const offer = await createSolarOffer({
+            id,
+            ownerId,
+            energyAmountKwh: requestedEnergy.toString(),
+            minimumBatteryPercent:
+                minimumBatteryPercent !== undefined
+                    ? minimumBatteryPercent.toString()
+                    : undefined,
+            status: "pending",
+            expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+        });
+
+        return successResponse({ offer }, 201);
+    } catch (error) {
+        return errorResponse(error);
+    }
+}
