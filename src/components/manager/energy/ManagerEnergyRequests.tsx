@@ -1,84 +1,43 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
+import { useEnergyRequests, type ManagerEnergyRequest } from '@/hooks/manager/useEnergyRequests';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import {
+    ActivityIndicator,
+    Modal,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
+} from 'react-native';
 
-interface EnergyRequestItem {
-    id: string;
-    household: string;
-    currentUsage: number;
-    previousAllocation: number;
-    requestedAmount: number;
-    status: 'pending' | 'approved' | 'rejected';
-    requestedAt: string;
+function formatRequestDate(dateStr: string) {
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    } catch {
+        return dateStr;
+    }
 }
-
-const INITIAL_REQUESTS: EnergyRequestItem[] = [
-    {
-        id: '1',
-        household: 'Household A',
-        currentUsage: 35,
-        previousAllocation: 10,
-        requestedAmount: 15,
-        status: 'pending',
-        requestedAt: '10 mins ago',
-    },
-    {
-        id: '2',
-        household: 'Household B',
-        currentUsage: 42,
-        previousAllocation: 5,
-        requestedAmount: 12,
-        status: 'pending',
-        requestedAt: '35 mins ago',
-    },
-    {
-        id: '3',
-        household: 'Household C',
-        currentUsage: 28,
-        previousAllocation: 17,
-        requestedAmount: 8,
-        status: 'pending',
-        requestedAt: '1 hour ago',
-    },
-    {
-        id: '4',
-        household: 'Household D',
-        currentUsage: 20,
-        previousAllocation: 12,
-        requestedAmount: 10,
-        status: 'approved',
-        requestedAt: 'Yesterday',
-    },
-    {
-        id: '5',
-        household: 'Household E',
-        currentUsage: 18,
-        previousAllocation: 6,
-        requestedAmount: 9,
-        status: 'rejected',
-        requestedAt: '2 days ago',
-    },
-    {
-        id: '6',
-        household: 'Household F',
-        currentUsage: 45,
-        previousAllocation: 18,
-        requestedAmount: 14,
-        status: 'approved',
-        requestedAt: '1 hour ago',
-    },
-];
 
 const ManagerEnergyRequests = () => {
     const router = useRouter();
-    const [requests, setRequests] = useState<EnergyRequestItem[]>(INITIAL_REQUESTS);
+    const { requests, loading, error, refetch } = useEnergyRequests();
+
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedFilter, setSelectedFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
     // Modals State
-    const [selectedRequest, setSelectedRequest] = useState<EnergyRequestItem | null>(null);
+    const [selectedRequest, setSelectedRequest] = useState<ManagerEnergyRequest | null>(null);
     const [reviewModalVisible, setReviewModalVisible] = useState(false);
     const [approveModalVisible, setApproveModalVisible] = useState(false);
 
@@ -87,36 +46,22 @@ const ManagerEnergyRequests = () => {
     const rejectedCount = requests.filter((r) => r.status === 'rejected').length;
     const availableEnergy = 45;
 
-    const openReviewModal = (item: EnergyRequestItem) => {
+    const openReviewModal = (item: ManagerEnergyRequest) => {
         setSelectedRequest(item);
         setReviewModalVisible(true);
     };
 
-    const openApproveModal = (item: EnergyRequestItem) => {
+    const openApproveModal = (item: ManagerEnergyRequest) => {
         setSelectedRequest(item);
         setApproveModalVisible(true);
     };
 
-    const confirmApproval = () => {
-        if (!selectedRequest) return;
-        setRequests((prev) =>
-            prev.map((item) =>
-                item.id === selectedRequest.id ? { ...item, status: 'approved' } : item
-            )
-        );
-        setApproveModalVisible(false);
-    };
-
-    const confirmRejection = (id: string) => {
-        setRequests((prev) =>
-            prev.map((item) =>
-                item.id === id ? { ...item, status: 'rejected' } : item
-            )
-        );
-    };
-
     const filteredRequests = requests.filter((req) => {
-        const matchesSearch = req.household.toLowerCase().includes(searchQuery.toLowerCase());
+        const household = (req.householdName || '').toLowerCase();
+        const reason = (req.reason || '').toLowerCase();
+        const query = searchQuery.toLowerCase();
+        const matchesSearch = household.includes(query) || reason.includes(query);
+
         if (selectedFilter === 'all') return matchesSearch;
         return matchesSearch && req.status === selectedFilter;
     });
@@ -129,6 +74,14 @@ const ManagerEnergyRequests = () => {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ flexGrow: 1, padding: 20, paddingVertical: 60 }}
                 className='flex-1'
+                refreshControl={
+                    <RefreshControl
+                        refreshing={loading}
+                        onRefresh={refetch}
+                        tintColor="#F59E0B"
+                        colors={['#F59E0B']}
+                    />
+                }
             >
                 {/* Header */}
                 <View className='flex-row items-center justify-between mb-6'>
@@ -150,9 +103,12 @@ const ManagerEnergyRequests = () => {
                         </View>
                     </View>
 
-                    <View className='h-10 w-10 items-center justify-center rounded-2xl bg-secondary border border-border/60 shadow-sm'>
-                        <Feather name="bell" size={20} color="#F59E0B" />
-                    </View>
+                    <Pressable
+                        onPress={refetch}
+                        className='h-10 w-10 items-center justify-center rounded-2xl bg-secondary border border-border/60 shadow-sm active:opacity-75'
+                    >
+                        <Feather name="refresh-cw" size={18} color="#F59E0B" />
+                    </Pressable>
                 </View>
 
                 {/* Top KPI Analytics Overview */}
@@ -194,7 +150,7 @@ const ManagerEnergyRequests = () => {
                     <TextInput
                         value={searchQuery}
                         onChangeText={setSearchQuery}
-                        placeholder="Search Request..."
+                        placeholder="Search household or reason..."
                         placeholderTextColor="#9CA3AF"
                         className='flex-1 ml-2.5 text-sm font-medium text-foreground py-0.5'
                     />
@@ -281,148 +237,177 @@ const ManagerEnergyRequests = () => {
                     </Pressable>
                 </ScrollView>
 
+                {/* Loading State */}
+                {loading && (
+                    <View className='items-center justify-center py-16'>
+                        <ActivityIndicator size="large" color="#F59E0B" />
+                        <Text className='text-xs font-semibold text-muted-foreground mt-3'>
+                            Loading energy requests from grid...
+                        </Text>
+                    </View>
+                )}
+
+                {/* API Error State */}
+                {!loading && error && (
+                    <View className='items-center justify-center py-8 px-4 rounded-xl border border-red-500/30 bg-red-500/10 mb-4'>
+                        <Feather name="alert-triangle" size={24} color="#EF4444" />
+                        <Text className='text-sm font-bold text-[#EF4444] mt-2'>
+                            Failed to load energy requests
+                        </Text>
+                        <Text className='text-xs text-muted-foreground text-center mt-1 mb-4'>
+                            {error}
+                        </Text>
+                        <Pressable
+                            onPress={refetch}
+                            className='px-4 py-2 rounded-lg bg-primary active:opacity-80'
+                        >
+                            <Text className='text-xs font-bold text-primary-foreground'>
+                                Retry
+                            </Text>
+                        </Pressable>
+                    </View>
+                )}
+
                 {/* Household Requests List */}
-                <View className='flex-col gap-4'>
-                    {filteredRequests.map((item) => {
-                        const isPending = item.status === 'pending';
-                        const isApproved = item.status === 'approved';
+                {!loading && !error && (
+                    <View className='flex-col gap-4'>
+                        {filteredRequests.map((item) => {
+                            const isPending = item.status === 'pending';
+                            const isApproved = item.status === 'approved';
+                            const formattedKwh = parseFloat(item.requestedEnergyKwh).toFixed(1);
 
-                        return (
-                            <View
-                                key={item.id}
-                                className='rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'
-                            >
-                                {/* Household Header & Status Pill */}
-                                <View className='flex-row items-center justify-between mb-3'>
-                                    <View className='flex-row items-center gap-3 flex-1 mr-2'>
-                                        <View className='h-10 w-10 items-center justify-center rounded-xl bg-card border border-border/60'>
-                                            <Feather name="home" size={16} color="#F59E0B" />
+                            return (
+                                <View
+                                    key={item.id}
+                                    className='rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'
+                                >
+                                    {/* Household Header & Status Pill */}
+                                    <View className='flex-row items-center justify-between mb-3'>
+                                        <View className='flex-row items-center gap-3 flex-1 mr-2'>
+                                            <View className='h-10 w-10 items-center justify-center rounded-xl bg-card border border-border/60'>
+                                                <Feather name="home" size={16} color="#F59E0B" />
+                                            </View>
+                                            <View className='flex-1'>
+                                                <Text className='text-base font-bold text-foreground' numberOfLines={1}>
+                                                    {item.householdName || 'Household Member'}
+                                                </Text>
+                                                <Text className='text-xs text-muted-foreground' numberOfLines={1}>
+                                                    {formatRequestDate(item.requestedAt)}
+                                                </Text>
+                                            </View>
                                         </View>
-                                        <View className='flex-1'>
-                                            <Text className='text-base font-bold text-foreground' numberOfLines={1}>
-                                                {item.household}
-                                            </Text>
-                                            <Text className='text-xs text-muted-foreground' numberOfLines={1}>
-                                                {item.requestedAt}
-                                            </Text>
-                                        </View>
-                                    </View>
 
-                                    {/* Status Badge */}
-                                    <View
-                                        className={`px-2.5 py-0.5 rounded-full border ${isPending
-                                            ? 'bg-yellow-500/15 border-yellow-500/40'
-                                            : isApproved
-                                                ? 'bg-emerald-500/15 border-emerald-500/40'
-                                                : 'bg-zinc-500/15 border-zinc-500/40'
-                                            }`}
-                                    >
-                                        <Text
-                                            className={`text-[10px] font-bold uppercase ${isPending
-                                                ? 'text-[#F59E0B]'
+                                        {/* Status Badge */}
+                                        <View
+                                            className={`px-2.5 py-0.5 rounded-full border ${isPending
+                                                ? 'bg-yellow-500/15 border-yellow-500/40'
                                                 : isApproved
-                                                    ? 'text-[#10B981]'
-                                                    : 'text-[#6B7280]'
+                                                    ? 'bg-emerald-500/15 border-emerald-500/40'
+                                                    : 'bg-zinc-500/15 border-zinc-500/40'
                                                 }`}
                                         >
-                                            {item.status}
-                                        </Text>
+                                            <Text
+                                                className={`text-[10px] font-bold uppercase ${isPending
+                                                    ? 'text-[#F59E0B]'
+                                                    : isApproved
+                                                        ? 'text-[#10B981]'
+                                                        : 'text-[#6B7280]'
+                                                    }`}
+                                            >
+                                                {item.status}
+                                            </Text>
+                                        </View>
                                     </View>
+
+                                    {/* Request Details Section (Requested Amount & Reason) */}
+                                    <View className='rounded-xl bg-card/70 border border-border/30 p-3 mb-3'>
+                                        <View className='flex-row items-center justify-between mb-1.5'>
+                                            <Text className='text-[11px] font-semibold text-muted-foreground'>
+                                                Requested Energy
+                                            </Text>
+                                            <Text className='text-base font-extrabold text-foreground'>
+                                                {formattedKwh} <Text className='text-[11px] font-bold text-muted-foreground'>kWh</Text>
+                                            </Text>
+                                        </View>
+
+                                        {item.reason && (
+                                            <View className='border-t border-border/30 pt-2 mt-1'>
+                                                <Text className='text-xs text-muted-foreground font-medium' numberOfLines={2}>
+                                                    "{item.reason}"
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </View>
+
+                                    {/* Action Buttons */}
+                                    {isPending ? (
+                                        <View className='flex-row items-center justify-end gap-2.5 pt-1'>
+                                            <Pressable
+                                                onPress={() => openReviewModal(item)}
+                                                className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
+                                            >
+                                                <Text className='text-xs font-bold text-foreground'>
+                                                    Review
+                                                </Text>
+                                            </Pressable>
+
+                                            <Pressable
+                                                onPress={() => openApproveModal(item)}
+                                                className='px-3.5 py-1.5 rounded-lg bg-primary border border-primary/40 active:opacity-80 shadow-sm'
+                                            >
+                                                <Text className='text-xs font-bold text-primary-foreground'>
+                                                    Approve
+                                                </Text>
+                                            </Pressable>
+                                        </View>
+                                    ) : isApproved ? (
+                                        <View className='flex-row items-center justify-between pt-1'>
+                                            <Text className='text-xs font-semibold text-[#10B981]'>
+                                                Allocation approved ({formattedKwh} kWh)
+                                            </Text>
+                                            <Pressable
+                                                onPress={() => openReviewModal(item)}
+                                                className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
+                                            >
+                                                <Text className='text-xs font-bold text-foreground'>
+                                                    Details
+                                                </Text>
+                                            </Pressable>
+                                        </View>
+                                    ) : (
+                                        <View className='flex-row items-center justify-between pt-1'>
+                                            <Text className='text-xs font-semibold text-[#EF4444]'>
+                                                Request rejected
+                                            </Text>
+                                            <Pressable
+                                                onPress={() => openReviewModal(item)}
+                                                className='px-3.5 py-1.5 rounded-lg bg-secondary border border-border/60 active:opacity-75'
+                                            >
+                                                <Text className='text-xs font-bold text-foreground'>
+                                                    Details
+                                                </Text>
+                                            </Pressable>
+                                        </View>
+                                    )}
                                 </View>
+                            );
+                        })}
 
-                                {/* Metrics Section (Usage vs Previous Allocation) */}
-                                <View className='flex-row items-center justify-between rounded-xl bg-card/70 border border-border/30 p-3 mb-3'>
-                                    <View className='flex-1'>
-                                        <Text className='text-[11px] font-semibold text-muted-foreground'>
-                                            Current Usage
-                                        </Text>
-                                        <Text className='text-sm font-extrabold text-foreground mt-0.5'>
-                                            {item.currentUsage} <Text className='text-[11px] font-bold text-muted-foreground'>kWh</Text>
-                                        </Text>
-                                    </View>
-
-                                    {/* Divider */}
-                                    <View className='h-7 w-[1px] bg-border/60 mx-2' />
-
-                                    {/* Previous Allocation */}
-                                    <View className='flex-1 pl-2'>
-                                        <Text className='text-[11px] font-semibold text-muted-foreground'>
-                                            Previous Allocation
-                                        </Text>
-                                        <Text className='text-sm font-extrabold text-foreground mt-0.5'>
-                                            {item.previousAllocation} <Text className='text-[11px] font-bold text-muted-foreground'>kWh</Text>
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                {/* Action Buttons */}
-                                {isPending ? (
-                                    <View className='flex-row items-center justify-end gap-2.5 pt-1'>
-                                        <Pressable
-                                            onPress={() => openReviewModal(item)}
-                                            className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
-                                        >
-                                            <Text className='text-xs font-bold text-foreground'>
-                                                Review
-                                            </Text>
-                                        </Pressable>
-
-                                        <Pressable
-                                            onPress={() => openApproveModal(item)}
-                                            className='px-3.5 py-1.5 rounded-lg bg-primary border border-primary/40 active:opacity-80 shadow-sm'
-                                        >
-                                            <Text className='text-xs font-bold text-primary-foreground'>
-                                                Approve
-                                            </Text>
-                                        </Pressable>
-                                    </View>
-                                ) : isApproved ? (
-                                    <View className='flex-row items-center justify-between pt-1'>
-                                        <Text className='text-xs font-semibold text-[#10B981]'>
-                                            Allocation approved ({item.requestedAmount} kWh)
-                                        </Text>
-                                        <Pressable
-                                            onPress={() => openReviewModal(item)}
-                                            className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
-                                        >
-                                            <Text className='text-xs font-bold text-foreground'>
-                                                Details
-                                            </Text>
-                                        </Pressable>
-                                    </View>
-                                ) : (
-                                    <View className='flex-row items-center justify-between pt-1'>
-                                        <Text className='text-xs font-semibold text-[#EF4444]'>
-                                            Request rejected
-                                        </Text>
-                                        <Pressable
-                                            onPress={() => openApproveModal(item)}
-                                            className='px-3.5 py-1.5 rounded-lg bg-primary border border-primary/40 active:opacity-80 shadow-sm'
-                                        >
-                                            <Text className='text-xs font-bold text-primary-foreground'>
-                                                Reconsider
-                                            </Text>
-                                        </Pressable>
-                                    </View>
-                                )}
+                        {/* Empty State */}
+                        {filteredRequests.length === 0 && (
+                            <View className='items-center justify-center py-12 px-4'>
+                                <Text className='text-base font-bold text-foreground'>
+                                    No requests found
+                                </Text>
+                                <Text className='text-xs text-muted-foreground text-center mt-1'>
+                                    {searchQuery
+                                        ? `No requests match "${searchQuery}"`
+                                        : 'There are currently no requests in this category.'}
+                                </Text>
                             </View>
-                        );
-                    })}
-
-                    {/* Empty State */}
-                    {filteredRequests.length === 0 && (
-                        <View className='items-center justify-center py-12 px-4'>
-                            <Text className='text-base font-bold text-foreground'>
-                                No requests found
-                            </Text>
-                            <Text className='text-xs text-muted-foreground text-center mt-1'>
-                                {searchQuery
-                                    ? `No requests match "${searchQuery}"`
-                                    : 'There are currently no requests in this category.'}
-                            </Text>
-                        </View>
-                    )}
-                </View>
+                        )}
+                    </View>
+                )}
             </ScrollView>
 
             {/* 1. Review Details Modal */}
@@ -436,12 +421,12 @@ const ManagerEnergyRequests = () => {
                     <View className='w-full max-w-sm rounded-2xl border border-border/60 bg-card p-5 shadow-lg'>
                         {/* Header */}
                         <View className='flex-row items-center justify-between mb-4'>
-                            <View>
-                                <Text className='text-lg font-bold text-foreground'>
-                                    Request Details
+                            <View className='flex-1 mr-2'>
+                                <Text className='text-lg font-bold text-foreground' numberOfLines={1}>
+                                    {selectedRequest?.householdName || 'Household'}
                                 </Text>
                                 <Text className='text-xs text-muted-foreground'>
-                                    {selectedRequest?.household} • {selectedRequest?.requestedAt}
+                                    {selectedRequest ? formatRequestDate(selectedRequest.requestedAt) : ''}
                                 </Text>
                             </View>
                             <Pressable
@@ -458,30 +443,30 @@ const ManagerEnergyRequests = () => {
                                 Requested Solar Allocation
                             </Text>
                             <Text className='text-3xl font-extrabold text-foreground mt-1'>
-                                {selectedRequest?.requestedAmount}{' '}
+                                {selectedRequest ? parseFloat(selectedRequest.requestedEnergyKwh).toFixed(1) : 0}{' '}
                                 <Text className='text-base font-bold text-muted-foreground'>kWh</Text>
                             </Text>
                         </View>
 
-                        {/* Usage Metrics Breakdown */}
-                        <View className='flex-row items-center justify-between rounded-xl bg-secondary/40 border border-border/30 p-3 mb-4'>
-                            <View className='flex-1'>
-                                <Text className='text-[11px] font-semibold text-muted-foreground'>
-                                    Current Usage
-                                </Text>
-                                <Text className='text-sm font-extrabold text-foreground mt-0.5'>
-                                    {selectedRequest?.currentUsage} kWh
-                                </Text>
-                            </View>
-                            <View className='h-7 w-[1px] bg-border/60 mx-2' />
-                            <View className='flex-1 pl-2'>
-                                <Text className='text-[11px] font-semibold text-muted-foreground'>
-                                    Prev Allocation
-                                </Text>
-                                <Text className='text-sm font-extrabold text-foreground mt-0.5'>
-                                    {selectedRequest?.previousAllocation} kWh
-                                </Text>
-                            </View>
+                        {/* Request Reason & Email */}
+                        <View className='rounded-xl bg-secondary/40 border border-border/30 p-3 mb-4'>
+                            <Text className='text-[11px] font-semibold text-muted-foreground mb-1'>
+                                Purpose / Reason
+                            </Text>
+                            <Text className='text-xs font-medium text-foreground leading-relaxed'>
+                                {selectedRequest?.reason || 'No specific reason provided.'}
+                            </Text>
+
+                            {selectedRequest?.householdEmail && (
+                                <View className='border-t border-border/30 pt-2 mt-2'>
+                                    <Text className='text-[11px] font-semibold text-muted-foreground'>
+                                        Contact Email
+                                    </Text>
+                                    <Text className='text-xs text-foreground mt-0.5'>
+                                        {selectedRequest.householdEmail}
+                                    </Text>
+                                </View>
+                            )}
                         </View>
 
                         {/* Status Line */}
@@ -512,48 +497,20 @@ const ManagerEnergyRequests = () => {
                             </View>
                         </View>
 
-                        {/* Modal Action Buttons */}
-                        {selectedRequest?.status === 'pending' ? (
-                            <View className='flex-row gap-3'>
-                                <Pressable
-                                    onPress={() => {
-                                        setReviewModalVisible(false);
-                                        if (selectedRequest) confirmRejection(selectedRequest.id);
-                                    }}
-                                    className='flex-1 py-2.5 items-center justify-center rounded-xl bg-red-500/10 border border-red-500/30 active:opacity-75'
-                                >
-                                    <Text className='text-xs font-bold text-[#EF4444]'>
-                                        Reject Request
-                                    </Text>
-                                </Pressable>
-
-                                <Pressable
-                                    onPress={() => {
-                                        setReviewModalVisible(false);
-                                        setApproveModalVisible(true);
-                                    }}
-                                    className='flex-1 py-2.5 items-center justify-center rounded-xl bg-primary border border-primary/40 active:opacity-80 shadow-sm'
-                                >
-                                    <Text className='text-xs font-bold text-primary-foreground'>
-                                        Approve
-                                    </Text>
-                                </Pressable>
-                            </View>
-                        ) : (
-                            <Pressable
-                                onPress={() => setReviewModalVisible(false)}
-                                className='w-full py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
-                            >
-                                <Text className='text-xs font-bold text-foreground'>
-                                    Close
-                                </Text>
-                            </Pressable>
-                        )}
+                        {/* Modal Action Buttons (Close only for Task 2) */}
+                        <Pressable
+                            onPress={() => setReviewModalVisible(false)}
+                            className='w-full py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
+                        >
+                            <Text className='text-xs font-bold text-foreground'>
+                                Close
+                            </Text>
+                        </Pressable>
                     </View>
                 </View>
             </Modal>
 
-            {/* 2. Approve Confirmation Modal */}
+            {/* 2. Approve Confirmation Modal (Preview only for Task 2) */}
             <Modal
                 visible={approveModalVisible}
                 transparent
@@ -565,7 +522,7 @@ const ManagerEnergyRequests = () => {
                         {/* Header */}
                         <View className='flex-row items-center justify-between mb-3'>
                             <Text className='text-lg font-bold text-foreground'>
-                                Confirm Allocation
+                                Review Allocation
                             </Text>
                             <Pressable
                                 onPress={() => setApproveModalVisible(false)}
@@ -576,29 +533,29 @@ const ManagerEnergyRequests = () => {
                         </View>
 
                         <Text className='text-xs text-muted-foreground mb-4 leading-relaxed'>
-                            Are you sure you want to approve energy allocation for{' '}
+                            Energy allocation review for{' '}
                             <Text className='font-bold text-foreground'>
-                                {selectedRequest?.household}
+                                {selectedRequest?.householdName}
                             </Text>
-                            ?
+                            :
                         </Text>
 
                         {/* Impact Overview Box */}
                         <View className='rounded-xl bg-secondary/60 border border-border/40 p-3.5 mb-5'>
                             <View className='flex-row items-center justify-between mb-2'>
                                 <Text className='text-xs text-muted-foreground'>
-                                    Allocation Amount
+                                    Requested Amount
                                 </Text>
                                 <Text className='text-xs font-bold text-foreground'>
-                                    +{selectedRequest?.requestedAmount} kWh
+                                    {selectedRequest ? parseFloat(selectedRequest.requestedEnergyKwh).toFixed(1) : 0} kWh
                                 </Text>
                             </View>
                             <View className='flex-row items-center justify-between'>
                                 <Text className='text-xs text-muted-foreground'>
-                                    Remaining Pool
+                                    Available Pool Energy
                                 </Text>
                                 <Text className='text-xs font-bold text-[#10B981]'>
-                                    {availableEnergy - (selectedRequest?.requestedAmount ?? 0)} kWh
+                                    {availableEnergy} kWh
                                 </Text>
                             </View>
                         </View>
@@ -615,11 +572,11 @@ const ManagerEnergyRequests = () => {
                             </Pressable>
 
                             <Pressable
-                                onPress={confirmApproval}
+                                onPress={() => setApproveModalVisible(false)}
                                 className='flex-1 py-2.5 items-center justify-center rounded-xl bg-primary border border-primary/40 active:opacity-80 shadow-sm'
                             >
                                 <Text className='text-xs font-bold text-primary-foreground'>
-                                    Confirm Approval
+                                    Close Preview
                                 </Text>
                             </Pressable>
                         </View>
