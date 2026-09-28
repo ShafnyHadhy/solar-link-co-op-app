@@ -4,6 +4,8 @@ import {
     useEnergyRequestDetail,
     type ManagerEnergyRequest,
 } from '@/hooks/manager/useEnergyRequests';
+import { useSolarOffers } from '@/hooks/manager/useSolarOffers';
+import ManagerSolarOffers from './ManagerSolarOffers';
 import { useUser } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -38,7 +40,9 @@ const ManagerEnergyRequests = () => {
     const router = useRouter();
     const { user } = useUser();
     const { requests, loading, error, refetch, approveRequest, rejectRequest } = useEnergyRequests();
+    const { offers, loading: offersLoading, refetch: refetchOffers } = useSolarOffers();
 
+    const [activeSection, setActiveSection] = useState<'requests' | 'offers'>('requests');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedFilter, setSelectedFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
@@ -141,6 +145,9 @@ const ManagerEnergyRequests = () => {
         return matchesSearch && req.status === selectedFilter;
     });
 
+    const isRefreshing = activeSection === 'requests' ? loading : offersLoading;
+    const handleRefresh = activeSection === 'requests' ? refetch : refetchOffers;
+
     return (
         <View className='flex-1 bg-background'>
             <TabScreenBackground />
@@ -151,15 +158,15 @@ const ManagerEnergyRequests = () => {
                 className='flex-1'
                 refreshControl={
                     <RefreshControl
-                        refreshing={loading}
-                        onRefresh={refetch}
+                        refreshing={isRefreshing}
+                        onRefresh={handleRefresh}
                         tintColor="#F59E0B"
                         colors={['#F59E0B']}
                     />
                 }
             >
                 {/* Header */}
-                <View className='flex-row items-center justify-between mb-6'>
+                <View className='flex-row items-center justify-between mb-5'>
                     <View className='flex-row items-center gap-2'>
                         <Pressable
                             onPress={() => router.canGoBack() && router.back()}
@@ -170,23 +177,80 @@ const ManagerEnergyRequests = () => {
 
                         <View>
                             <Text className='text-2xl font-extrabold text-foreground tracking-tight'>
-                                Energy Requests
+                                {activeSection === 'requests' ? 'Energy Requests' : 'Solar Offers'}
                             </Text>
                             <Text className='text-xs text-muted-foreground mt-0.5'>
-                                Review & allocate community solar power
+                                {activeSection === 'requests'
+                                    ? 'Review & allocate community solar power'
+                                    : 'Review energy shared by solar owners'}
                             </Text>
                         </View>
                     </View>
 
                     <Pressable
-                        onPress={refetch}
+                        onPress={handleRefresh}
                         className='h-10 w-10 items-center justify-center rounded-2xl bg-secondary border border-border/60 shadow-sm active:opacity-75'
                     >
                         <Feather name="refresh-cw" size={18} color="#F59E0B" />
                     </Pressable>
                 </View>
 
-                {/* Top KPI Analytics Overview */}
+                {/* Section Switcher: Household Requests vs Solar Offers */}
+                <View className='flex-row bg-secondary/80 p-1 rounded-2xl border border-border/60 mb-5 shadow-sm'>
+                    <Pressable
+                        onPress={() => setActiveSection('requests')}
+                        className={`flex-1 flex-row items-center justify-center py-2.5 rounded-xl gap-2 ${
+                            activeSection === 'requests'
+                                ? 'bg-primary shadow-sm'
+                                : 'active:opacity-75'
+                        }`}
+                    >
+                        <Feather
+                            name="download"
+                            size={15}
+                            color={activeSection === 'requests' ? '#000000' : '#9CA3AF'}
+                        />
+                        <Text
+                            className={`text-xs font-bold ${
+                                activeSection === 'requests'
+                                    ? 'text-primary-foreground'
+                                    : 'text-muted-foreground'
+                            }`}
+                        >
+                            Requests ({requests.length})
+                        </Text>
+                    </Pressable>
+
+                    <Pressable
+                        onPress={() => setActiveSection('offers')}
+                        className={`flex-1 flex-row items-center justify-center py-2.5 rounded-xl gap-2 ${
+                            activeSection === 'offers'
+                                ? 'bg-primary shadow-sm'
+                                : 'active:opacity-75'
+                        }`}
+                    >
+                        <Feather
+                            name="sun"
+                            size={15}
+                            color={activeSection === 'offers' ? '#000000' : '#9CA3AF'}
+                        />
+                        <Text
+                            className={`text-xs font-bold ${
+                                activeSection === 'offers'
+                                    ? 'text-primary-foreground'
+                                    : 'text-muted-foreground'
+                            }`}
+                        >
+                            Solar Offers ({offers.length})
+                        </Text>
+                    </Pressable>
+                </View>
+
+                {activeSection === 'offers' ? (
+                    <ManagerSolarOffers />
+                ) : (
+                    <>
+                        {/* Top KPI Analytics Overview */}
                 <View className='flex-row gap-3 mb-5 w-full'>
                     {/* Pending Requests */}
                     <View className='flex-1 flex-col justify-between rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'>
@@ -506,6 +570,8 @@ const ManagerEnergyRequests = () => {
                             </View>
                         )}
                     </View>
+                )}
+                    </>
                 )}
             </ScrollView>
 
