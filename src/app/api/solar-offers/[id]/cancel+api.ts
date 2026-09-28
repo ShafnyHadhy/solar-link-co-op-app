@@ -13,10 +13,10 @@ import {
 
 export async function PATCH(
     _request: Request,
-    context: { params: { id: string } }
+    { id }: Record<string, string>
 ) {
     try {
-        const existing = await getOfferById(context.params.id);
+        const existing = await getOfferById(id);
 
         if (!existing) {
             throw new NotFoundError("Solar offer not found");
@@ -28,7 +28,7 @@ export async function PATCH(
             );
         }
 
-        const offer = await cancelSolarOffer(context.params.id);
+        const offer = await cancelSolarOffer(id);
 
         return successResponse({ offer });
     } catch (error) {
