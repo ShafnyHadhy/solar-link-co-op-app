@@ -1,5 +1,9 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
-import { useEnergyRequests, type ManagerEnergyRequest } from '@/hooks/manager/useEnergyRequests';
+import {
+    useEnergyRequests,
+    useEnergyRequestDetail,
+    type ManagerEnergyRequest,
+} from '@/hooks/manager/useEnergyRequests';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -36,23 +40,38 @@ const ManagerEnergyRequests = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedFilter, setSelectedFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
-    // Modals State
-    const [selectedRequest, setSelectedRequest] = useState<ManagerEnergyRequest | null>(null);
+    // Modals & Selection State
+    const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
+    const [selectedApproveItem, setSelectedApproveItem] = useState<ManagerEnergyRequest | null>(null);
     const [reviewModalVisible, setReviewModalVisible] = useState(false);
     const [approveModalVisible, setApproveModalVisible] = useState(false);
+
+    // Fetch individual request details on demand when review modal is open
+    const {
+        request: detailRequest,
+        loading: detailLoading,
+        error: detailError,
+        notFound: detailNotFound,
+        refetch: refetchDetail,
+    } = useEnergyRequestDetail(reviewModalVisible ? selectedRequestId : null);
 
     const pendingCount = requests.filter((r) => r.status === 'pending').length;
     const approvedCount = requests.filter((r) => r.status === 'approved').length;
     const rejectedCount = requests.filter((r) => r.status === 'rejected').length;
     const availableEnergy = 45;
 
-    const openReviewModal = (item: ManagerEnergyRequest) => {
-        setSelectedRequest(item);
+    const openReviewModal = (id: string) => {
+        setSelectedRequestId(id);
         setReviewModalVisible(true);
     };
 
+    const closeReviewModal = () => {
+        setReviewModalVisible(false);
+        setSelectedRequestId(null);
+    };
+
     const openApproveModal = (item: ManagerEnergyRequest) => {
-        setSelectedRequest(item);
+        setSelectedApproveItem(item);
         setApproveModalVisible(true);
     };
 
@@ -343,7 +362,7 @@ const ManagerEnergyRequests = () => {
                                     {isPending ? (
                                         <View className='flex-row items-center justify-end gap-2.5 pt-1'>
                                             <Pressable
-                                                onPress={() => openReviewModal(item)}
+                                                onPress={() => openReviewModal(item.id)}
                                                 className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
                                             >
                                                 <Text className='text-xs font-bold text-foreground'>
@@ -366,7 +385,7 @@ const ManagerEnergyRequests = () => {
                                                 Allocation approved ({formattedKwh} kWh)
                                             </Text>
                                             <Pressable
-                                                onPress={() => openReviewModal(item)}
+                                                onPress={() => openReviewModal(item.id)}
                                                 className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
                                             >
                                                 <Text className='text-xs font-bold text-foreground'>
@@ -380,7 +399,7 @@ const ManagerEnergyRequests = () => {
                                                 Request rejected
                                             </Text>
                                             <Pressable
-                                                onPress={() => openReviewModal(item)}
+                                                onPress={() => openReviewModal(item.id)}
                                                 className='px-3.5 py-1.5 rounded-lg bg-secondary border border-border/60 active:opacity-75'
                                             >
                                                 <Text className='text-xs font-bold text-foreground'>
@@ -415,7 +434,7 @@ const ManagerEnergyRequests = () => {
                 visible={reviewModalVisible}
                 transparent
                 animationType="fade"
-                onRequestClose={() => setReviewModalVisible(false)}
+                onRequestClose={closeReviewModal}
             >
                 <View className='flex-1 bg-black/60 items-center justify-center p-4'>
                     <View className='w-full max-w-sm rounded-2xl border border-border/60 bg-card p-5 shadow-lg'>
@@ -423,89 +442,192 @@ const ManagerEnergyRequests = () => {
                         <View className='flex-row items-center justify-between mb-4'>
                             <View className='flex-1 mr-2'>
                                 <Text className='text-lg font-bold text-foreground' numberOfLines={1}>
-                                    {selectedRequest?.householdName || 'Household'}
+                                    {detailLoading
+                                        ? 'Loading Details...'
+                                        : detailNotFound
+                                            ? 'Request Not Found'
+                                            : detailRequest?.householdName || 'Household Details'}
                                 </Text>
                                 <Text className='text-xs text-muted-foreground'>
-                                    {selectedRequest ? formatRequestDate(selectedRequest.requestedAt) : ''}
+                                    {detailRequest ? formatRequestDate(detailRequest.requestedAt) : selectedRequestId ? `ID: ${selectedRequestId}` : ''}
                                 </Text>
                             </View>
                             <Pressable
-                                onPress={() => setReviewModalVisible(false)}
+                                onPress={closeReviewModal}
                                 className='h-8 w-8 items-center justify-center rounded-full bg-secondary active:opacity-70'
                             >
                                 <Feather name="x" size={18} color="#9CA3AF" />
                             </Pressable>
                         </View>
 
-                        {/* Power Requested Highlight */}
-                        <View className='rounded-xl bg-secondary/60 border border-border/40 p-4 mb-4 items-center'>
-                            <Text className='text-xs font-semibold text-muted-foreground'>
-                                Requested Solar Allocation
-                            </Text>
-                            <Text className='text-3xl font-extrabold text-foreground mt-1'>
-                                {selectedRequest ? parseFloat(selectedRequest.requestedEnergyKwh).toFixed(1) : 0}{' '}
-                                <Text className='text-base font-bold text-muted-foreground'>kWh</Text>
-                            </Text>
-                        </View>
-
-                        {/* Request Reason & Email */}
-                        <View className='rounded-xl bg-secondary/40 border border-border/30 p-3 mb-4'>
-                            <Text className='text-[11px] font-semibold text-muted-foreground mb-1'>
-                                Purpose / Reason
-                            </Text>
-                            <Text className='text-xs font-medium text-foreground leading-relaxed'>
-                                {selectedRequest?.reason || 'No specific reason provided.'}
-                            </Text>
-
-                            {selectedRequest?.householdEmail && (
-                                <View className='border-t border-border/30 pt-2 mt-2'>
-                                    <Text className='text-[11px] font-semibold text-muted-foreground'>
-                                        Contact Email
-                                    </Text>
-                                    <Text className='text-xs text-foreground mt-0.5'>
-                                        {selectedRequest.householdEmail}
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
-
-                        {/* Status Line */}
-                        <View className='flex-row items-center justify-between mb-5 px-1'>
-                            <Text className='text-xs font-semibold text-muted-foreground'>
-                                Current Status
-                            </Text>
-                            <View
-                                className={`px-2.5 py-0.5 rounded-full border ${
-                                    selectedRequest?.status === 'pending'
-                                        ? 'bg-yellow-500/15 border-yellow-500/40'
-                                        : selectedRequest?.status === 'approved'
-                                        ? 'bg-emerald-500/15 border-emerald-500/40'
-                                        : 'bg-zinc-500/15 border-zinc-500/40'
-                                }`}
-                            >
-                                <Text
-                                    className={`text-[10px] font-bold uppercase ${
-                                        selectedRequest?.status === 'pending'
-                                            ? 'text-[#F59E0B]'
-                                            : selectedRequest?.status === 'approved'
-                                            ? 'text-[#10B981]'
-                                            : 'text-[#6B7280]'
-                                    }`}
-                                >
-                                    {selectedRequest?.status}
+                        {/* Loading State */}
+                        {detailLoading && (
+                            <View className='items-center justify-center py-10'>
+                                <ActivityIndicator size="small" color="#F59E0B" />
+                                <Text className='text-xs font-semibold text-muted-foreground mt-3'>
+                                    Retrieving request details...
                                 </Text>
                             </View>
-                        </View>
+                        )}
 
-                        {/* Modal Action Buttons (Close only for Task 2) */}
-                        <Pressable
-                            onPress={() => setReviewModalVisible(false)}
-                            className='w-full py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
-                        >
-                            <Text className='text-xs font-bold text-foreground'>
-                                Close
-                            </Text>
-                        </Pressable>
+                        {/* Not Found State (404) */}
+                        {!detailLoading && detailNotFound && (
+                            <View className='items-center justify-center py-6 px-2'>
+                                <View className='h-12 w-12 rounded-full bg-yellow-500/15 border border-yellow-500/30 items-center justify-center mb-3'>
+                                    <Feather name="alert-circle" size={24} color="#F59E0B" />
+                                </View>
+                                <Text className='text-sm font-bold text-foreground mb-1 text-center'>
+                                    Energy Request Not Found
+                                </Text>
+                                <Text className='text-xs text-muted-foreground text-center mb-5 leading-relaxed'>
+                                    This request (ID: {selectedRequestId}) does not exist in the database or has been deleted.
+                                </Text>
+                                <Pressable
+                                    onPress={closeReviewModal}
+                                    className='w-full py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
+                                >
+                                    <Text className='text-xs font-bold text-foreground'>
+                                        Close
+                                    </Text>
+                                </Pressable>
+                            </View>
+                        )}
+
+                        {/* Error State */}
+                        {!detailLoading && !detailNotFound && detailError && (
+                            <View className='items-center justify-center py-6 px-2'>
+                                <View className='h-12 w-12 rounded-full bg-red-500/15 border border-red-500/30 items-center justify-center mb-3'>
+                                    <Feather name="alert-triangle" size={24} color="#EF4444" />
+                                </View>
+                                <Text className='text-sm font-bold text-[#EF4444] mb-1 text-center'>
+                                    Failed to load request
+                                </Text>
+                                <Text className='text-xs text-muted-foreground text-center mb-5 leading-relaxed'>
+                                    {detailError}
+                                </Text>
+                                <View className='flex-row gap-2 w-full'>
+                                    <Pressable
+                                        onPress={closeReviewModal}
+                                        className='flex-1 py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
+                                    >
+                                        <Text className='text-xs font-bold text-foreground'>
+                                            Close
+                                        </Text>
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={refetchDetail}
+                                        className='flex-1 py-2.5 items-center justify-center rounded-xl bg-primary active:opacity-80'
+                                    >
+                                        <Text className='text-xs font-bold text-primary-foreground'>
+                                            Retry
+                                        </Text>
+                                    </Pressable>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* Request Details Content */}
+                        {!detailLoading && !detailNotFound && !detailError && detailRequest && (
+                            <>
+                                {/* Power Requested Highlight */}
+                                <View className='rounded-xl bg-secondary/60 border border-border/40 p-4 mb-4 items-center'>
+                                    <Text className='text-xs font-semibold text-muted-foreground'>
+                                        Requested Solar Allocation
+                                    </Text>
+                                    <Text className='text-3xl font-extrabold text-foreground mt-1'>
+                                        {parseFloat(detailRequest.requestedEnergyKwh).toFixed(1)}{' '}
+                                        <Text className='text-base font-bold text-muted-foreground'>kWh</Text>
+                                    </Text>
+                                </View>
+
+                                {/* Request Reason & Household Information */}
+                                <View className='rounded-xl bg-secondary/40 border border-border/30 p-3 mb-4'>
+                                    <Text className='text-[11px] font-semibold text-muted-foreground mb-1'>
+                                        Purpose / Reason
+                                    </Text>
+                                    <Text className='text-xs font-medium text-foreground leading-relaxed'>
+                                        {detailRequest.reason || 'No specific reason provided.'}
+                                    </Text>
+
+                                    {/* Household Contact Info */}
+                                    <View className='border-t border-border/30 pt-2 mt-2.5'>
+                                        <Text className='text-[11px] font-semibold text-muted-foreground'>
+                                            Household Contact
+                                        </Text>
+                                        <Text className='text-xs text-foreground mt-0.5'>
+                                            {detailRequest.householdEmail || 'No email on record'}
+                                        </Text>
+                                        {detailRequest.householdPhone && (
+                                            <Text className='text-xs text-muted-foreground mt-0.5'>
+                                                Tel: {detailRequest.householdPhone}
+                                            </Text>
+                                        )}
+                                        {detailRequest.householdGrid && (
+                                            <Text className='text-[11px] text-muted-foreground mt-0.5'>
+                                                Grid: {detailRequest.householdGrid}
+                                            </Text>
+                                        )}
+                                    </View>
+
+                                    {/* Reviewed Information if available */}
+                                    {(detailRequest.reviewedAt || detailRequest.reviewedBy) && (
+                                        <View className='border-t border-border/30 pt-2 mt-2.5'>
+                                            <Text className='text-[11px] font-semibold text-muted-foreground'>
+                                                Review Audit
+                                            </Text>
+                                            {detailRequest.reviewedAt && (
+                                                <Text className='text-xs text-muted-foreground mt-0.5'>
+                                                    Reviewed on: {formatRequestDate(detailRequest.reviewedAt)}
+                                                </Text>
+                                            )}
+                                            {detailRequest.reviewedBy && (
+                                                <Text className='text-xs text-muted-foreground mt-0.5'>
+                                                    By: {detailRequest.reviewedBy}
+                                                </Text>
+                                            )}
+                                        </View>
+                                    )}
+                                </View>
+
+                                {/* Status Line */}
+                                <View className='flex-row items-center justify-between mb-5 px-1'>
+                                    <Text className='text-xs font-semibold text-muted-foreground'>
+                                        Current Status
+                                    </Text>
+                                    <View
+                                        className={`px-2.5 py-0.5 rounded-full border ${
+                                            detailRequest.status === 'pending'
+                                                ? 'bg-yellow-500/15 border-yellow-500/40'
+                                                : detailRequest.status === 'approved'
+                                                    ? 'bg-emerald-500/15 border-emerald-500/40'
+                                                    : 'bg-zinc-500/15 border-zinc-500/40'
+                                            }`}
+                                    >
+                                        <Text
+                                            className={`text-[10px] font-bold uppercase ${
+                                                detailRequest.status === 'pending'
+                                                    ? 'text-[#F59E0B]'
+                                                    : detailRequest.status === 'approved'
+                                                        ? 'text-[#10B981]'
+                                                        : 'text-[#6B7280]'
+                                                }`}
+                                        >
+                                            {detailRequest.status}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Modal Close Button */}
+                                <Pressable
+                                    onPress={closeReviewModal}
+                                    className='w-full py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
+                                >
+                                    <Text className='text-xs font-bold text-foreground'>
+                                        Close
+                                    </Text>
+                                </Pressable>
+                            </>
+                        )}
                     </View>
                 </View>
             </Modal>
@@ -535,7 +657,7 @@ const ManagerEnergyRequests = () => {
                         <Text className='text-xs text-muted-foreground mb-4 leading-relaxed'>
                             Energy allocation review for{' '}
                             <Text className='font-bold text-foreground'>
-                                {selectedRequest?.householdName}
+                                {selectedApproveItem?.householdName}
                             </Text>
                             :
                         </Text>
@@ -547,7 +669,7 @@ const ManagerEnergyRequests = () => {
                                     Requested Amount
                                 </Text>
                                 <Text className='text-xs font-bold text-foreground'>
-                                    {selectedRequest ? parseFloat(selectedRequest.requestedEnergyKwh).toFixed(1) : 0} kWh
+                                    {selectedApproveItem ? parseFloat(selectedApproveItem.requestedEnergyKwh).toFixed(1) : 0} kWh
                                 </Text>
                             </View>
                             <View className='flex-row items-center justify-between'>
