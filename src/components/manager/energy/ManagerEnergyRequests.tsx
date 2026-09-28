@@ -250,80 +250,82 @@ const ManagerEnergyRequests = () => {
                 </View>
 
                 {/* Filter Tabs */}
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ gap: 8 }}
-                    className='mb-5'
-                >
-                    <Pressable
-                        onPress={() => setSelectedFilter('all')}
-                        className={`px-4 py-2 rounded-full border ${selectedFilter === 'all'
-                            ? 'bg-primary border-primary shadow-sm'
-                            : 'bg-secondary/60 border-border/60 active:bg-secondary'
-                            }`}
+                <View className='mb-5'>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ gap: 8, alignItems: 'center' }}
+                        style={{ flexGrow: 0 }}
                     >
-                        <Text
-                            className={`text-xs font-bold ${selectedFilter === 'all'
-                                ? 'text-primary-foreground'
-                                : 'text-muted-foreground'
+                        <Pressable
+                            onPress={() => setSelectedFilter('all')}
+                            className={`px-4 py-2 rounded-full border ${selectedFilter === 'all'
+                                ? 'bg-primary border-primary shadow-sm'
+                                : 'bg-secondary/60 border-border/60 active:bg-secondary'
                                 }`}
                         >
-                            All ({requests.length})
-                        </Text>
-                    </Pressable>
+                            <Text
+                                className={`text-xs font-bold ${selectedFilter === 'all'
+                                    ? 'text-primary-foreground'
+                                    : 'text-muted-foreground'
+                                    }`}
+                            >
+                                All ({requests.length})
+                            </Text>
+                        </Pressable>
 
-                    <Pressable
-                        onPress={() => setSelectedFilter('pending')}
-                        className={`px-4 py-2 rounded-full border ${selectedFilter === 'pending'
-                            ? 'bg-primary border-primary shadow-sm'
-                            : 'bg-secondary/60 border-border/60 active:bg-secondary'
-                            }`}
-                    >
-                        <Text
-                            className={`text-xs font-bold ${selectedFilter === 'pending'
-                                ? 'text-primary-foreground'
-                                : 'text-muted-foreground'
+                        <Pressable
+                            onPress={() => setSelectedFilter('pending')}
+                            className={`px-4 py-2 rounded-full border ${selectedFilter === 'pending'
+                                ? 'bg-primary border-primary shadow-sm'
+                                : 'bg-secondary/60 border-border/60 active:bg-secondary'
                                 }`}
                         >
-                            Pending ({pendingCount})
-                        </Text>
-                    </Pressable>
+                            <Text
+                                className={`text-xs font-bold ${selectedFilter === 'pending'
+                                    ? 'text-primary-foreground'
+                                    : 'text-muted-foreground'
+                                    }`}
+                            >
+                                Pending ({pendingCount})
+                            </Text>
+                        </Pressable>
 
-                    <Pressable
-                        onPress={() => setSelectedFilter('approved')}
-                        className={`px-4 py-2 rounded-full border ${selectedFilter === 'approved'
-                            ? 'bg-primary border-primary shadow-sm'
-                            : 'bg-secondary/60 border-border/60 active:bg-secondary'
-                            }`}
-                    >
-                        <Text
-                            className={`text-xs font-bold ${selectedFilter === 'approved'
-                                ? 'text-primary-foreground'
-                                : 'text-muted-foreground'
+                        <Pressable
+                            onPress={() => setSelectedFilter('approved')}
+                            className={`px-4 py-2 rounded-full border ${selectedFilter === 'approved'
+                                ? 'bg-primary border-primary shadow-sm'
+                                : 'bg-secondary/60 border-border/60 active:bg-secondary'
                                 }`}
                         >
-                            Approved ({approvedCount})
-                        </Text>
-                    </Pressable>
+                            <Text
+                                className={`text-xs font-bold ${selectedFilter === 'approved'
+                                    ? 'text-primary-foreground'
+                                    : 'text-muted-foreground'
+                                    }`}
+                            >
+                                Approved ({approvedCount})
+                            </Text>
+                        </Pressable>
 
-                    <Pressable
-                        onPress={() => setSelectedFilter('rejected')}
-                        className={`px-4 py-2 rounded-full border ${selectedFilter === 'rejected'
-                            ? 'bg-primary border-primary shadow-sm'
-                            : 'bg-secondary/60 border-border/60 active:bg-secondary'
-                            }`}
-                    >
-                        <Text
-                            className={`text-xs font-bold ${selectedFilter === 'rejected'
-                                ? 'text-primary-foreground'
-                                : 'text-muted-foreground'
+                        <Pressable
+                            onPress={() => setSelectedFilter('rejected')}
+                            className={`px-4 py-2 rounded-full border ${selectedFilter === 'rejected'
+                                ? 'bg-primary border-primary shadow-sm'
+                                : 'bg-secondary/60 border-border/60 active:bg-secondary'
                                 }`}
                         >
-                            Rejected ({rejectedCount})
-                        </Text>
-                    </Pressable>
-                </ScrollView>
+                            <Text
+                                className={`text-xs font-bold ${selectedFilter === 'rejected'
+                                    ? 'text-primary-foreground'
+                                    : 'text-muted-foreground'
+                                    }`}
+                            >
+                                Rejected ({rejectedCount})
+                            </Text>
+                        </Pressable>
+                    </ScrollView>
+                </View>
 
                 {/* Loading State */}
                 {loading && (
