@@ -4,6 +4,7 @@ import {
     useEnergyRequestDetail,
     type ManagerEnergyRequest,
 } from '@/hooks/manager/useEnergyRequests';
+import { useUser } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -35,7 +36,8 @@ function formatRequestDate(dateStr: string) {
 
 const ManagerEnergyRequests = () => {
     const router = useRouter();
-    const { requests, loading, error, refetch } = useEnergyRequests();
+    const { user } = useUser();
+    const { requests, loading, error, refetch, approveRequest } = useEnergyRequests();
 
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedFilter, setSelectedFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
@@ -45,6 +47,11 @@ const ManagerEnergyRequests = () => {
     const [selectedApproveItem, setSelectedApproveItem] = useState<ManagerEnergyRequest | null>(null);
     const [reviewModalVisible, setReviewModalVisible] = useState(false);
     const [approveModalVisible, setApproveModalVisible] = useState(false);
+
+    // Approval action state
+    const [isApproving, setIsApproving] = useState(false);
+    const [approveError, setApproveError] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     // Fetch individual request details on demand when review modal is open
     const {
@@ -72,7 +79,27 @@ const ManagerEnergyRequests = () => {
 
     const openApproveModal = (item: ManagerEnergyRequest) => {
         setSelectedApproveItem(item);
+        setApproveError(null);
         setApproveModalVisible(true);
+    };
+
+    const handleConfirmApprove = async () => {
+        if (!selectedApproveItem) return;
+        setIsApproving(true);
+        setApproveError(null);
+
+        try {
+            await approveRequest(selectedApproveItem.id, user?.id);
+            const householdName = selectedApproveItem.householdName || 'Household';
+            setApproveModalVisible(false);
+            setSelectedApproveItem(null);
+            setSuccessMessage(`Energy request for ${householdName} approved successfully.`);
+            setTimeout(() => setSuccessMessage(null), 4000);
+        } catch (err: any) {
+            setApproveError(err?.message || 'Failed to approve request');
+        } finally {
+            setIsApproving(false);
+        }
     };
 
     const filteredRequests = requests.filter((req) => {
@@ -162,6 +189,19 @@ const ManagerEnergyRequests = () => {
                         </Text>
                     </View>
                 </View>
+
+                {/* Success Feedback Banner */}
+                {successMessage && (
+                    <View className='flex-row items-center gap-2.5 py-3 px-4 rounded-xl border border-emerald-500/40 bg-emerald-500/15 mb-4 shadow-sm'>
+                        <Feather name="check-circle" size={18} color="#10B981" />
+                        <Text className='flex-1 text-xs font-bold text-[#10B981]'>
+                            {successMessage}
+                        </Text>
+                        <Pressable onPress={() => setSuccessMessage(null)}>
+                            <Feather name="x" size={16} color="#10B981" />
+                        </Pressable>
+                    </View>
+                )}
 
                 {/* Search Bar */}
                 <View className='flex-row items-center bg-secondary/60 border border-border/60 rounded-full px-4 py-2.5 mb-4 shadow-sm'>
@@ -617,37 +657,77 @@ const ManagerEnergyRequests = () => {
                                     </View>
                                 </View>
 
-                                {/* Modal Close Button */}
-                                <Pressable
-                                    onPress={closeReviewModal}
-                                    className='w-full py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
-                                >
-                                    <Text className='text-xs font-bold text-foreground'>
-                                        Close
-                                    </Text>
-                                </Pressable>
+                                {/* Modal Action Buttons */}
+                                {detailRequest.status === 'pending' ? (
+                                    <View className='flex-row gap-2.5'>
+                                        <Pressable
+                                            onPress={closeReviewModal}
+                                            className='flex-1 py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
+                                        >
+                                            <Text className='text-xs font-bold text-foreground'>
+                                                Close
+                                            </Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={() => {
+                                                const itemToApprove: ManagerEnergyRequest = {
+                                                    id: detailRequest.id,
+                                                    householdId: detailRequest.householdId,
+                                                    householdName: detailRequest.householdName,
+                                                    householdEmail: detailRequest.householdEmail,
+                                                    requestedEnergyKwh: detailRequest.requestedEnergyKwh,
+                                                    reason: detailRequest.reason,
+                                                    status: detailRequest.status,
+                                                    requestedAt: detailRequest.requestedAt,
+                                                    reviewedAt: detailRequest.reviewedAt,
+                                                    reviewedBy: detailRequest.reviewedBy,
+                                                };
+                                                closeReviewModal();
+                                                openApproveModal(itemToApprove);
+                                            }}
+                                            className='flex-1 py-2.5 items-center justify-center rounded-xl bg-primary border border-primary/40 active:opacity-80 shadow-sm'
+                                        >
+                                            <Text className='text-xs font-bold text-primary-foreground'>
+                                                Approve
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                ) : (
+                                    <Pressable
+                                        onPress={closeReviewModal}
+                                        className='w-full py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
+                                    >
+                                        <Text className='text-xs font-bold text-foreground'>
+                                            Close
+                                        </Text>
+                                    </Pressable>
+                                )}
                             </>
                         )}
                     </View>
                 </View>
             </Modal>
 
-            {/* 2. Approve Confirmation Modal (Preview only for Task 2) */}
+            {/* 2. Approve Confirmation Modal */}
             <Modal
                 visible={approveModalVisible}
                 transparent
                 animationType="fade"
-                onRequestClose={() => setApproveModalVisible(false)}
+                onRequestClose={() => !isApproving && setApproveModalVisible(false)}
             >
                 <View className='flex-1 bg-black/60 items-center justify-center p-4'>
                     <View className='w-full max-w-sm rounded-2xl border border-border/60 bg-card p-5 shadow-lg'>
                         {/* Header */}
                         <View className='flex-row items-center justify-between mb-3'>
                             <Text className='text-lg font-bold text-foreground'>
-                                Review Allocation
+                                Approve Allocation
                             </Text>
                             <Pressable
-                                onPress={() => setApproveModalVisible(false)}
+                                disabled={isApproving}
+                                onPress={() => {
+                                    setApproveModalVisible(false);
+                                    setApproveError(null);
+                                }}
                                 className='h-8 w-8 items-center justify-center rounded-full bg-secondary active:opacity-70'
                             >
                                 <Feather name="x" size={18} color="#9CA3AF" />
@@ -655,15 +735,15 @@ const ManagerEnergyRequests = () => {
                         </View>
 
                         <Text className='text-xs text-muted-foreground mb-4 leading-relaxed'>
-                            Energy allocation review for{' '}
+                            You are approving the energy allocation request for{' '}
                             <Text className='font-bold text-foreground'>
-                                {selectedApproveItem?.householdName}
+                                {selectedApproveItem?.householdName || 'Household'}
                             </Text>
                             :
                         </Text>
 
                         {/* Impact Overview Box */}
-                        <View className='rounded-xl bg-secondary/60 border border-border/40 p-3.5 mb-5'>
+                        <View className='rounded-xl bg-secondary/60 border border-border/40 p-3.5 mb-4'>
                             <View className='flex-row items-center justify-between mb-2'>
                                 <Text className='text-xs text-muted-foreground'>
                                     Requested Amount
@@ -682,10 +762,23 @@ const ManagerEnergyRequests = () => {
                             </View>
                         </View>
 
+                        {/* Inline Error in Modal if any */}
+                        {approveError && (
+                            <View className='p-3 rounded-xl bg-red-500/10 border border-red-500/30 mb-4'>
+                                <Text className='text-xs font-semibold text-[#EF4444] text-center'>
+                                    {approveError}
+                                </Text>
+                            </View>
+                        )}
+
                         {/* Action Buttons */}
                         <View className='flex-row gap-3'>
                             <Pressable
-                                onPress={() => setApproveModalVisible(false)}
+                                disabled={isApproving}
+                                onPress={() => {
+                                    setApproveModalVisible(false);
+                                    setApproveError(null);
+                                }}
                                 className='flex-1 py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
                             >
                                 <Text className='text-xs font-bold text-foreground'>
@@ -694,12 +787,17 @@ const ManagerEnergyRequests = () => {
                             </Pressable>
 
                             <Pressable
-                                onPress={() => setApproveModalVisible(false)}
-                                className='flex-1 py-2.5 items-center justify-center rounded-xl bg-primary border border-primary/40 active:opacity-80 shadow-sm'
+                                disabled={isApproving}
+                                onPress={handleConfirmApprove}
+                                className='flex-1 py-2.5 items-center justify-center rounded-xl bg-primary border border-primary/40 active:opacity-80 shadow-sm flex-row items-center justify-center gap-2'
                             >
-                                <Text className='text-xs font-bold text-primary-foreground'>
-                                    Close Preview
-                                </Text>
+                                {isApproving ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                    <Text className='text-xs font-bold text-primary-foreground'>
+                                        Confirm Approval
+                                    </Text>
+                                )}
                             </Pressable>
                         </View>
                     </View>

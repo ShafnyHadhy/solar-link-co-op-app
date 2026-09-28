@@ -49,11 +49,44 @@ export function useEnergyRequests() {
         fetchRequests();
     }, [fetchRequests]);
 
+    const approveRequest = useCallback(
+        async (requestId: string, managerId?: string) => {
+            const headers: Record<string, string> = {
+                "Content-Type": "application/json",
+            };
+            if (managerId) {
+                headers["x-user-id"] = managerId;
+            }
+
+            const response = await fetch(
+                getApiUrl(`/api/manager/energy-requests/${requestId}`),
+                {
+                    method: "PATCH",
+                    headers,
+                    body: JSON.stringify({ action: "approve" }),
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || "Failed to approve energy request");
+            }
+
+            // Refetch live list to sync database changes
+            await fetchRequests();
+
+            return data.request || data.data;
+        },
+        [fetchRequests]
+    );
+
     return {
         requests,
         loading,
         error,
         refetch: fetchRequests,
+        approveRequest,
     };
 }
 

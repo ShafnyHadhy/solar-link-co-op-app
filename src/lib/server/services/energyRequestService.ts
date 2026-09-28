@@ -1,7 +1,12 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "../db/client";
-import { energyRequests, users } from "../db/schema";
-import { NotFoundError } from "../utils/errors";
+import { auditLogs, energyRequests, users } from "../db/schema";
+import {
+    BadRequestError,
+    ForbiddenError,
+    NotFoundError,
+    UnauthorizedError,
+} from "../utils/errors";
 
 /**
  * Retrieve all energy requests for the manager.
@@ -78,4 +83,96 @@ export async function getEnergyRequestById(id: string) {
             assignedGrid: row.householdGrid,
         },
     };
+}
+
+/**
+ * Approve a pending energy request.
+ * 1. Verify the request exists.
+ * 2. Verify its current status is "pending".
+ * 3. Verify the acting user is a manager.
+ * 4. Prevent approval if the request is already approved, rejected, fulfilled or cancelled.
+ * 5. Update energy_requests: status = "approved", reviewedBy = managerId, reviewedAt = now.
+ * 6. Insert audit_logs entry: userId, action = "APPROVE_ENERGY_REQUEST", entityType = "energy_request", entityId = requestId, details.
+ * 7. Return the updated request.
+ */
+export async function approveEnergyRequest(requestId: string, managerId: string) {
+    if (!managerId) {
+        throw new UnauthorizedError("Manager identity is required to approve an energy request.");
+    }
+
+    // 1. Verify acting user is a manager
+    const managerResults = await db
+        .select({
+            id: users.id,
+            name: users.name,
+            role: users.role,
+        })
+        .from(users)
+        .where(eq(users.id, managerId))
+        .limit(1);
+
+    if (!managerResults || managerResults.length === 0) {
+        throw new NotFoundError(`Manager with ID '${managerId}' was not found.`);
+    }
+
+    const manager = managerResults[0];
+    if (manager.role !== "manager") {
+        throw new ForbiddenError("Forbidden: Only managers can approve energy requests.");
+    }
+
+    // 2. Verify request exists
+    const requestResults = await db
+        .select()
+        .from(energyRequests)
+        .where(eq(energyRequests.id, requestId))
+        .limit(1);
+
+    if (!requestResults || requestResults.length === 0) {
+        throw new NotFoundError(`Energy request '${requestId}' not found.`);
+    }
+
+    const existingRequest = requestResults[0];
+
+    // 3. Verify status is "pending" and prevent approval if already approved, rejected, fulfilled, or cancelled
+    if (existingRequest.status !== "pending") {
+        throw new BadRequestError(
+            `Cannot approve energy request with status '${existingRequest.status}'. Only pending requests can be approved.`
+        );
+    }
+
+    const now = new Date();
+
+    // 4. Update energy_requests
+    await db
+        .update(energyRequests)
+        .set({
+            status: "approved",
+            reviewedBy: managerId,
+            reviewedAt: now,
+        })
+        .where(eq(energyRequests.id, requestId));
+
+    // 5. Create audit_logs record
+    const auditId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    await db.insert(auditLogs).values({
+        id: auditId,
+        userId: managerId,
+        action: "APPROVE_ENERGY_REQUEST",
+        entityType: "energy_request",
+        entityId: requestId,
+        details: JSON.stringify({
+            requestId,
+            householdId: existingRequest.householdId,
+            requestedEnergyKwh: existingRequest.requestedEnergyKwh,
+            previousStatus: existingRequest.status,
+            newStatus: "approved",
+            approvedBy: managerId,
+            managerName: manager.name,
+            approvedAt: now.toISOString(),
+        }),
+        createdAt: now,
+    });
+
+    // 6. Return the updated request with full household details
+    return getEnergyRequestById(requestId);
 }
