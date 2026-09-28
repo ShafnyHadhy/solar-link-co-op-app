@@ -1,9 +1,11 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
 import { useAuth, useUser } from '@clerk/expo';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import React, { useState } from 'react';
-import { Modal, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Modal, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SolarOwnerPrediction } from '../prediction/SolarOwnerPrediction';
+import { SolarOwnerReports } from '../reports/SolarOwnerReports';
 import { SolarToast } from '../shared/SolarToast';
 import { ViewHeader } from '../shared/ViewHeader';
 import { useSolarOwnerStore } from '../store/useSolarOwnerStore';
@@ -18,11 +20,65 @@ export const SolarOwnerMenu = () => {
         notificationsEnabled,
         toggleNotificationSetting,
         showToast,
+        solarAssets,
+        createSolarAssetAction,
+        updateSolarAssetAction,
+        fetchSolarData,
     } = useSolarOwnerStore();
 
     const [tipsModalVisible, setTipsModalVisible] = useState(false);
     const [maintenanceModalVisible, setMaintenanceModalVisible] = useState(false);
     const [hardwareModalVisible, setHardwareModalVisible] = useState(false);
+    const [assetModalVisible, setAssetModalVisible] = useState(false);
+    const [predictionModalVisible, setPredictionModalVisible] = useState(false);
+    const [reportsModalVisible, setReportsModalVisible] = useState(false);
+
+    const primaryAsset = solarAssets[0] || null;
+
+    // Asset form state
+    const [assetName, setAssetName] = useState('Home Solar System');
+    const [assetCapacity, setAssetCapacity] = useState('6.0');
+    const [assetLocation, setAssetLocation] = useState('Main Roof');
+    const [assetType, setAssetType] = useState('solar_panel');
+    const [isSavingAsset, setIsSavingAsset] = useState(false);
+
+    useEffect(() => {
+        if (primaryAsset) {
+            setAssetName(primaryAsset.name);
+            setAssetCapacity(primaryAsset.capacityKw || '6.0');
+            setAssetLocation(primaryAsset.location || 'Main Roof');
+            setAssetType(primaryAsset.assetType || 'solar_panel');
+        }
+    }, [primaryAsset]);
+
+    const handleSaveAsset = async () => {
+        if (!user?.id) return;
+        const capacityNum = parseFloat(assetCapacity);
+        if (isNaN(capacityNum) || capacityNum <= 0) {
+            showToast('Please enter a valid capacity in kW', 'warning');
+            return;
+        }
+
+        setIsSavingAsset(true);
+        if (primaryAsset) {
+            const ok = await updateSolarAssetAction(primaryAsset.id, user.id, {
+                name: assetName,
+                capacityKw: capacityNum,
+                location: assetLocation,
+                assetType,
+            });
+            if (ok) setAssetModalVisible(false);
+        } else {
+            const ok = await createSolarAssetAction(user.id, {
+                name: assetName,
+                capacityKw: capacityNum,
+                location: assetLocation,
+                assetType,
+            });
+            if (ok) setAssetModalVisible(false);
+        }
+        setIsSavingAsset(false);
+    };
 
     return (
         <View className="flex-1 bg-background">
@@ -89,10 +145,33 @@ export const SolarOwnerMenu = () => {
                             </View>
                             <View className="flex-1 min-w-0">
                                 <Text className="text-sm font-bold text-foreground" numberOfLines={1}>
-                                    Solar Panels & Inverter Specs
+                                    {primaryAsset ? primaryAsset.name : 'Solar Panels & Inverter Specs'}
                                 </Text>
                                 <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-                                    6.0 kWp • 12 SunPower panels • 98.4% Eff.
+                                    {primaryAsset
+                                        ? `${primaryAsset.capacityKw || '6.0'} kWp • ${primaryAsset.location || 'Main Roof'} • Status: ${primaryAsset.status}`
+                                        : '6.0 kWp • 12 SunPower panels • 98.4% Eff.'}
+                                </Text>
+                            </View>
+                        </View>
+                        <Feather name="chevron-right" size={18} color="#9CA3AF" style={{ flexShrink: 0 }} />
+                    </Pressable>
+
+                    {/* Register / Edit Asset Row */}
+                    <Pressable
+                        onPress={() => setAssetModalVisible(true)}
+                        className="flex-row items-center justify-between p-4 active:bg-secondary/40 gap-2"
+                    >
+                        <View className="flex-row items-center flex-1 mr-2 min-w-0">
+                            <View className="h-9 w-9 rounded-xl bg-sky-500/15 items-center justify-center mr-3 border border-sky-500/30 flex-shrink-0">
+                                <Feather name={primaryAsset ? 'edit-3' : 'plus-circle'} size={16} color="#0EA5E9" />
+                            </View>
+                            <View className="flex-1 min-w-0">
+                                <Text className="text-sm font-bold text-foreground" numberOfLines={1}>
+                                    {primaryAsset ? 'Manage Solar Asset Specs' : 'Register Solar Asset (US-04A)'}
+                                </Text>
+                                <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                                    {primaryAsset ? 'Edit capacity, location & system name' : 'Add rooftop panels to sync with microgrid'}
                                 </Text>
                             </View>
                         </View>
@@ -133,6 +212,52 @@ export const SolarOwnerMenu = () => {
                                 </Text>
                                 <Text className="text-xs text-muted-foreground" numberOfLines={1}>
                                     5 recommendations to maximize yield
+                                </Text>
+                            </View>
+                        </View>
+                        <Feather name="chevron-right" size={18} color="#9CA3AF" style={{ flexShrink: 0 }} />
+                    </Pressable>
+                </View>
+
+                {/* 3. ANALYTICS & FORECASTING (Linked Screens) */}
+                <Text className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-2 mb-2">
+                    Advanced Analytics & Forecasting
+                </Text>
+                <View className="rounded-[24px] border border-border/70 bg-card/85 dark:bg-card/50 overflow-hidden mb-5 shadow-sm divide-y divide-border/40">
+                    <Pressable
+                        onPress={() => setPredictionModalVisible(true)}
+                        className="flex-row items-center justify-between p-4 active:bg-secondary/40 gap-2"
+                    >
+                        <View className="flex-row items-center flex-1 mr-2 min-w-0">
+                            <View className="h-9 w-9 rounded-xl bg-amber-500/15 items-center justify-center mr-3 border border-amber-500/30 flex-shrink-0">
+                                <MaterialCommunityIcons name="weather-sunny" size={18} color="#F59E0B" />
+                            </View>
+                            <View className="flex-1 min-w-0">
+                                <Text className="text-sm font-bold text-foreground" numberOfLines={1}>
+                                    Solar Yield Prediction & 7-Day Forecast
+                                </Text>
+                                <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                                    AI hourly irradiance, peak sun hours & yield estimates
+                                </Text>
+                            </View>
+                        </View>
+                        <Feather name="chevron-right" size={18} color="#9CA3AF" style={{ flexShrink: 0 }} />
+                    </Pressable>
+
+                    <Pressable
+                        onPress={() => setReportsModalVisible(true)}
+                        className="flex-row items-center justify-between p-4 active:bg-secondary/40 gap-2"
+                    >
+                        <View className="flex-row items-center flex-1 mr-2 min-w-0">
+                            <View className="h-9 w-9 rounded-xl bg-emerald-500/15 items-center justify-center mr-3 border border-emerald-500/30 flex-shrink-0">
+                                <Feather name="pie-chart" size={16} color="#10B981" />
+                            </View>
+                            <View className="flex-1 min-w-0">
+                                <Text className="text-sm font-bold text-foreground" numberOfLines={1}>
+                                    Monthly Savings & Financial Statements
+                                </Text>
+                                <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                                    ROI breakdown, sharing earnings & exportable PDFs
                                 </Text>
                             </View>
                         </View>
@@ -365,6 +490,141 @@ export const SolarOwnerMenu = () => {
                         </ScrollView>
                     </View>
                 </View>
+            </Modal>
+
+            {/* --- MODAL: ASSET MANAGEMENT (US-04A CRUD) --- */}
+            <Modal visible={assetModalVisible} transparent animationType="slide">
+                <View className="flex-1 bg-black/60 justify-end">
+                    <View className="rounded-t-[36px] bg-card border-t border-border p-6 max-h-[85%]">
+                        <View className="flex-row items-center justify-between mb-4">
+                            <View className="flex-row items-center">
+                                <View className="h-10 w-10 rounded-2xl bg-sky-500/20 items-center justify-center mr-3 border border-sky-500/30">
+                                    <MaterialCommunityIcons name="solar-panel" size={22} color="#0EA5E9" />
+                                </View>
+                                <View>
+                                    <Text className="text-lg font-black text-foreground">
+                                        {primaryAsset ? 'Update Solar Asset' : 'Register Solar Asset'}
+                                    </Text>
+                                    <Text className="text-xs text-muted-foreground">
+                                        Hardware telemetry & co-op grid specs
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <Pressable
+                                onPress={() => setAssetModalVisible(false)}
+                                className="h-8 w-8 rounded-full bg-secondary items-center justify-center active:opacity-70"
+                            >
+                                <Feather name="x" size={18} color="#9CA3AF" />
+                            </Pressable>
+                        </View>
+
+                        <ScrollView className="gap-3.5" showsVerticalScrollIndicator={false}>
+                            {/* System Name */}
+                            <View>
+                                <Text className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+                                    System / Array Name
+                                </Text>
+                                <View className="rounded-2xl bg-secondary/80 border border-border/80 px-4 py-2.5">
+                                    <TextInput
+                                        value={assetName}
+                                        onChangeText={setAssetName}
+                                        placeholder="e.g. Home Rooftop Solar Array"
+                                        placeholderTextColor="#9CA3AF"
+                                        className="text-sm font-bold text-foreground py-0.5"
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Peak Capacity (kW) */}
+                            <View>
+                                <Text className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+                                    Peak Capacity (kWp)
+                                </Text>
+                                <View className="flex-row items-center rounded-2xl bg-secondary/80 border border-border/80 px-4 py-2.5">
+                                    <TextInput
+                                        keyboardType="numeric"
+                                        value={assetCapacity}
+                                        onChangeText={setAssetCapacity}
+                                        placeholder="6.0"
+                                        placeholderTextColor="#9CA3AF"
+                                        className="flex-1 text-sm font-bold text-foreground py-0.5"
+                                    />
+                                    <Text className="text-xs font-bold text-amber-500 ml-2">kW</Text>
+                                </View>
+                            </View>
+
+                            {/* Location */}
+                            <View>
+                                <Text className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+                                    Array Location
+                                </Text>
+                                <View className="rounded-2xl bg-secondary/80 border border-border/80 px-4 py-2.5">
+                                    <TextInput
+                                        value={assetLocation}
+                                        onChangeText={setAssetLocation}
+                                        placeholder="e.g. Main Roof, Garage, Ground Mount"
+                                        placeholderTextColor="#9CA3AF"
+                                        className="text-sm font-bold text-foreground py-0.5"
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Asset Type */}
+                            <View>
+                                <Text className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+                                    Hardware Category
+                                </Text>
+                                <View className="flex-row gap-2">
+                                    {[
+                                        { id: 'solar_panel', label: 'Solar Panels' },
+                                        { id: 'hybrid_inverter', label: 'Hybrid Inverter' },
+                                        { id: 'battery_storage', label: 'Battery Storage' },
+                                    ].map((cat) => (
+                                        <Pressable
+                                            key={cat.id}
+                                            onPress={() => setAssetType(cat.id)}
+                                            className={`flex-1 py-2 rounded-xl items-center border ${
+                                                assetType === cat.id
+                                                    ? 'bg-sky-500/20 border-sky-500'
+                                                    : 'bg-secondary/60 border-border/60'
+                                            }`}
+                                        >
+                                            <Text
+                                                className={`text-[11px] font-bold ${
+                                                    assetType === cat.id ? 'text-sky-500 font-black' : 'text-muted-foreground'
+                                                }`}
+                                            >
+                                                {cat.label}
+                                            </Text>
+                                        </Pressable>
+                                    ))}
+                                </View>
+                            </View>
+
+                            {/* Save Button */}
+                            <Pressable
+                                onPress={handleSaveAsset}
+                                disabled={isSavingAsset}
+                                className="w-full rounded-2xl bg-primary py-4 items-center justify-center shadow-lg active:opacity-90 mt-3 mb-2"
+                            >
+                                <Text className="text-base font-black text-primary-foreground">
+                                    {isSavingAsset ? 'Saving to Database...' : primaryAsset ? 'Update System Telemetry' : 'Register Solar Asset'}
+                                </Text>
+                            </Pressable>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* --- MODAL: SOLAR PREDICTION & FORECAST SCREEN --- */}
+            <Modal visible={predictionModalVisible} animationType="slide">
+                <SolarOwnerPrediction onBack={() => setPredictionModalVisible(false)} />
+            </Modal>
+
+            {/* --- MODAL: FINANCIAL SAVINGS & REPORTS SCREEN --- */}
+            <Modal visible={reportsModalVisible} animationType="slide">
+                <SolarOwnerReports onBack={() => setReportsModalVisible(false)} />
             </Modal>
         </View>
     );
