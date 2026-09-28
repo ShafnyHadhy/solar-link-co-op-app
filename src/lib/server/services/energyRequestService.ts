@@ -176,3 +176,95 @@ export async function approveEnergyRequest(requestId: string, managerId: string)
     // 6. Return the updated request with full household details
     return getEnergyRequestById(requestId);
 }
+
+/**
+ * Reject a pending energy request.
+ * 1. Verify request exists.
+ * 2. Verify current status is "pending".
+ * 3. Verify acting user is a manager.
+ * 4. Prevent invalid status transitions.
+ * 5. Update energy_requests: status = "rejected", reviewedBy = managerId, reviewedAt = now.
+ * 6. Create audit_logs record: userId = managerId, action = "REJECT_ENERGY_REQUEST", entityType = "energy_request", entityId = requestId.
+ * 7. Return the updated request.
+ */
+export async function rejectEnergyRequest(requestId: string, managerId: string) {
+    if (!managerId) {
+        throw new UnauthorizedError("Manager identity is required to reject an energy request.");
+    }
+
+    // 1. Verify acting user is a manager
+    const managerResults = await db
+        .select({
+            id: users.id,
+            name: users.name,
+            role: users.role,
+        })
+        .from(users)
+        .where(eq(users.id, managerId))
+        .limit(1);
+
+    if (!managerResults || managerResults.length === 0) {
+        throw new NotFoundError(`Manager with ID '${managerId}' was not found.`);
+    }
+
+    const manager = managerResults[0];
+    if (manager.role !== "manager") {
+        throw new ForbiddenError("Forbidden: Only managers can reject energy requests.");
+    }
+
+    // 2. Verify request exists
+    const requestResults = await db
+        .select()
+        .from(energyRequests)
+        .where(eq(energyRequests.id, requestId))
+        .limit(1);
+
+    if (!requestResults || requestResults.length === 0) {
+        throw new NotFoundError(`Energy request '${requestId}' not found.`);
+    }
+
+    const existingRequest = requestResults[0];
+
+    // 3. Verify status is "pending" and prevent invalid status transitions
+    if (existingRequest.status !== "pending") {
+        throw new BadRequestError(
+            `Cannot reject energy request with status '${existingRequest.status}'. Only pending requests can be rejected.`
+        );
+    }
+
+    const now = new Date();
+
+    // 4. Update energy_requests
+    await db
+        .update(energyRequests)
+        .set({
+            status: "rejected",
+            reviewedBy: managerId,
+            reviewedAt: now,
+        })
+        .where(eq(energyRequests.id, requestId));
+
+    // 5. Create audit_logs record
+    const auditId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    await db.insert(auditLogs).values({
+        id: auditId,
+        userId: managerId,
+        action: "REJECT_ENERGY_REQUEST",
+        entityType: "energy_request",
+        entityId: requestId,
+        details: JSON.stringify({
+            requestId,
+            householdId: existingRequest.householdId,
+            requestedEnergyKwh: existingRequest.requestedEnergyKwh,
+            previousStatus: existingRequest.status,
+            newStatus: "rejected",
+            rejectedBy: managerId,
+            managerName: manager.name,
+            rejectedAt: now.toISOString(),
+        }),
+        createdAt: now,
+    });
+
+    // 6. Return the updated request with full household details
+    return getEnergyRequestById(requestId);
+}

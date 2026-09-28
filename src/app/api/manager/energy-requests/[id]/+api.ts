@@ -1,10 +1,11 @@
 // Manager Individual Energy Request API Route
 // GET /api/manager/energy-requests/:id — retrieve single energy request details
-// PATCH /api/manager/energy-requests/:id — approve a pending energy request
+// PATCH /api/manager/energy-requests/:id — approve or reject a pending energy request
 
 import {
     approveEnergyRequest,
     getEnergyRequestById,
+    rejectEnergyRequest,
 } from "@/lib/server/services/energyRequestService";
 import { db } from "@/lib/server/db/client";
 import { users } from "@/lib/server/db/schema";
@@ -62,8 +63,10 @@ export async function PATCH(
 
         const body = await request.json().catch(() => ({}));
 
-        if (body?.action !== "approve") {
-            throw new BadRequestError("Invalid action. Expected { \"action\": \"approve\" }");
+        if (body?.action !== "approve" && body?.action !== "reject") {
+            throw new BadRequestError(
+                "Invalid action. Expected { \"action\": \"approve\" } or { \"action\": \"reject\" }"
+            );
         }
 
         // Obtain manager identity from Clerk header/body or fallback to registered manager in db
@@ -88,11 +91,19 @@ export async function PATCH(
             throw new UnauthorizedError("Manager identity could not be verified. Authentication required.");
         }
 
-        const updatedRequest = await approveEnergyRequest(id, managerId);
+        const updatedRequest =
+            body.action === "approve"
+                ? await approveEnergyRequest(id, managerId)
+                : await rejectEnergyRequest(id, managerId);
+
+        const message =
+            body.action === "approve"
+                ? "Energy request approved successfully"
+                : "Energy request rejected successfully";
 
         return Response.json({
             success: true,
-            message: "Energy request approved successfully",
+            message,
             request: updatedRequest,
             data: updatedRequest,
         });
@@ -100,3 +111,4 @@ export async function PATCH(
         return errorResponse(error);
     }
 }
+

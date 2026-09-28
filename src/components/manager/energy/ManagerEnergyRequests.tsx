@@ -37,7 +37,7 @@ function formatRequestDate(dateStr: string) {
 const ManagerEnergyRequests = () => {
     const router = useRouter();
     const { user } = useUser();
-    const { requests, loading, error, refetch, approveRequest } = useEnergyRequests();
+    const { requests, loading, error, refetch, approveRequest, rejectRequest } = useEnergyRequests();
 
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedFilter, setSelectedFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
@@ -45,12 +45,16 @@ const ManagerEnergyRequests = () => {
     // Modals & Selection State
     const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
     const [selectedApproveItem, setSelectedApproveItem] = useState<ManagerEnergyRequest | null>(null);
+    const [selectedRejectItem, setSelectedRejectItem] = useState<ManagerEnergyRequest | null>(null);
     const [reviewModalVisible, setReviewModalVisible] = useState(false);
     const [approveModalVisible, setApproveModalVisible] = useState(false);
+    const [rejectModalVisible, setRejectModalVisible] = useState(false);
 
-    // Approval action state
+    // Action state (approval & rejection)
     const [isApproving, setIsApproving] = useState(false);
     const [approveError, setApproveError] = useState<string | null>(null);
+    const [isRejecting, setIsRejecting] = useState(false);
+    const [rejectError, setRejectError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     // Fetch individual request details on demand when review modal is open
@@ -83,6 +87,12 @@ const ManagerEnergyRequests = () => {
         setApproveModalVisible(true);
     };
 
+    const openRejectModal = (item: ManagerEnergyRequest) => {
+        setSelectedRejectItem(item);
+        setRejectError(null);
+        setRejectModalVisible(true);
+    };
+
     const handleConfirmApprove = async () => {
         if (!selectedApproveItem) return;
         setIsApproving(true);
@@ -99,6 +109,25 @@ const ManagerEnergyRequests = () => {
             setApproveError(err?.message || 'Failed to approve request');
         } finally {
             setIsApproving(false);
+        }
+    };
+
+    const handleConfirmReject = async () => {
+        if (!selectedRejectItem) return;
+        setIsRejecting(true);
+        setRejectError(null);
+
+        try {
+            await rejectRequest(selectedRejectItem.id, user?.id);
+            const householdName = selectedRejectItem.householdName || 'Household';
+            setRejectModalVisible(false);
+            setSelectedRejectItem(null);
+            setSuccessMessage(`Energy request for ${householdName} was rejected.`);
+            setTimeout(() => setSuccessMessage(null), 4000);
+        } catch (err: any) {
+            setRejectError(err?.message || 'Failed to reject request');
+        } finally {
+            setIsRejecting(false);
         }
     };
 
@@ -400,7 +429,16 @@ const ManagerEnergyRequests = () => {
 
                                     {/* Action Buttons */}
                                     {isPending ? (
-                                        <View className='flex-row items-center justify-end gap-2.5 pt-1'>
+                                        <View className='flex-row items-center justify-end gap-2 pt-1'>
+                                            <Pressable
+                                                onPress={() => openRejectModal(item)}
+                                                className='px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 active:opacity-75'
+                                            >
+                                                <Text className='text-xs font-bold text-[#EF4444]'>
+                                                    Reject
+                                                </Text>
+                                            </Pressable>
+
                                             <Pressable
                                                 onPress={() => openReviewModal(item.id)}
                                                 className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
@@ -661,13 +699,29 @@ const ManagerEnergyRequests = () => {
                                 {detailRequest.status === 'pending' ? (
                                     <View className='flex-row gap-2.5'>
                                         <Pressable
-                                            onPress={closeReviewModal}
-                                            className='flex-1 py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
+                                            onPress={() => {
+                                                const itemToReject: ManagerEnergyRequest = {
+                                                    id: detailRequest.id,
+                                                    householdId: detailRequest.householdId,
+                                                    householdName: detailRequest.householdName,
+                                                    householdEmail: detailRequest.householdEmail,
+                                                    requestedEnergyKwh: detailRequest.requestedEnergyKwh,
+                                                    reason: detailRequest.reason,
+                                                    status: detailRequest.status,
+                                                    requestedAt: detailRequest.requestedAt,
+                                                    reviewedAt: detailRequest.reviewedAt,
+                                                    reviewedBy: detailRequest.reviewedBy,
+                                                };
+                                                closeReviewModal();
+                                                openRejectModal(itemToReject);
+                                            }}
+                                            className='flex-1 py-2.5 items-center justify-center rounded-xl bg-red-500/10 border border-red-500/30 active:opacity-75'
                                         >
-                                            <Text className='text-xs font-bold text-foreground'>
-                                                Close
+                                            <Text className='text-xs font-bold text-[#EF4444]'>
+                                                Reject Request
                                             </Text>
                                         </Pressable>
+
                                         <Pressable
                                             onPress={() => {
                                                 const itemToApprove: ManagerEnergyRequest = {
@@ -796,6 +850,101 @@ const ManagerEnergyRequests = () => {
                                 ) : (
                                     <Text className='text-xs font-bold text-primary-foreground'>
                                         Confirm Approval
+                                    </Text>
+                                )}
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* 3. Reject Confirmation Modal */}
+            <Modal
+                visible={rejectModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => !isRejecting && setRejectModalVisible(false)}
+            >
+                <View className='flex-1 bg-black/60 items-center justify-center p-4'>
+                    <View className='w-full max-w-sm rounded-2xl border border-border/60 bg-card p-5 shadow-lg'>
+                        {/* Header */}
+                        <View className='flex-row items-center justify-between mb-3'>
+                            <Text className='text-lg font-bold text-foreground'>
+                                Reject Request
+                            </Text>
+                            <Pressable
+                                disabled={isRejecting}
+                                onPress={() => {
+                                    setRejectModalVisible(false);
+                                    setRejectError(null);
+                                }}
+                                className='h-8 w-8 items-center justify-center rounded-full bg-secondary active:opacity-70'
+                            >
+                                <Feather name="x" size={18} color="#9CA3AF" />
+                            </Pressable>
+                        </View>
+
+                        <Text className='text-xs text-muted-foreground mb-4 leading-relaxed'>
+                            Are you sure you want to reject the energy allocation request for{' '}
+                            <Text className='font-bold text-foreground'>
+                                {selectedRejectItem?.householdName || 'Household'}
+                            </Text>
+                            ?
+                        </Text>
+
+                        {/* Request Summary Box */}
+                        <View className='rounded-xl bg-secondary/60 border border-border/40 p-3.5 mb-4'>
+                            <View className='flex-row items-center justify-between mb-2'>
+                                <Text className='text-xs text-muted-foreground'>
+                                    Requested Amount
+                                </Text>
+                                <Text className='text-xs font-bold text-foreground'>
+                                    {selectedRejectItem ? parseFloat(selectedRejectItem.requestedEnergyKwh).toFixed(1) : 0} kWh
+                                </Text>
+                            </View>
+                            {selectedRejectItem?.reason && (
+                                <View className='border-t border-border/30 pt-2'>
+                                    <Text className='text-[11px] text-muted-foreground' numberOfLines={2}>
+                                        Reason: "{selectedRejectItem.reason}"
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Inline Error if rejection failed */}
+                        {rejectError && (
+                            <View className='p-3 rounded-xl bg-red-500/10 border border-red-500/30 mb-4'>
+                                <Text className='text-xs font-semibold text-[#EF4444] text-center'>
+                                    {rejectError}
+                                </Text>
+                            </View>
+                        )}
+
+                        {/* Action Buttons */}
+                        <View className='flex-row gap-3'>
+                            <Pressable
+                                disabled={isRejecting}
+                                onPress={() => {
+                                    setRejectModalVisible(false);
+                                    setRejectError(null);
+                                }}
+                                className='flex-1 py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
+                            >
+                                <Text className='text-xs font-bold text-foreground'>
+                                    Cancel
+                                </Text>
+                            </Pressable>
+
+                            <Pressable
+                                disabled={isRejecting}
+                                onPress={handleConfirmReject}
+                                className='flex-1 py-2.5 items-center justify-center rounded-xl bg-red-600 border border-red-600/40 active:opacity-80 shadow-sm flex-row items-center justify-center gap-2'
+                            >
+                                {isRejecting ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                    <Text className='text-xs font-bold text-white'>
+                                        Confirm Rejection
                                     </Text>
                                 )}
                             </Pressable>
