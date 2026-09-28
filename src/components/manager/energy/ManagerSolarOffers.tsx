@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
+    Modal,
     Pressable,
     ScrollView,
     Text,
@@ -10,6 +11,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import {
     useSolarOffers,
+    useSolarOfferDetail,
     type ManagerSolarOffer,
 } from '@/hooks/manager/useSolarOffers';
 
@@ -82,6 +84,28 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = () => {
 
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedFilter, setSelectedFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+
+    // Individual Offer Detail Modal State
+    const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
+    const [offerModalVisible, setOfferModalVisible] = useState(false);
+
+    const {
+        offer: detailOffer,
+        loading: detailLoading,
+        error: detailError,
+        notFound: detailNotFound,
+        refetch: refetchDetail,
+    } = useSolarOfferDetail(offerModalVisible ? selectedOfferId : null);
+
+    const openOfferModal = (id: string) => {
+        setSelectedOfferId(id);
+        setOfferModalVisible(true);
+    };
+
+    const closeOfferModal = () => {
+        setOfferModalVisible(false);
+        setSelectedOfferId(null);
+    };
 
     const pendingCount = offers.filter((o) => o.status === 'pending').length;
     const approvedCount = offers.filter((o) => o.status === 'approved').length;
@@ -273,9 +297,10 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = () => {
                             : 'N/A';
 
                         return (
-                            <View
+                            <Pressable
                                 key={item.id}
-                                className='rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'
+                                onPress={() => openOfferModal(item.id)}
+                                className='rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm active:opacity-90'
                             >
                                 {/* Header Row: Owner info & Status Badge */}
                                 <View className='flex-row items-center justify-between mb-3'>
@@ -339,7 +364,7 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = () => {
                                     </View>
                                 </View>
 
-                                {/* Bottom Metadata & Status Hint */}
+                                {/* Bottom Metadata & Details Button */}
                                 <View className='flex-row items-center justify-between pt-1'>
                                     <View className='flex-row items-center gap-1.5 flex-1'>
                                         <Feather
@@ -354,15 +379,16 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = () => {
                                         </Text>
                                     </View>
 
-                                    <Text className='text-xs font-medium text-muted-foreground/80 italic'>
-                                        {item.status === 'pending'
-                                            ? 'Awaiting review'
-                                            : item.status === 'approved'
-                                                ? 'Active offer'
-                                                : 'Offer closed'}
-                                    </Text>
+                                    <Pressable
+                                        onPress={() => openOfferModal(item.id)}
+                                        className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
+                                    >
+                                        <Text className='text-xs font-bold text-foreground'>
+                                            Details
+                                        </Text>
+                                    </Pressable>
                                 </View>
-                            </View>
+                            </Pressable>
                         );
                     })}
 
@@ -382,6 +408,207 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = () => {
                     )}
                 </View>
             )}
+
+            {/* Individual Solar Offer Details Modal */}
+            <Modal
+                visible={offerModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={closeOfferModal}
+            >
+                <View className='flex-1 bg-black/60 items-center justify-center p-4'>
+                    <View className='w-full max-w-sm rounded-2xl border border-border/60 bg-card p-5 shadow-lg'>
+                        {/* Header */}
+                        <View className='flex-row items-center justify-between mb-4'>
+                            <View className='flex-1 mr-2'>
+                                <Text className='text-lg font-bold text-foreground' numberOfLines={1}>
+                                    {detailLoading
+                                        ? 'Loading Details...'
+                                        : detailNotFound
+                                            ? 'Offer Not Found'
+                                            : detailOffer?.ownerName || 'Solar Offer Details'}
+                                </Text>
+                                <Text className='text-xs text-muted-foreground'>
+                                    {detailOffer ? formatOfferDate(detailOffer.offeredAt) : selectedOfferId ? `ID: ${selectedOfferId}` : ''}
+                                </Text>
+                            </View>
+                            <Pressable
+                                onPress={closeOfferModal}
+                                className='h-8 w-8 items-center justify-center rounded-full bg-secondary active:opacity-70'
+                            >
+                                <Feather name="x" size={18} color="#9CA3AF" />
+                            </Pressable>
+                        </View>
+
+                        {/* Loading State */}
+                        {detailLoading && (
+                            <View className='items-center justify-center py-10'>
+                                <ActivityIndicator size="small" color="#F59E0B" />
+                                <Text className='text-xs font-semibold text-muted-foreground mt-3'>
+                                    Retrieving solar offer details...
+                                </Text>
+                            </View>
+                        )}
+
+                        {/* Not Found State (404) */}
+                        {!detailLoading && detailNotFound && (
+                            <View className='items-center justify-center py-6 px-2'>
+                                <View className='h-12 w-12 rounded-full bg-yellow-500/15 border border-yellow-500/30 items-center justify-center mb-3'>
+                                    <Feather name="alert-circle" size={24} color="#F59E0B" />
+                                </View>
+                                <Text className='text-sm font-bold text-foreground mb-1 text-center'>
+                                    Solar Offer Not Found
+                                </Text>
+                                <Text className='text-xs text-muted-foreground text-center mb-5 leading-relaxed'>
+                                    This offer (ID: {selectedOfferId}) does not exist in the database or has been deleted.
+                                </Text>
+                                <Pressable
+                                    onPress={closeOfferModal}
+                                    className='w-full py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
+                                >
+                                    <Text className='text-xs font-bold text-foreground'>
+                                        Close
+                                    </Text>
+                                </Pressable>
+                            </View>
+                        )}
+
+                        {/* Error State */}
+                        {!detailLoading && !detailNotFound && detailError && (
+                            <View className='items-center justify-center py-6 px-2'>
+                                <View className='h-12 w-12 rounded-full bg-red-500/15 border border-red-500/30 items-center justify-center mb-3'>
+                                    <Feather name="alert-triangle" size={24} color="#EF4444" />
+                                </View>
+                                <Text className='text-sm font-bold text-[#EF4444] mb-1 text-center'>
+                                    Failed to load offer
+                                </Text>
+                                <Text className='text-xs text-muted-foreground text-center mb-5 leading-relaxed'>
+                                    {detailError}
+                                </Text>
+                                <View className='flex-row gap-2 w-full'>
+                                    <Pressable
+                                        onPress={closeOfferModal}
+                                        className='flex-1 py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
+                                    >
+                                        <Text className='text-xs font-bold text-foreground'>
+                                            Close
+                                        </Text>
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={refetchDetail}
+                                        className='flex-1 py-2.5 items-center justify-center rounded-xl bg-primary active:opacity-80'
+                                    >
+                                        <Text className='text-xs font-bold text-primary-foreground'>
+                                            Retry
+                                        </Text>
+                                    </Pressable>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* Offer Details Content */}
+                        {!detailLoading && !detailNotFound && !detailError && detailOffer && (
+                            <>
+                                {/* Power Offered Highlight */}
+                                <View className='rounded-xl bg-secondary/60 border border-border/40 p-4 mb-4 items-center'>
+                                    <Text className='text-xs font-semibold text-muted-foreground'>
+                                        Offered Clean Solar Energy
+                                    </Text>
+                                    <Text className='text-3xl font-extrabold text-foreground mt-1'>
+                                        {parseFloat(detailOffer.energyAmountKwh).toFixed(1)}{' '}
+                                        <Text className='text-base font-bold text-muted-foreground'>kWh</Text>
+                                    </Text>
+                                </View>
+
+                                {/* Solar Owner Information Card */}
+                                <View className='rounded-xl bg-secondary/40 border border-border/30 p-3 mb-4'>
+                                    <Text className='text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1'>
+                                        Solar Producer
+                                    </Text>
+                                    <Text className='text-sm font-bold text-foreground'>
+                                        {detailOffer.ownerName || 'Solar Producer'}
+                                    </Text>
+                                    <Text className='text-xs text-muted-foreground mt-0.5'>
+                                        {detailOffer.ownerEmail || 'No email on record'}
+                                    </Text>
+                                    {detailOffer.ownerPhone && (
+                                        <Text className='text-xs text-muted-foreground mt-0.5'>
+                                            Tel: {detailOffer.ownerPhone}
+                                        </Text>
+                                    )}
+
+                                    {/* Grid & Solar Capacity Row */}
+                                    <View className='border-t border-border/30 pt-2.5 mt-2.5 flex-row items-center justify-between'>
+                                        <View>
+                                            <Text className='text-[11px] font-semibold text-muted-foreground'>
+                                                Microgrid
+                                            </Text>
+                                            <Text className='text-xs font-bold text-foreground mt-0.5'>
+                                                {detailOffer.ownerGrid || 'Co-Op Main Grid'}
+                                            </Text>
+                                        </View>
+                                        <View className='items-end'>
+                                            <Text className='text-[11px] font-semibold text-muted-foreground'>
+                                                Solar Capacity
+                                            </Text>
+                                            <Text className='text-xs font-bold text-foreground mt-0.5'>
+                                                {detailOffer.ownerSolarCapacityKw ? `${detailOffer.ownerSolarCapacityKw} kW` : 'N/A'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </View>
+
+                                {/* Offer Constraints & Timing */}
+                                <View className='rounded-xl bg-secondary/30 border border-border/30 p-3 mb-4'>
+                                    <View className='flex-row items-center justify-between mb-2'>
+                                        <Text className='text-xs font-semibold text-muted-foreground'>
+                                            Min Battery Reserve
+                                        </Text>
+                                        <View className='flex-row items-center gap-1'>
+                                            <Feather name="battery-charging" size={13} color="#10B981" />
+                                            <Text className='text-xs font-extrabold text-foreground'>
+                                                {detailOffer.minimumBatteryPercent ? `${parseFloat(detailOffer.minimumBatteryPercent).toFixed(0)}%` : '0%'}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    <View className='flex-row items-center justify-between pt-2 border-t border-border/30'>
+                                        <Text className='text-xs font-semibold text-muted-foreground'>
+                                            Offer Expiration
+                                        </Text>
+                                        <Text className='text-xs font-medium text-foreground'>
+                                            {detailOffer.expiresAt ? formatOfferDate(detailOffer.expiresAt) : 'No expiration date'}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Status Pill Banner */}
+                                <View className='flex-row items-center justify-between mb-4 px-1'>
+                                    <Text className='text-xs font-semibold text-muted-foreground'>
+                                        Offer Status
+                                    </Text>
+                                    <View className={`flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border ${getStatusBadge(detailOffer.status).bg} ${getStatusBadge(detailOffer.status).border}`}>
+                                        <Feather name={getStatusBadge(detailOffer.status).icon} size={11} color={getStatusBadge(detailOffer.status).text.includes('10B981') ? '#10B981' : getStatusBadge(detailOffer.status).text.includes('EF4444') ? '#EF4444' : '#F59E0B'} />
+                                        <Text className={`text-[11px] font-bold ${getStatusBadge(detailOffer.status).text}`}>
+                                            {getStatusBadge(detailOffer.status).label}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Close Action */}
+                                <Pressable
+                                    onPress={closeOfferModal}
+                                    className='w-full py-3 rounded-xl bg-secondary border border-border/60 items-center justify-center active:opacity-75 shadow-sm'
+                                >
+                                    <Text className='text-xs font-bold text-foreground'>
+                                        Close
+                                    </Text>
+                                </Pressable>
+                            </>
+                        )}
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
