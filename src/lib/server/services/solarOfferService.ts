@@ -1,23 +1,16 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "../db/client";
-import { solarOffers, users } from "../db/schema";
-import { NotFoundError } from "../utils/errors";
+import { auditLogs, solarOffers, users } from "../db/schema";
+import {
+    BadRequestError,
+    ForbiddenError,
+    NotFoundError,
+    UnauthorizedError,
+} from "../utils/errors";
 
 /**
  * Retrieve all solar offers for the manager.
  * Joins solar_offers.ownerId -> users.id to include solar owner details.
- *
- * Returned fields:
- * - id (offer id)
- * - ownerId (owner id)
- * - ownerName (owner name)
- * - ownerEmail (owner email)
- * - energyAmountKwh (energy amount kWh)
- * - minimumBatteryPercent (minimum battery percentage)
- * - status (pending, approved, rejected, completed, cancelled)
- * - offeredAt (timestamp when offered)
- * - expiresAt (expiration timestamp)
- * - createdAt (record creation timestamp)
  */
 export async function getSolarOffers() {
     return db
@@ -95,6 +88,230 @@ export async function getSolarOfferById(id: string) {
     };
 }
 
+/**
+ * All valid solar offer statuses in the system:
+ * - pending
+ * - approved
+ * - rejected
+ * - completed
+ * - cancelled
+ */
+export const SOLAR_OFFER_STATUSES = [
+    "pending",
+    "approved",
+    "rejected",
+    "completed",
+    "cancelled",
+] as const;
+
+export type SolarOfferStatus = (typeof SOLAR_OFFER_STATUSES)[number];
+
+/**
+ * Valid status transitions permitted for manager operations:
+ * - pending -> approved
+ * - pending -> rejected
+ * All other transitions are strictly blocked.
+ */
+export const VALID_MANAGER_OFFER_STATUS_TRANSITIONS: Record<
+    SolarOfferStatus,
+    readonly SolarOfferStatus[]
+> = {
+    pending: ["approved", "rejected"],
+    approved: [],
+    rejected: [],
+    completed: [],
+    cancelled: [],
+};
+
+/**
+ * Validates that a manager can transition a solar offer from currentStatus to targetStatus.
+ * Throws BadRequestError if the transition is prohibited.
+ */
+export function validateManagerOfferStatusTransition(
+    currentStatus: string,
+    targetStatus: "approved" | "rejected"
+) {
+    const validNextStatuses =
+        VALID_MANAGER_OFFER_STATUS_TRANSITIONS[currentStatus as SolarOfferStatus];
+
+    if (!validNextStatuses || !validNextStatuses.includes(targetStatus)) {
+        throw new BadRequestError(
+            `Invalid status transition: Cannot transition solar offer from '${currentStatus}' to '${targetStatus}'. Only pending offers can be approved or rejected.`
+        );
+    }
+}
+
+/**
+ * Approve a pending solar offer.
+ * 1. Verify acting user is a manager.
+ * 2. Verify offer exists.
+ * 3. Verify status transition (strictly enforces pending -> approved).
+ * 4. Update solar_offers: status = "approved".
+ * 5. Create audit log.
+ * 6. Return updated offer with owner details.
+ */
+export async function approveSolarOffer(offerId: string, managerId: string) {
+    if (!managerId) {
+        throw new UnauthorizedError("Manager identity is required to approve a solar offer.");
+    }
+
+    // 1. Verify acting user is a manager
+    const managerResults = await db
+        .select({
+            id: users.id,
+            name: users.name,
+            role: users.role,
+        })
+        .from(users)
+        .where(eq(users.id, managerId))
+        .limit(1);
+
+    if (!managerResults || managerResults.length === 0) {
+        throw new NotFoundError(`Manager with ID '${managerId}' was not found.`);
+    }
+
+    const manager = managerResults[0];
+    if (manager.role !== "manager") {
+        throw new ForbiddenError("Forbidden: Only managers can approve solar offers.");
+    }
+
+    // 2. Verify offer exists
+    const offerResults = await db
+        .select()
+        .from(solarOffers)
+        .where(eq(solarOffers.id, offerId))
+        .limit(1);
+
+    if (!offerResults || offerResults.length === 0) {
+        throw new NotFoundError(`Solar offer '${offerId}' not found.`);
+    }
+
+    const existingOffer = offerResults[0];
+
+    // 3. Verify status transition (strictly enforces pending -> approved)
+    validateManagerOfferStatusTransition(existingOffer.status, "approved");
+
+    const now = new Date();
+
+    // 4. Update solar_offers
+    await db
+        .update(solarOffers)
+        .set({
+            status: "approved",
+        })
+        .where(eq(solarOffers.id, offerId));
+
+    // 5. Create audit log
+    const auditId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    await db.insert(auditLogs).values({
+        id: auditId,
+        userId: managerId,
+        action: "APPROVE_SOLAR_OFFER",
+        entityType: "solar_offer",
+        entityId: offerId,
+        details: JSON.stringify({
+            offerId,
+            ownerId: existingOffer.ownerId,
+            energyAmountKwh: existingOffer.energyAmountKwh,
+            minimumBatteryPercent: existingOffer.minimumBatteryPercent,
+            previousStatus: existingOffer.status,
+            newStatus: "approved",
+            approvedBy: managerId,
+            managerName: manager.name,
+            approvedAt: now.toISOString(),
+        }),
+        createdAt: now,
+    });
+
+    // 6. Return updated offer with owner details
+    return getSolarOfferById(offerId);
+}
+
+/**
+ * Reject a pending solar offer.
+ * 1. Verify acting user is a manager.
+ * 2. Verify offer exists.
+ * 3. Verify status transition (strictly enforces pending -> rejected).
+ * 4. Update solar_offers: status = "rejected".
+ * 5. Create audit log.
+ * 6. Return updated offer with owner details.
+ */
+export async function rejectSolarOffer(offerId: string, managerId: string) {
+    if (!managerId) {
+        throw new UnauthorizedError("Manager identity is required to reject a solar offer.");
+    }
+
+    // 1. Verify acting user is a manager
+    const managerResults = await db
+        .select({
+            id: users.id,
+            name: users.name,
+            role: users.role,
+        })
+        .from(users)
+        .where(eq(users.id, managerId))
+        .limit(1);
+
+    if (!managerResults || managerResults.length === 0) {
+        throw new NotFoundError(`Manager with ID '${managerId}' was not found.`);
+    }
+
+    const manager = managerResults[0];
+    if (manager.role !== "manager") {
+        throw new ForbiddenError("Forbidden: Only managers can reject solar offers.");
+    }
+
+    // 2. Verify offer exists
+    const offerResults = await db
+        .select()
+        .from(solarOffers)
+        .where(eq(solarOffers.id, offerId))
+        .limit(1);
+
+    if (!offerResults || offerResults.length === 0) {
+        throw new NotFoundError(`Solar offer '${offerId}' not found.`);
+    }
+
+    const existingOffer = offerResults[0];
+
+    // 3. Verify status transition (strictly enforces pending -> rejected)
+    validateManagerOfferStatusTransition(existingOffer.status, "rejected");
+
+    const now = new Date();
+
+    // 4. Update solar_offers
+    await db
+        .update(solarOffers)
+        .set({
+            status: "rejected",
+        })
+        .where(eq(solarOffers.id, offerId));
+
+    // 5. Create audit log
+    const auditId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    await db.insert(auditLogs).values({
+        id: auditId,
+        userId: managerId,
+        action: "REJECT_SOLAR_OFFER",
+        entityType: "solar_offer",
+        entityId: offerId,
+        details: JSON.stringify({
+            offerId,
+            ownerId: existingOffer.ownerId,
+            energyAmountKwh: existingOffer.energyAmountKwh,
+            minimumBatteryPercent: existingOffer.minimumBatteryPercent,
+            previousStatus: existingOffer.status,
+            newStatus: "rejected",
+            rejectedBy: managerId,
+            managerName: manager.name,
+            rejectedAt: now.toISOString(),
+        }),
+        createdAt: now,
+    });
+
+    // 6. Return updated offer with owner details
+    return getSolarOfferById(offerId);
+}
+
 export type ManagerSolarOffer = Awaited<ReturnType<typeof getSolarOffers>>[number];
 export type ManagerSolarOfferDetail = Awaited<ReturnType<typeof getSolarOfferById>>;
-

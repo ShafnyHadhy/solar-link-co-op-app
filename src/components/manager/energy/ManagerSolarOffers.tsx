@@ -8,6 +8,7 @@ import {
     TextInput,
     View,
 } from 'react-native';
+import { useUser } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import {
     useSolarOffers,
@@ -77,17 +78,50 @@ function getStatusBadge(status: ManagerSolarOffer['status']) {
 
 interface ManagerSolarOffersProps {
     onRefreshTrigger?: () => void;
+    offers?: ManagerSolarOffer[];
+    loading?: boolean;
+    error?: string | null;
+    refetch?: () => Promise<void>;
+    approveOffer?: (offerId: string, managerId?: string) => Promise<ManagerSolarOffer>;
+    rejectOffer?: (offerId: string, managerId?: string) => Promise<ManagerSolarOffer>;
 }
 
-export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = () => {
-    const { offers, loading, error, refetch } = useSolarOffers();
+export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
+    onRefreshTrigger,
+    offers: propOffers,
+    loading: propLoading,
+    error: propError,
+    refetch: propRefetch,
+    approveOffer: propApproveOffer,
+    rejectOffer: propRejectOffer,
+}) => {
+    const { user } = useUser();
+    const internalHook = useSolarOffers({ enabled: propOffers === undefined });
+
+    const offers = propOffers ?? internalHook.offers;
+    const loading = propLoading ?? internalHook.loading;
+    const error = propError ?? internalHook.error;
+    const refetch = propRefetch ?? internalHook.refetch;
+    const approveOffer = propApproveOffer ?? internalHook.approveOffer;
+    const rejectOffer = propRejectOffer ?? internalHook.rejectOffer;
 
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedFilter, setSelectedFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
-    // Individual Offer Detail Modal State
+    // Modals & Selection State
     const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
+    const [selectedApproveItem, setSelectedApproveItem] = useState<ManagerSolarOffer | null>(null);
+    const [selectedRejectItem, setSelectedRejectItem] = useState<ManagerSolarOffer | null>(null);
     const [offerModalVisible, setOfferModalVisible] = useState(false);
+    const [approveModalVisible, setApproveModalVisible] = useState(false);
+    const [rejectModalVisible, setRejectModalVisible] = useState(false);
+
+    // Action state (approval & rejection)
+    const [isApproving, setIsApproving] = useState(false);
+    const [approveError, setApproveError] = useState<string | null>(null);
+    const [isRejecting, setIsRejecting] = useState(false);
+    const [rejectError, setRejectError] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     const {
         offer: detailOffer,
@@ -105,6 +139,56 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = () => {
     const closeOfferModal = () => {
         setOfferModalVisible(false);
         setSelectedOfferId(null);
+    };
+
+    const openApproveModal = (item: ManagerSolarOffer) => {
+        setSelectedApproveItem(item);
+        setApproveError(null);
+        setApproveModalVisible(true);
+    };
+
+    const openRejectModal = (item: ManagerSolarOffer) => {
+        setSelectedRejectItem(item);
+        setRejectError(null);
+        setRejectModalVisible(true);
+    };
+
+    const handleConfirmApprove = async () => {
+        if (!selectedApproveItem) return;
+        setIsApproving(true);
+        setApproveError(null);
+
+        try {
+            await approveOffer(selectedApproveItem.id, user?.id);
+            const ownerName = selectedApproveItem.ownerName || 'Solar Producer';
+            setApproveModalVisible(false);
+            setSelectedApproveItem(null);
+            setSuccessMessage(`Solar offer from ${ownerName} approved successfully.`);
+            setTimeout(() => setSuccessMessage(null), 4000);
+        } catch (err: any) {
+            setApproveError(err?.message || 'Failed to approve solar offer');
+        } finally {
+            setIsApproving(false);
+        }
+    };
+
+    const handleConfirmReject = async () => {
+        if (!selectedRejectItem) return;
+        setIsRejecting(true);
+        setRejectError(null);
+
+        try {
+            await rejectOffer(selectedRejectItem.id, user?.id);
+            const ownerName = selectedRejectItem.ownerName || 'Solar Producer';
+            setRejectModalVisible(false);
+            setSelectedRejectItem(null);
+            setSuccessMessage(`Solar offer from ${ownerName} was declined.`);
+            setTimeout(() => setSuccessMessage(null), 4000);
+        } catch (err: any) {
+            setRejectError(err?.message || 'Failed to reject solar offer');
+        } finally {
+            setIsRejecting(false);
+        }
     };
 
     const pendingCount = offers.filter((o) => o.status === 'pending').length;
@@ -159,6 +243,19 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = () => {
                     </Text>
                 </View>
             </View>
+
+            {/* Success Feedback Banner */}
+            {successMessage && (
+                <View className='flex-row items-center gap-2.5 py-3 px-4 rounded-xl border border-emerald-500/40 bg-emerald-500/15 mb-4 shadow-sm'>
+                    <Feather name="check-circle" size={18} color="#10B981" />
+                    <Text className='flex-1 text-xs font-bold text-[#10B981]'>
+                        {successMessage}
+                    </Text>
+                    <Pressable onPress={() => setSuccessMessage(null)}>
+                        <Feather name="x" size={16} color="#10B981" />
+                    </Pressable>
+                </View>
+            )}
 
             {/* Search Bar */}
             <View className='flex-row items-center bg-secondary/60 border border-border/60 rounded-full px-4 py-2.5 mb-4 shadow-sm'>
@@ -291,16 +388,17 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = () => {
                 <View className='flex-col gap-4'>
                     {filteredOffers.map((item) => {
                         const badge = getStatusBadge(item.status);
+                        const isPending = item.status === 'pending';
+                        const isApproved = item.status === 'approved';
                         const formattedKwh = parseFloat(item.energyAmountKwh).toFixed(1);
                         const minBattery = item.minimumBatteryPercent
                             ? `${parseFloat(item.minimumBatteryPercent).toFixed(0)}%`
                             : 'N/A';
 
                         return (
-                            <Pressable
+                            <View
                                 key={item.id}
-                                onPress={() => openOfferModal(item.id)}
-                                className='rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm active:opacity-90'
+                                className='rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'
                             >
                                 {/* Header Row: Owner info & Status Badge */}
                                 <View className='flex-row items-center justify-between mb-3'>
@@ -364,31 +462,66 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = () => {
                                     </View>
                                 </View>
 
-                                {/* Bottom Metadata & Details Button */}
-                                <View className='flex-row items-center justify-between pt-1'>
-                                    <View className='flex-row items-center gap-1.5 flex-1'>
-                                        <Feather
-                                            name="clock"
-                                            size={12}
-                                            color="#9CA3AF"
-                                        />
-                                        <Text className='text-xs text-muted-foreground' numberOfLines={1}>
-                                            {item.expiresAt
-                                                ? `Expires ${formatOfferDate(item.expiresAt)}`
-                                                : 'Open availability'}
-                                        </Text>
-                                    </View>
+                                {/* Bottom Metadata & Action Buttons */}
+                                {isPending ? (
+                                    <View className='flex-row items-center justify-between pt-1'>
+                                        <Pressable
+                                            onPress={() => openRejectModal(item)}
+                                            className='px-3.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 active:opacity-75'
+                                        >
+                                            <Text className='text-xs font-bold text-[#EF4444]'>
+                                                Reject
+                                            </Text>
+                                        </Pressable>
 
-                                    <Pressable
-                                        onPress={() => openOfferModal(item.id)}
-                                        className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
-                                    >
-                                        <Text className='text-xs font-bold text-foreground'>
-                                            Details
+                                        <Pressable
+                                            onPress={() => openOfferModal(item.id)}
+                                            className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
+                                        >
+                                            <Text className='text-xs font-bold text-foreground'>
+                                                Details
+                                            </Text>
+                                        </Pressable>
+
+                                        <Pressable
+                                            onPress={() => openApproveModal(item)}
+                                            className='px-3.5 py-1.5 rounded-lg bg-primary border border-primary/40 active:opacity-80 shadow-sm'
+                                        >
+                                            <Text className='text-xs font-bold text-primary-foreground'>
+                                                Approve
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                ) : isApproved ? (
+                                    <View className='flex-row items-center justify-between pt-1'>
+                                        <Text className='text-xs font-semibold text-[#10B981]'>
+                                            Solar allocation approved ({formattedKwh} kWh)
                                         </Text>
-                                    </Pressable>
-                                </View>
-                            </Pressable>
+                                        <Pressable
+                                            onPress={() => openOfferModal(item.id)}
+                                            className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
+                                        >
+                                            <Text className='text-xs font-bold text-foreground'>
+                                                Details
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                ) : (
+                                    <View className='flex-row items-center justify-between pt-1'>
+                                        <Text className='text-xs font-semibold text-[#EF4444]'>
+                                            Solar offer rejected
+                                        </Text>
+                                        <Pressable
+                                            onPress={() => openOfferModal(item.id)}
+                                            className='px-3.5 py-1.5 rounded-lg bg-secondary border border-border/60 active:opacity-75'
+                                        >
+                                            <Text className='text-xs font-bold text-foreground'>
+                                                Details
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                )}
+                            </View>
                         );
                     })}
 
@@ -409,7 +542,7 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = () => {
                 </View>
             )}
 
-            {/* Individual Solar Offer Details Modal */}
+            {/* 1. Individual Solar Offer Details Modal */}
             <Modal
                 visible={offerModalVisible}
                 transparent
@@ -595,17 +728,261 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = () => {
                                     </View>
                                 </View>
 
-                                {/* Close Action */}
-                                <Pressable
-                                    onPress={closeOfferModal}
-                                    className='w-full py-3 rounded-xl bg-secondary border border-border/60 items-center justify-center active:opacity-75 shadow-sm'
-                                >
-                                    <Text className='text-xs font-bold text-foreground'>
-                                        Close
-                                    </Text>
-                                </Pressable>
+                                {/* Modal Actions: If pending, allow Approve/Reject */}
+                                {detailOffer.status === 'pending' ? (
+                                    <View className='flex-row gap-2.5'>
+                                        <Pressable
+                                            onPress={() => {
+                                                const itemToReject: ManagerSolarOffer = {
+                                                    id: detailOffer.id,
+                                                    ownerId: detailOffer.ownerId,
+                                                    ownerName: detailOffer.ownerName,
+                                                    ownerEmail: detailOffer.ownerEmail,
+                                                    energyAmountKwh: detailOffer.energyAmountKwh,
+                                                    minimumBatteryPercent: detailOffer.minimumBatteryPercent,
+                                                    status: detailOffer.status,
+                                                    offeredAt: detailOffer.offeredAt,
+                                                    expiresAt: detailOffer.expiresAt,
+                                                    createdAt: detailOffer.createdAt,
+                                                };
+                                                closeOfferModal();
+                                                openRejectModal(itemToReject);
+                                            }}
+                                            className='flex-1 py-2.5 items-center justify-center rounded-xl bg-red-500/10 border border-red-500/30 active:opacity-75'
+                                        >
+                                            <Text className='text-xs font-bold text-[#EF4444]'>
+                                                Reject Offer
+                                            </Text>
+                                        </Pressable>
+
+                                        <Pressable
+                                            onPress={() => {
+                                                const itemToApprove: ManagerSolarOffer = {
+                                                    id: detailOffer.id,
+                                                    ownerId: detailOffer.ownerId,
+                                                    ownerName: detailOffer.ownerName,
+                                                    ownerEmail: detailOffer.ownerEmail,
+                                                    energyAmountKwh: detailOffer.energyAmountKwh,
+                                                    minimumBatteryPercent: detailOffer.minimumBatteryPercent,
+                                                    status: detailOffer.status,
+                                                    offeredAt: detailOffer.offeredAt,
+                                                    expiresAt: detailOffer.expiresAt,
+                                                    createdAt: detailOffer.createdAt,
+                                                };
+                                                closeOfferModal();
+                                                openApproveModal(itemToApprove);
+                                            }}
+                                            className='flex-1 py-2.5 items-center justify-center rounded-xl bg-primary border border-primary/40 active:opacity-80 shadow-sm'
+                                        >
+                                            <Text className='text-xs font-bold text-primary-foreground'>
+                                                Approve
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                ) : (
+                                    <Pressable
+                                        onPress={closeOfferModal}
+                                        className='w-full py-3 rounded-xl bg-secondary border border-border/60 items-center justify-center active:opacity-75 shadow-sm'
+                                    >
+                                        <Text className='text-xs font-bold text-foreground'>
+                                            Close
+                                        </Text>
+                                    </Pressable>
+                                )}
                             </>
                         )}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* 2. Approve Confirmation Modal */}
+            <Modal
+                visible={approveModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => !isApproving && setApproveModalVisible(false)}
+            >
+                <View className='flex-1 bg-black/60 items-center justify-center p-4'>
+                    <View className='w-full max-w-sm rounded-2xl border border-border/60 bg-card p-5 shadow-lg'>
+                        {/* Header */}
+                        <View className='flex-row items-center justify-between mb-3'>
+                            <Text className='text-lg font-bold text-foreground'>
+                                Approve Solar Offer
+                            </Text>
+                            <Pressable
+                                disabled={isApproving}
+                                onPress={() => {
+                                    setApproveModalVisible(false);
+                                    setApproveError(null);
+                                }}
+                                className='h-8 w-8 items-center justify-center rounded-full bg-secondary active:opacity-70'
+                            >
+                                <Feather name="x" size={18} color="#9CA3AF" />
+                            </Pressable>
+                        </View>
+
+                        <Text className='text-xs text-muted-foreground mb-4 leading-relaxed'>
+                            You are approving the solar power offer from{' '}
+                            <Text className='font-bold text-foreground'>
+                                {selectedApproveItem?.ownerName || 'Solar Producer'}
+                            </Text>
+                            :
+                        </Text>
+
+                        {/* Impact Overview Box */}
+                        <View className='rounded-xl bg-secondary/60 border border-border/40 p-3.5 mb-4'>
+                            <View className='flex-row items-center justify-between mb-2'>
+                                <Text className='text-xs text-muted-foreground'>
+                                    Offered Generation
+                                </Text>
+                                <Text className='text-xs font-bold text-foreground'>
+                                    {selectedApproveItem ? parseFloat(selectedApproveItem.energyAmountKwh).toFixed(1) : 0} kWh
+                                </Text>
+                            </View>
+                            <View className='flex-row items-center justify-between'>
+                                <Text className='text-xs text-muted-foreground'>
+                                    Battery Threshold
+                                </Text>
+                                <Text className='text-xs font-bold text-[#10B981]'>
+                                    {selectedApproveItem?.minimumBatteryPercent ? `${parseFloat(selectedApproveItem.minimumBatteryPercent).toFixed(0)}%` : '0%'}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Inline Error in Modal if any */}
+                        {approveError && (
+                            <View className='p-3 rounded-xl bg-red-500/10 border border-red-500/30 mb-4'>
+                                <Text className='text-xs font-semibold text-[#EF4444] text-center'>
+                                    {approveError}
+                                </Text>
+                            </View>
+                        )}
+
+                        {/* Action Buttons */}
+                        <View className='flex-row gap-3'>
+                            <Pressable
+                                disabled={isApproving}
+                                onPress={() => {
+                                    setApproveModalVisible(false);
+                                    setApproveError(null);
+                                }}
+                                className='flex-1 py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
+                            >
+                                <Text className='text-xs font-bold text-foreground'>
+                                    Cancel
+                                </Text>
+                            </Pressable>
+
+                            <Pressable
+                                disabled={isApproving}
+                                onPress={handleConfirmApprove}
+                                className='flex-1 py-2.5 items-center justify-center rounded-xl bg-primary border border-primary/40 active:opacity-80 shadow-sm flex-row items-center justify-center gap-2'
+                            >
+                                {isApproving ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                    <Text className='text-xs font-bold text-primary-foreground'>
+                                        Confirm Approval
+                                    </Text>
+                                )}
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* 3. Reject Confirmation Modal */}
+            <Modal
+                visible={rejectModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => !isRejecting && setRejectModalVisible(false)}
+            >
+                <View className='flex-1 bg-black/60 items-center justify-center p-4'>
+                    <View className='w-full max-w-sm rounded-2xl border border-border/60 bg-card p-5 shadow-lg'>
+                        {/* Header */}
+                        <View className='flex-row items-center justify-between mb-3'>
+                            <Text className='text-lg font-bold text-foreground'>
+                                Decline Solar Offer
+                            </Text>
+                            <Pressable
+                                disabled={isRejecting}
+                                onPress={() => {
+                                    setRejectModalVisible(false);
+                                    setRejectError(null);
+                                }}
+                                className='h-8 w-8 items-center justify-center rounded-full bg-secondary active:opacity-70'
+                            >
+                                <Feather name="x" size={18} color="#9CA3AF" />
+                            </Pressable>
+                        </View>
+
+                        <Text className='text-xs text-muted-foreground mb-4 leading-relaxed'>
+                            Are you sure you want to decline the solar energy offer from{' '}
+                            <Text className='font-bold text-foreground'>
+                                {selectedRejectItem?.ownerName || 'Solar Producer'}
+                            </Text>
+                            ?
+                        </Text>
+
+                        {/* Offer Summary */}
+                        <View className='rounded-xl bg-secondary/60 border border-border/40 p-3.5 mb-4'>
+                            <View className='flex-row items-center justify-between mb-2'>
+                                <Text className='text-xs text-muted-foreground'>
+                                    Offered Power
+                                </Text>
+                                <Text className='text-xs font-bold text-foreground'>
+                                    {selectedRejectItem ? parseFloat(selectedRejectItem.energyAmountKwh).toFixed(1) : 0} kWh
+                                </Text>
+                            </View>
+                            <View className='flex-row items-center justify-between'>
+                                <Text className='text-xs text-muted-foreground'>
+                                    Status Change
+                                </Text>
+                                <Text className='text-xs font-bold text-[#EF4444]'>
+                                    pending → rejected
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Inline Error in Modal if any */}
+                        {rejectError && (
+                            <View className='p-3 rounded-xl bg-red-500/10 border border-red-500/30 mb-4'>
+                                <Text className='text-xs font-semibold text-[#EF4444] text-center'>
+                                    {rejectError}
+                                </Text>
+                            </View>
+                        )}
+
+                        {/* Action Buttons */}
+                        <View className='flex-row gap-3'>
+                            <Pressable
+                                disabled={isRejecting}
+                                onPress={() => {
+                                    setRejectModalVisible(false);
+                                    setRejectError(null);
+                                }}
+                                className='flex-1 py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
+                            >
+                                <Text className='text-xs font-bold text-foreground'>
+                                    Cancel
+                                </Text>
+                            </Pressable>
+
+                            <Pressable
+                                disabled={isRejecting}
+                                onPress={handleConfirmReject}
+                                className='flex-1 py-2.5 items-center justify-center rounded-xl bg-red-500 active:opacity-80 shadow-sm flex-row items-center justify-center gap-2'
+                            >
+                                {isRejecting ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                    <Text className='text-xs font-bold text-white'>
+                                        Confirm Reject
+                                    </Text>
+                                )}
+                            </Pressable>
+                        </View>
                     </View>
                 </View>
             </Modal>

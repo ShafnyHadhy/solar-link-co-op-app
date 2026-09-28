@@ -28,9 +28,10 @@ export interface ManagerSolarOfferDetail extends ManagerSolarOffer {
     };
 }
 
-export function useSolarOffers() {
+export function useSolarOffers(options: { enabled?: boolean } = {}) {
+    const { enabled = true } = options;
     const [offers, setOffers] = useState<ManagerSolarOffer[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
+    const [loading, setLoading] = useState<boolean>(enabled);
     const [error, setError] = useState<string | null>(null);
 
     const fetchOffers = useCallback(async () => {
@@ -60,14 +61,104 @@ export function useSolarOffers() {
     }, []);
 
     useEffect(() => {
-        fetchOffers();
-    }, [fetchOffers]);
+        if (enabled) {
+            fetchOffers();
+        }
+    }, [enabled, fetchOffers]);
+
+    const approveOffer = useCallback(
+        async (offerId: string, managerId?: string) => {
+            const headers: Record<string, string> = {
+                "Content-Type": "application/json",
+            };
+            if (managerId) {
+                headers["x-user-id"] = managerId;
+            }
+
+            const response = await fetch(
+                getApiUrl(`/api/manager/solar-offers/${offerId}`),
+                {
+                    method: "PATCH",
+                    headers,
+                    body: JSON.stringify({ action: "approve", managerId }),
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || "Failed to approve solar offer");
+            }
+
+            const updated: ManagerSolarOffer = data.offer || data.data;
+
+            // Immediately synchronize local state with persisted database status
+            setOffers((prev) =>
+                prev.map((o) =>
+                    o.id === offerId
+                        ? { ...o, ...updated, status: updated.status }
+                        : o
+                )
+            );
+
+            // Refetch live list to ensure complete database synchronization
+            await fetchOffers();
+
+            return updated;
+        },
+        [fetchOffers]
+    );
+
+    const rejectOffer = useCallback(
+        async (offerId: string, managerId?: string) => {
+            const headers: Record<string, string> = {
+                "Content-Type": "application/json",
+            };
+            if (managerId) {
+                headers["x-user-id"] = managerId;
+            }
+
+            const response = await fetch(
+                getApiUrl(`/api/manager/solar-offers/${offerId}`),
+                {
+                    method: "PATCH",
+                    headers,
+                    body: JSON.stringify({ action: "reject", managerId }),
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || "Failed to reject solar offer");
+            }
+
+            const updated: ManagerSolarOffer = data.offer || data.data;
+
+            // Immediately synchronize local state with persisted database status
+            setOffers((prev) =>
+                prev.map((o) =>
+                    o.id === offerId
+                        ? { ...o, ...updated, status: updated.status }
+                        : o
+                )
+            );
+
+            // Refetch live list to ensure complete database synchronization
+            await fetchOffers();
+
+            return updated;
+        },
+        [fetchOffers]
+    );
 
     return {
         offers,
         loading,
         error,
         refetch: fetchOffers,
+        approveOffer,
+        rejectOffer,
     };
 }
 

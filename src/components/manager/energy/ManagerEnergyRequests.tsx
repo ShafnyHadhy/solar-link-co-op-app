@@ -40,7 +40,14 @@ const ManagerEnergyRequests = () => {
     const router = useRouter();
     const { user } = useUser();
     const { requests, loading, error, refetch, approveRequest, rejectRequest } = useEnergyRequests();
-    const { offers, loading: offersLoading, refetch: refetchOffers } = useSolarOffers();
+    const {
+        offers,
+        loading: offersLoading,
+        error: offersError,
+        refetch: refetchOffers,
+        approveOffer: approveSolarOffer,
+        rejectOffer: rejectSolarOffer,
+    } = useSolarOffers();
 
     const [activeSection, setActiveSection] = useState<'requests' | 'offers'>('requests');
     const [searchQuery, setSearchQuery] = useState('');
@@ -247,7 +254,14 @@ const ManagerEnergyRequests = () => {
                 </View>
 
                 {activeSection === 'offers' ? (
-                    <ManagerSolarOffers />
+                    <ManagerSolarOffers
+                        offers={offers}
+                        loading={offersLoading}
+                        error={offersError}
+                        refetch={refetchOffers}
+                        approveOffer={approveSolarOffer}
+                        rejectOffer={rejectSolarOffer}
+                    />
                 ) : (
                     <>
                         {/* Top KPI Analytics Overview */}
