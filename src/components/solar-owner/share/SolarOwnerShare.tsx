@@ -1,6 +1,7 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
+import { useUser } from '@clerk/expo';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SolarToast } from '../shared/SolarToast';
@@ -9,6 +10,7 @@ import { useSolarOwnerStore } from '../store/useSolarOwnerStore';
 
 export const SolarOwnerShare = () => {
     const insets = useSafeAreaInsets();
+    const { user } = useUser();
     const {
         metrics,
         battery,
@@ -19,21 +21,39 @@ export const SolarOwnerShare = () => {
         acceptRequest,
         rejectRequest,
         shareEnergyWithCommunity,
+        solarOffers,
+        fetchSolarOffers,
+        cancelSolarOfferAction,
     } = useSolarOwnerStore();
 
     const [shareModalOpen, setShareModalOpen] = useState(false);
     const [shareAmountInput, setShareAmountInput] = useState<string>('3.5');
     const [selectedPool, setSelectedPool] = useState<string>('Co-Op Community Pool');
+    const [offerFilter, setOfferFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'cancelled'>('all');
+    const [cancellingOfferId, setCancellingOfferId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (user?.id) {
+            fetchSolarOffers(user.id);
+        }
+    }, [user?.id]);
 
     const enteredVal = parseFloat(shareAmountInput) || 0;
     const remainingAfterShare = Math.max(0, metrics.dailyExcessKWh - enteredVal);
 
-    const handleShareSubmit = () => {
+    const handleShareSubmit = async () => {
         if (enteredVal <= 0 || enteredVal > metrics.dailyExcessKWh) return;
-        const success = shareEnergyWithCommunity(enteredVal, selectedPool);
+        const success = await shareEnergyWithCommunity(enteredVal, selectedPool, user?.id);
         if (success) {
             setShareModalOpen(false);
         }
+    };
+
+    const handleCancelOffer = async (offerId: string) => {
+        if (!user?.id) return;
+        setCancellingOfferId(offerId);
+        await cancelSolarOfferAction(offerId, user.id);
+        setCancellingOfferId(null);
     };
 
     const handlePreset = (fraction: number) => {
@@ -176,7 +196,177 @@ export const SolarOwnerShare = () => {
                     </View>
                 </View>
 
-                {/* 3. INCOMING COMMUNITY ENERGY REQUESTS */}
+                {/* 3. MY SUBMITTED OFFERS (Manager Review & Dispatch Lifecycle) */}
+                <View className="rounded-[28px] border border-border/70 bg-card/85 dark:bg-card/50 p-5 mb-5 shadow-sm">
+                    <View className="flex-row items-center justify-between mb-3 gap-2">
+                        <View className="flex-1 mr-2 min-w-0">
+                            <View className="flex-row items-center gap-1.5 mb-0.5">
+                                <Text className="text-base font-bold text-foreground" numberOfLines={1}>
+                                    My Submitted Offers
+                                </Text>
+                                <View className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                            </View>
+                            <Text className="text-xs text-muted-foreground font-medium" numberOfLines={1}>
+                                Co-Op Manager review & dispatch status
+                            </Text>
+                        </View>
+                        <View className="bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-500/30 flex-shrink-0">
+                            <Text className="text-[10px] font-black text-amber-500">
+                                {solarOffers.filter((o) => o.status === 'pending').length} Pending
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Filter Pills */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row mb-3.5 pb-1">
+                        {(['all', 'pending', 'approved', 'rejected', 'cancelled'] as const).map((filter) => {
+                            const isSelected = offerFilter === filter;
+                            const count = filter === 'all' ? solarOffers.length : solarOffers.filter((o) => o.status === filter).length;
+                            return (
+                                <Pressable
+                                    key={filter}
+                                    onPress={() => setOfferFilter(filter)}
+                                    className={`px-3 py-1.5 rounded-full mr-2 border flex-row items-center active:opacity-80 ${
+                                        isSelected
+                                            ? 'bg-amber-500 border-amber-600'
+                                            : 'bg-secondary/60 border-border/60'
+                                    }`}
+                                >
+                                    <Text
+                                        className={`text-[11px] font-bold capitalize ${
+                                            isSelected ? 'text-amber-950 font-black' : 'text-foreground'
+                                        }`}
+                                    >
+                                        {filter}
+                                    </Text>
+                                    <View
+                                        className={`ml-1.5 px-1.5 py-0.2 rounded-full ${
+                                            isSelected ? 'bg-amber-600/30' : 'bg-background/80'
+                                        }`}
+                                    >
+                                        <Text
+                                            className={`text-[9px] font-black ${
+                                                isSelected ? 'text-amber-950' : 'text-muted-foreground'
+                                            }`}
+                                        >
+                                            {count}
+                                        </Text>
+                                    </View>
+                                </Pressable>
+                            );
+                        })}
+                    </ScrollView>
+
+                    {/* Offers List */}
+                    {(() => {
+                        const filtered = solarOffers.filter(
+                            (o) => offerFilter === 'all' || o.status === offerFilter
+                        );
+
+                        if (filtered.length === 0) {
+                            return (
+                                <View className="rounded-2xl border border-dashed border-border/70 p-6 items-center justify-center bg-secondary/15 my-1">
+                                    <MaterialCommunityIcons name="solar-power-variant" size={28} color="#9CA3AF" />
+                                    <Text className="text-xs font-bold text-foreground mt-2">
+                                        No {offerFilter !== 'all' ? offerFilter : ''} solar offers found
+                                    </Text>
+                                    <Text className="text-[10px] text-muted-foreground mt-0.5 text-center">
+                                        Submit excess energy to create a new sharing offer.
+                                    </Text>
+                                    <Pressable
+                                        onPress={() => setShareModalOpen(true)}
+                                        className="mt-3 px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/40 active:opacity-80"
+                                    >
+                                        <Text className="text-xs font-bold text-amber-500">
+                                            + Create Sharing Offer
+                                        </Text>
+                                    </Pressable>
+                                </View>
+                            );
+                        }
+
+                        return (
+                            <View className="gap-2.5">
+                                {filtered.map((offer) => {
+                                    const isPending = offer.status === 'pending';
+                                    const isApproved = offer.status === 'approved';
+                                    const isRejected = offer.status === 'rejected';
+                                    const isCancelled = offer.status === 'cancelled';
+                                    const isCancelling = cancellingOfferId === offer.id;
+
+                                    const dateStr = offer.offeredAt
+                                        ? new Date(offer.offeredAt).toLocaleDateString(undefined, {
+                                              month: 'short',
+                                              day: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                          })
+                                        : 'Today';
+
+                                    const statusBadge = isPending
+                                        ? { bg: 'bg-amber-500/15 border-amber-500/40', text: 'text-amber-500', icon: 'clock' as const, label: 'Pending Review' }
+                                        : isApproved
+                                        ? { bg: 'bg-emerald-500/15 border-emerald-500/40', text: 'text-emerald-500', icon: 'check-circle' as const, label: 'Manager Approved' }
+                                        : isRejected
+                                        ? { bg: 'bg-destructive/15 border-destructive/40', text: 'text-destructive', icon: 'alert-circle' as const, label: 'Rejected' }
+                                        : isCancelled
+                                        ? { bg: 'bg-secondary border-border/80', text: 'text-muted-foreground', icon: 'slash' as const, label: 'Cancelled' }
+                                        : { bg: 'bg-sky-500/15 border-sky-500/40', text: 'text-sky-500', icon: 'zap' as const, label: 'Completed' };
+
+                                    return (
+                                        <View
+                                            key={offer.id}
+                                            className="rounded-2xl border border-border/60 bg-secondary/30 p-3.5"
+                                        >
+                                            <View className="flex-row items-center justify-between mb-2">
+                                                <View className="flex-row items-center flex-1 mr-2">
+                                                    <View className="h-8 w-8 rounded-xl bg-amber-500/20 items-center justify-center mr-2.5 border border-amber-500/30">
+                                                        <Feather name="upload" size={14} color="#F59E0B" />
+                                                    </View>
+                                                    <View>
+                                                        <Text className="text-sm font-black text-foreground">
+                                                            {Number(offer.energyAmountKwh).toFixed(1)} kWh Offer
+                                                        </Text>
+                                                        <Text className="text-[10px] text-muted-foreground">
+                                                            ID: {offer.id.slice(0, 16)}... • {dateStr}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+
+                                                <View className={`flex-row items-center px-2 py-0.5 rounded-full border ${statusBadge.bg}`}>
+                                                    <Feather name={statusBadge.icon} size={10} color={isPending ? '#F59E0B' : isApproved ? '#10B981' : isRejected ? '#EF4444' : '#9CA3AF'} style={{ marginRight: 4 }} />
+                                                    <Text className={`text-[10px] font-bold ${statusBadge.text}`}>
+                                                        {statusBadge.label}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            <View className="flex-row items-center justify-between pt-2 border-t border-border/40">
+                                                <Text className="text-[11px] text-muted-foreground font-medium">
+                                                    Reserve: {offer.minimumBatteryPercent ? `${Number(offer.minimumBatteryPercent).toFixed(0)}% Min Battery` : '75% Default'}
+                                                </Text>
+
+                                                {isPending && (
+                                                    <Pressable
+                                                        onPress={() => handleCancelOffer(offer.id)}
+                                                        disabled={isCancelling}
+                                                        className="px-3 py-1 rounded-xl bg-destructive/15 border border-destructive/30 active:opacity-70"
+                                                    >
+                                                        <Text className="text-xs font-bold text-destructive">
+                                                            {isCancelling ? 'Cancelling...' : 'Cancel Offer'}
+                                                        </Text>
+                                                    </Pressable>
+                                                )}
+                                            </View>
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        );
+                    })()}
+                </View>
+
+                {/* 4. INCOMING COMMUNITY ENERGY REQUESTS */}
                 <View className="rounded-[28px] border border-border/70 bg-card/85 dark:bg-card/50 p-5 mb-5 shadow-sm">
                     <View className="flex-row items-center justify-between mb-4 gap-2">
                         <View className="flex-1 mr-2 min-w-0">
