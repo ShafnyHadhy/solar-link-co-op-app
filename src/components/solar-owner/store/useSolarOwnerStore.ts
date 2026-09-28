@@ -72,6 +72,9 @@ interface SolarOwnerState {
     fetchSolarData: (ownerId: string) => Promise<void>;
     fetchSolarOffers: (ownerId: string) => Promise<void>;
     createSolarOffer: (ownerId: string, assetId: string, energyAmountKwh: number, minimumBatteryPercent?: number) => Promise<boolean>;
+    cancelSolarOfferAction: (offerId: string, ownerId: string) => Promise<boolean>;
+    createSolarAssetAction: (ownerId: string, asset: { name: string; assetType: string; capacityKw: number; location?: string }) => Promise<boolean>;
+    updateSolarAssetAction: (assetId: string, ownerId: string, updates: { name?: string; assetType?: string; capacityKw?: number; status?: string; location?: string }) => Promise<boolean>;
 
     // Sharing State
     communityRequests: CommunityEnergyRequest[];
@@ -82,7 +85,7 @@ interface SolarOwnerState {
     setMinBatteryReserve: (percent: number) => void;
     acceptRequest: (requestId: string) => void;
     rejectRequest: (requestId: string) => void;
-    shareEnergyWithCommunity: (amountKWh: number, poolType?: string) => boolean;
+    shareEnergyWithCommunity: (amountKWh: number, poolType?: string, ownerId?: string) => Promise<boolean> | boolean;
 
     // Alerts State
     alerts: SolarAlertItem[];
@@ -568,6 +571,85 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
         }
     },
 
+    cancelSolarOfferAction: async (offerId: string, ownerId: string) => {
+        try {
+            const res = await fetch(getApiUrl(`/api/solar-offers/${offerId}/cancel`), {
+                method: 'PATCH',
+            });
+            const data = await res.json();
+            if (data.success !== false) {
+                get().showToast('Offer cancelled successfully', 'info');
+                await get().fetchSolarOffers(ownerId);
+                return true;
+            } else {
+                get().showToast(data.error || 'Failed to cancel offer', 'warning');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to cancel offer:', error);
+            get().showToast('Network error — could not cancel offer', 'warning');
+            return false;
+        }
+    },
+
+    createSolarAssetAction: async (ownerId: string, asset: { name: string; assetType: string; capacityKw: number; location?: string }) => {
+        try {
+            const assetId = `asset_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+            const res = await fetch(getApiUrl('/api/solar-assets'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: assetId,
+                    ownerId,
+                    name: asset.name,
+                    assetType: asset.assetType,
+                    capacityKw: asset.capacityKw.toString(),
+                    location: asset.location || 'Main Roof',
+                    status: 'active',
+                }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                get().showToast('Solar asset registered successfully!', 'success');
+                await get().fetchSolarData(ownerId);
+                return true;
+            } else {
+                get().showToast(data.error || 'Failed to register asset', 'warning');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to create asset:', error);
+            get().showToast('Network error — could not register asset', 'warning');
+            return false;
+        }
+    },
+
+    updateSolarAssetAction: async (assetId: string, ownerId: string, updates: { name?: string; assetType?: string; capacityKw?: number; status?: string; location?: string }) => {
+        try {
+            const res = await fetch(getApiUrl(`/api/solar-assets/${assetId}`), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...updates,
+                    capacityKw: updates.capacityKw !== undefined ? updates.capacityKw.toString() : undefined,
+                }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                get().showToast('Solar asset updated successfully!', 'success');
+                await get().fetchSolarData(ownerId);
+                return true;
+            } else {
+                get().showToast(data.error || 'Failed to update asset', 'warning');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to update asset:', error);
+            get().showToast('Network error — could not update asset', 'warning');
+            return false;
+        }
+    },
+
     communityRequests: INITIAL_REQUESTS,
     sharingHistory: INITIAL_SHARING_HISTORY,
     autoShareEnabled: true,
@@ -643,7 +725,7 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
         }
     },
 
-    shareEnergyWithCommunity: (amountKWh, poolType = 'Co-Op Community Pool') => {
+    shareEnergyWithCommunity: (amountKWh, poolType = 'Co-Op Community Pool', ownerId?: string) => {
         const currentMetrics = get().metrics;
         if (amountKWh <= 0 || amountKWh > currentMetrics.dailyExcessKWh) {
             get().showToast('Please enter an amount within your available excess energy', 'warning');
@@ -675,20 +757,26 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
 
         // ── Create real offer in backend ──
         const assets = get().solarAssets;
-        if (assets.length > 0) {
-            // Fire-and-forget — don't block the UI
+        const targetOwnerId = ownerId || (assets.length > 0 ? assets[0].ownerId : undefined);
+        const assetId = assets.length > 0 ? assets[0].id : `asset_default_${targetOwnerId ? targetOwnerId.slice(-6) : 'auto'}`;
+
+        if (targetOwnerId) {
             const offerId = `offer_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
             fetch(getApiUrl('/api/solar-offers'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     id: offerId,
-                    ownerId: assets[0].ownerId,
-                    assetId: assets[0].id,
+                    ownerId: targetOwnerId,
+                    assetId: assetId,
                     energyAmountKwh: amountKWh,
                     minimumBatteryPercent: get().minBatteryReservePercent,
                 }),
-            }).catch(() => { /* silent — local state already updated */ });
+            })
+            .then(async () => {
+                await get().fetchSolarOffers(targetOwnerId);
+            })
+            .catch(() => { /* silent fallback */ });
         }
 
         get().showToast(
