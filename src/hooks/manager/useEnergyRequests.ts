@@ -73,10 +73,21 @@ export function useEnergyRequests() {
                 throw new Error(data.error || "Failed to approve energy request");
             }
 
-            // Refetch live list to sync database changes
+            const updated: ManagerEnergyRequest = data.request || data.data;
+
+            // Immediately synchronize local state with persisted database status
+            setRequests((prev) =>
+                prev.map((r) =>
+                    r.id === requestId
+                        ? { ...r, ...updated, status: updated.status }
+                        : r
+                )
+            );
+
+            // Refetch live list to ensure complete database synchronization
             await fetchRequests();
 
-            return data.request || data.data;
+            return updated;
         },
         [fetchRequests]
     );
@@ -105,10 +116,21 @@ export function useEnergyRequests() {
                 throw new Error(data.error || "Failed to reject energy request");
             }
 
-            // Refetch live list to sync database changes
+            const updated: ManagerEnergyRequest = data.request || data.data;
+
+            // Immediately synchronize local state with persisted database status
+            setRequests((prev) =>
+                prev.map((r) =>
+                    r.id === requestId
+                        ? { ...r, ...updated, status: updated.status }
+                        : r
+                )
+            );
+
+            // Refetch live list to ensure complete database synchronization
             await fetchRequests();
 
-            return data.request || data.data;
+            return updated;
         },
         [fetchRequests]
     );

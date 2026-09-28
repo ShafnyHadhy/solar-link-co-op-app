@@ -86,6 +86,59 @@ export async function getEnergyRequestById(id: string) {
 }
 
 /**
+ * All valid energy request statuses in the system:
+ * - pending
+ * - approved
+ * - rejected
+ * - fulfilled
+ * - cancelled
+ */
+export const ENERGY_REQUEST_STATUSES = [
+    "pending",
+    "approved",
+    "rejected",
+    "fulfilled",
+    "cancelled",
+] as const;
+
+export type EnergyRequestStatus = (typeof ENERGY_REQUEST_STATUSES)[number];
+
+/**
+ * Valid status transitions permitted for manager operations:
+ * - pending -> approved
+ * - pending -> rejected
+ * All other transitions are strictly blocked.
+ */
+export const VALID_MANAGER_STATUS_TRANSITIONS: Record<
+    EnergyRequestStatus,
+    readonly EnergyRequestStatus[]
+> = {
+    pending: ["approved", "rejected"],
+    approved: [],
+    rejected: [],
+    fulfilled: [],
+    cancelled: [],
+};
+
+/**
+ * Validates that a manager can transition a request from currentStatus to targetStatus.
+ * Throws BadRequestError if the transition is prohibited.
+ */
+export function validateManagerStatusTransition(
+    currentStatus: string,
+    targetStatus: "approved" | "rejected"
+) {
+    const validNextStatuses =
+        VALID_MANAGER_STATUS_TRANSITIONS[currentStatus as EnergyRequestStatus];
+
+    if (!validNextStatuses || !validNextStatuses.includes(targetStatus)) {
+        throw new BadRequestError(
+            `Invalid status transition: Cannot transition energy request from '${currentStatus}' to '${targetStatus}'. Only pending requests can be approved or rejected.`
+        );
+    }
+}
+
+/**
  * Approve a pending energy request.
  * 1. Verify the request exists.
  * 2. Verify its current status is "pending".
@@ -133,12 +186,8 @@ export async function approveEnergyRequest(requestId: string, managerId: string)
 
     const existingRequest = requestResults[0];
 
-    // 3. Verify status is "pending" and prevent approval if already approved, rejected, fulfilled, or cancelled
-    if (existingRequest.status !== "pending") {
-        throw new BadRequestError(
-            `Cannot approve energy request with status '${existingRequest.status}'. Only pending requests can be approved.`
-        );
-    }
+    // 3. Verify status transition (strictly enforces pending -> approved)
+    validateManagerStatusTransition(existingRequest.status, "approved");
 
     const now = new Date();
 
@@ -225,12 +274,8 @@ export async function rejectEnergyRequest(requestId: string, managerId: string) 
 
     const existingRequest = requestResults[0];
 
-    // 3. Verify status is "pending" and prevent invalid status transitions
-    if (existingRequest.status !== "pending") {
-        throw new BadRequestError(
-            `Cannot reject energy request with status '${existingRequest.status}'. Only pending requests can be rejected.`
-        );
-    }
+    // 3. Verify status transition (strictly enforces pending -> rejected)
+    validateManagerStatusTransition(existingRequest.status, "rejected");
 
     const now = new Date();
 
