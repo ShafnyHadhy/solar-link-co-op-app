@@ -2,7 +2,7 @@ import TabScreenBackground from '@/components/shared/TabScreenBackground';
 import { useUser } from '@clerk/expo';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SolarOwnerAlertsModal } from '../alerts/SolarOwnerAlertsModal';
@@ -17,13 +17,20 @@ export const SolarOwnerDashboard = () => {
     const insets = useSafeAreaInsets();
     const { user } = useUser();
     const router = useRouter();
-    const { metrics, battery, alerts, weather } = useSolarOwnerStore();
+    const { metrics, battery, alerts, weather, fetchSolarData, lastFetchedAt } = useSolarOwnerStore();
 
     const [alertsModalOpen, setAlertsModalOpen] = useState(false);
     const [quickShareOpen, setQuickShareOpen] = useState(false);
 
     const unreadAlerts = alerts.filter((a) => !a.isRead);
     const mostRecentAlert = unreadAlerts[0] || alerts[0];
+
+    // Fetch real data from API on mount
+    useEffect(() => {
+        if (user?.id && !lastFetchedAt) {
+            fetchSolarData(user.id);
+        }
+    }, [user?.id, lastFetchedAt]);
 
     const handleNavigateToShareTab = () => {
         router.push('/(tabs)/share');

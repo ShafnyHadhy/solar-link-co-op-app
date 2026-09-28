@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { getApiUrl } from '@/lib/api';
 import {
     BatteryState,
     CommunityEnergyRequest,
@@ -10,6 +11,32 @@ import {
     SolarMetrics,
     WeatherForecastData,
 } from '../types/solarOwner.types';
+
+/** Shape of a solar asset returned by the API */
+export interface SolarAssetData {
+    id: string;
+    ownerId: string;
+    assetType: string;
+    name: string;
+    capacityKw: string | null;
+    status: string;
+    location: string | null;
+    installedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+/** Shape of a solar offer returned by the API */
+export interface SolarOfferData {
+    id: string;
+    ownerId: string;
+    energyAmountKwh: string;
+    minimumBatteryPercent: string | null;
+    status: string;
+    offeredAt: string;
+    expiresAt: string | null;
+    createdAt: string;
+}
 
 export type SolarOwnerActiveView = 
     | 'dashboard'
@@ -34,6 +61,17 @@ interface SolarOwnerState {
     metrics: SolarMetrics;
     battery: BatteryState;
     hardware: HardwareInfo;
+
+    // ── API-Connected State ──
+    solarAssets: SolarAssetData[];
+    solarOffers: SolarOfferData[];
+    isLoading: boolean;
+    lastFetchedAt: number | null;
+
+    // API Actions
+    fetchSolarData: (ownerId: string) => Promise<void>;
+    fetchSolarOffers: (ownerId: string) => Promise<void>;
+    createSolarOffer: (ownerId: string, assetId: string, energyAmountKwh: number, minimumBatteryPercent?: number) => Promise<boolean>;
 
     // Sharing State
     communityRequests: CommunityEnergyRequest[];
@@ -406,6 +444,130 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
     battery: INITIAL_BATTERY,
     hardware: INITIAL_HARDWARE,
 
+    // ── API-Connected State ──
+    solarAssets: [],
+    solarOffers: [],
+    isLoading: false,
+    lastFetchedAt: null,
+
+    fetchSolarData: async (ownerId: string) => {
+        if (get().isLoading) return;
+        set({ isLoading: true });
+
+        try {
+            // 1. Fetch solar assets
+            const assetsRes = await fetch(
+                `${getApiUrl('/api/solar-assets')}?ownerId=${ownerId}`
+            );
+            const assetsData = await assetsRes.json();
+
+            if (assetsData.success && assetsData.assets?.length > 0) {
+                set({ solarAssets: assetsData.assets });
+
+                // 2. Fetch energy surplus for the first asset
+                const firstAssetId = assetsData.assets[0].id;
+                const surplusRes = await fetch(
+                    `${getApiUrl('/api/energy-surplus')}?assetId=${firstAssetId}`
+                );
+                const surplusData = await surplusRes.json();
+
+                if (surplusData.success && surplusData.data?.surplus) {
+                    const s = surplusData.data.surplus;
+                    const currentMetrics = get().metrics;
+
+                    // Update metrics with real data from API
+                    set({
+                        metrics: {
+                            ...currentMetrics,
+                            dailyGenerationKWh: s.generationKwh,
+                            dailyConsumptionKWh: s.consumptionKwh,
+                            dailyExcessKWh: s.surplusKwh,
+                            // Keep computed values proportional
+                            generationKW: +(s.generationKwh / 4.9).toFixed(1),
+                            consumptionKW: +(s.consumptionKwh / 5.7).toFixed(1),
+                            excessKW: +(s.surplusKwh / 4.4).toFixed(1),
+                        },
+                    });
+                }
+            }
+
+            // 3. Fetch solar offers
+            const offersRes = await fetch(
+                `${getApiUrl('/api/solar-offers')}?ownerId=${ownerId}`
+            );
+            const offersData = await offersRes.json();
+
+            if (offersData.success && offersData.data?.offers) {
+                set({ solarOffers: offersData.data.offers });
+            }
+
+            set({ lastFetchedAt: Date.now() });
+        } catch (error) {
+            console.error('Failed to fetch solar data:', error);
+            get().showToast('Could not load live data — showing cached values', 'warning');
+        } finally {
+            set({ isLoading: false });
+        }
+    },
+
+    fetchSolarOffers: async (ownerId: string) => {
+        try {
+            const res = await fetch(
+                `${getApiUrl('/api/solar-offers')}?ownerId=${ownerId}`
+            );
+            const data = await res.json();
+            if (data.success && data.data?.offers) {
+                set({ solarOffers: data.data.offers });
+            }
+        } catch (error) {
+            console.error('Failed to fetch offers:', error);
+        }
+    },
+
+    createSolarOffer: async (ownerId, assetId, energyAmountKwh, minimumBatteryPercent) => {
+        try {
+            const offerId = `offer_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+            const res = await fetch(getApiUrl('/api/solar-offers'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: offerId,
+                    ownerId,
+                    assetId,
+                    energyAmountKwh,
+                    minimumBatteryPercent: minimumBatteryPercent ?? get().minBatteryReservePercent,
+                }),
+            });
+
+            const data = await res.json();
+
+            if (data.success !== false) {
+                get().showToast(
+                    `Offer submitted: ${energyAmountKwh} kWh → Pending manager approval`,
+                    'success'
+                );
+                // Refresh offers list
+                await get().fetchSolarOffers(ownerId);
+                // Update local surplus
+                const currentMetrics = get().metrics;
+                set({
+                    metrics: {
+                        ...currentMetrics,
+                        dailyExcessKWh: +(currentMetrics.dailyExcessKWh - energyAmountKwh).toFixed(1),
+                    },
+                });
+                return true;
+            } else {
+                get().showToast(data.error || 'Failed to create offer', 'warning');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to create offer:', error);
+            get().showToast('Network error — could not submit offer', 'warning');
+            return false;
+        }
+    },
+
     communityRequests: INITIAL_REQUESTS,
     sharingHistory: INITIAL_SHARING_HISTORY,
     autoShareEnabled: true,
@@ -511,14 +673,22 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
             sharingHistory: [newTx, ...get().sharingHistory],
         });
 
-        // Submit to Manager store if available
-        try {
-            const { useManagerStore } = require('../../manager/store/useManagerStore');
-            if (useManagerStore?.getState()?.submitSolarOffer) {
-                useManagerStore.getState().submitSolarOffer(amountKWh, poolType, 'Agash Jeeva (Solar Roof #12)');
-            }
-        } catch (e) {
-            // Ignore if manager store not loaded
+        // ── Create real offer in backend ──
+        const assets = get().solarAssets;
+        if (assets.length > 0) {
+            // Fire-and-forget — don't block the UI
+            const offerId = `offer_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+            fetch(getApiUrl('/api/solar-offers'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: offerId,
+                    ownerId: assets[0].ownerId,
+                    assetId: assets[0].id,
+                    energyAmountKwh: amountKWh,
+                    minimumBatteryPercent: get().minBatteryReservePercent,
+                }),
+            }).catch(() => { /* silent — local state already updated */ });
         }
 
         get().showToast(
