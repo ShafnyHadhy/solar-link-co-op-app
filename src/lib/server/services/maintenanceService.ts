@@ -30,3 +30,39 @@ export async function getServiceTicketById(ticketId: string) {
         throw new Error("Failed to retrieve service ticket");
     }
 }
+
+export async function updateServiceTicketStatus(
+    ticketId: string,
+    status:
+        | "open"
+        | "assigned"
+        | "in_progress"
+        | "resolved"
+        | "closed"
+) {
+    try {
+        const [updatedTicket] = await db
+            .update(serviceTickets)
+            .set({
+                status,
+                updatedAt: new Date(),
+                resolvedAt:
+                    status === "resolved"
+                        ? new Date()
+                        : null,
+            })
+            .where(eq(serviceTickets.id, ticketId))
+            .returning();
+
+        return updatedTicket ?? null;
+    } catch (error) {
+        console.error(
+            "Failed to update service ticket status:",
+            error
+        );
+
+        throw new Error(
+            "Failed to update service ticket status"
+        );
+    }
+}

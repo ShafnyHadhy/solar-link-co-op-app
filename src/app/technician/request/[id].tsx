@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import {
     ActivityIndicator,
+    Alert,
     Pressable,
     ScrollView,
     Text,
@@ -50,8 +51,12 @@ const TicketDetailsScreen = () => {
         useState<ServiceTicket | null>(null);
 
     const [loading, setLoading] = useState(true);
+
     const [error, setError] =
         useState<string | null>(null);
+
+    const [updatingStatus, setUpdatingStatus] =
+        useState(false);
 
     useEffect(() => {
         if (!id) {
@@ -109,6 +114,115 @@ const TicketDetailsScreen = () => {
         fetchTicket();
     }, [id]);
 
+    const formatStatus = (status: TicketStatus) =>
+        status
+            .replace("_", " ")
+            .replace(/\b\w/g, (letter) =>
+                letter.toUpperCase()
+            );
+
+    const formatDate = (date: string | null) => {
+        if (!date) {
+            return "Not available";
+        }
+
+        return new Date(date).toLocaleString();
+    };
+
+    const updateStatus = async (
+        newStatus: TicketStatus
+    ) => {
+        if (!ticket || updatingStatus) {
+            return;
+        }
+
+        try {
+            setUpdatingStatus(true);
+
+            const response = await fetch(
+                `/api/service-tickets/${encodeURIComponent(ticket.id)}`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+                    },
+                    body: JSON.stringify({
+                        status: newStatus,
+                    }),
+                }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    result.message ??
+                        "Failed to update ticket status"
+                );
+            }
+
+            const updatedTicket =
+                result.data?.ticket ??
+                result.ticket ??
+                null;
+
+            if (!updatedTicket) {
+                throw new Error(
+                    "Updated ticket was not returned"
+                );
+            }
+
+            setTicket(updatedTicket);
+
+            Alert.alert(
+                "Status Updated",
+                `Ticket status changed to ${formatStatus(
+                    newStatus
+                )}.`
+            );
+        } catch (err) {
+            console.error(
+                "Failed to update ticket status:",
+                err
+            );
+
+            Alert.alert(
+                "Update Failed",
+                err instanceof Error
+                    ? err.message
+                    : "Failed to update ticket status"
+            );
+        } finally {
+            setUpdatingStatus(false);
+        }
+    };
+
+    const getPriorityStyle = (
+        priority: TicketPriority
+    ) => {
+        switch (priority) {
+            case "critical":
+            case "high":
+                return {
+                    box: "bg-priority-high",
+                    text: "text-priority-high-foreground",
+                };
+
+            case "medium":
+                return {
+                    box: "bg-priority-medium",
+                    text: "text-priority-medium-foreground",
+                };
+
+            case "low":
+                return {
+                    box: "bg-priority-low",
+                    text: "text-priority-low-foreground",
+                };
+        }
+    };
+
     if (loading) {
         return (
             <View className="flex-1 items-center justify-center bg-background">
@@ -151,49 +265,17 @@ const TicketDetailsScreen = () => {
         );
     }
 
-    const formatStatus = (status: TicketStatus) =>
-        status
-            .replace("_", " ")
-            .replace(/\b\w/g, (letter) =>
-                letter.toUpperCase()
-            );
-
-    const formatDate = (date: string | null) => {
-        if (!date) {
-            return "Not available";
-        }
-
-        return new Date(date).toLocaleString();
-    };
-
-    const getPriorityStyle = (
-        priority: TicketPriority
-    ) => {
-        switch (priority) {
-            case "critical":
-            case "high":
-                return {
-                    box: "bg-priority-high",
-                    text: "text-priority-high-foreground",
-                };
-
-            case "medium":
-                return {
-                    box: "bg-priority-medium",
-                    text: "text-priority-medium-foreground",
-                };
-
-            case "low":
-                return {
-                    box: "bg-priority-low",
-                    text: "text-priority-low-foreground",
-                };
-        }
-    };
-
     const priorityStyle = getPriorityStyle(
         ticket.priority
     );
+
+    const statuses: TicketStatus[] = [
+        "open",
+        "assigned",
+        "in_progress",
+        "resolved",
+        "closed",
+    ];
 
     return (
         <View className="flex-1 bg-background">
@@ -241,7 +323,7 @@ const TicketDetailsScreen = () => {
                     paddingBottom: 50,
                 }}
             >
-                {/* Main ticket */}
+                {/* Main Ticket */}
                 <View className="rounded-[24px] border border-border bg-card p-5">
                     <View className="mb-4 h-12 w-12 items-center justify-center rounded-2xl bg-muted">
                         <Feather
@@ -273,7 +355,7 @@ const TicketDetailsScreen = () => {
                     </View>
                 </View>
 
-                {/* Issue */}
+                {/* Issue Description */}
                 <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
                     Issue Description
                 </Text>
@@ -285,7 +367,7 @@ const TicketDetailsScreen = () => {
                     </Text>
                 </View>
 
-                {/* Ticket information */}
+                {/* Ticket Information */}
                 <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
                     Ticket Information
                 </Text>
@@ -338,7 +420,7 @@ const TicketDetailsScreen = () => {
                     />
                 </View>
 
-                {/* Timeline */}
+                {/* Ticket Timeline */}
                 <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
                     Ticket Timeline
                 </Text>
@@ -370,17 +452,83 @@ const TicketDetailsScreen = () => {
                     />
                 </View>
 
-                {/* CESA-201 comes next */}
+                {/* Technician Actions */}
                 <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
                     Technician Actions
                 </Text>
 
                 <View className="rounded-[24px] border border-border bg-card p-5">
-                    <Text className="text-sm leading-6 text-muted-foreground">
-                        Ticket status and technician
-                        assignment actions will be
-                        available here.
-                    </Text>
+                    <View className="mb-4 flex-row items-center">
+                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-muted">
+                            <Feather
+                                name="refresh-cw"
+                                size={18}
+                                color="#6B7280"
+                            />
+                        </View>
+
+                        <View className="ml-3 flex-1">
+                            <Text className="text-sm font-bold text-foreground">
+                                Update Status
+                            </Text>
+
+                            <Text className="mt-1 text-xs text-muted-foreground">
+                                Current:{" "}
+                                {formatStatus(
+                                    ticket.status
+                                )}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <View className="flex-row flex-wrap gap-2">
+                        {statuses.map((status) => {
+                            const selected =
+                                ticket.status === status;
+
+                            return (
+                                <Pressable
+                                    key={status}
+                                    disabled={
+                                        updatingStatus ||
+                                        selected
+                                    }
+                                    onPress={() =>
+                                        updateStatus(
+                                            status
+                                        )
+                                    }
+                                    className={`rounded-xl border px-4 py-3 ${
+                                        selected
+                                            ? "border-primary bg-primary"
+                                            : "border-border bg-card"
+                                    }`}
+                                >
+                                    <Text
+                                        className={`text-xs font-bold ${
+                                            selected
+                                                ? "text-primary-foreground"
+                                                : "text-foreground"
+                                        }`}
+                                    >
+                                        {formatStatus(
+                                            status
+                                        )}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+
+                    {updatingStatus && (
+                        <View className="mt-4 flex-row items-center">
+                            <ActivityIndicator size="small" />
+
+                            <Text className="ml-2 text-xs text-muted-foreground">
+                                Updating status...
+                            </Text>
+                        </View>
+                    )}
                 </View>
             </ScrollView>
         </View>
