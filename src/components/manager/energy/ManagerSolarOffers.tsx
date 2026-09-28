@@ -65,6 +65,14 @@ function getStatusBadge(status: ManagerSolarOffer['status']) {
                 text: 'text-[#3B82F6]',
                 icon: 'check' as const,
             };
+        case 'cancelled':
+            return {
+                label: 'Cancelled',
+                bg: 'bg-zinc-500/15',
+                border: 'border-zinc-500/30',
+                text: 'text-zinc-400',
+                icon: 'slash' as const,
+            };
         default:
             return {
                 label: status,
@@ -390,6 +398,8 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
                         const badge = getStatusBadge(item.status);
                         const isPending = item.status === 'pending';
                         const isApproved = item.status === 'approved';
+                        const isCompleted = item.status === 'completed';
+                        const isCancelled = item.status === 'cancelled';
                         const formattedKwh = parseFloat(item.energyAmountKwh).toFixed(1);
                         const minBattery = item.minimumBatteryPercent
                             ? `${parseFloat(item.minimumBatteryPercent).toFixed(0)}%`
@@ -500,6 +510,34 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
                                         <Pressable
                                             onPress={() => openOfferModal(item.id)}
                                             className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
+                                        >
+                                            <Text className='text-xs font-bold text-foreground'>
+                                                Details
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                ) : isCompleted ? (
+                                    <View className='flex-row items-center justify-between pt-1'>
+                                        <Text className='text-xs font-semibold text-[#3B82F6]'>
+                                            Solar dispatch completed ({formattedKwh} kWh)
+                                        </Text>
+                                        <Pressable
+                                            onPress={() => openOfferModal(item.id)}
+                                            className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
+                                        >
+                                            <Text className='text-xs font-bold text-foreground'>
+                                                Details
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                ) : isCancelled ? (
+                                    <View className='flex-row items-center justify-between pt-1'>
+                                        <Text className='text-xs font-semibold text-muted-foreground'>
+                                            Offer cancelled by owner
+                                        </Text>
+                                        <Pressable
+                                            onPress={() => openOfferModal(item.id)}
+                                            className='px-3.5 py-1.5 rounded-lg bg-secondary border border-border/60 active:opacity-75'
                                         >
                                             <Text className='text-xs font-bold text-foreground'>
                                                 Details
