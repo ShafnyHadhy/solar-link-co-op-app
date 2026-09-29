@@ -66,3 +66,31 @@ export async function updateServiceTicketStatus(
         );
     }
 }
+
+export async function assignServiceTicketTechnician(
+    ticketId: string,
+    technicianId: string
+) {
+    try {
+        const [updatedTicket] = await db
+            .update(serviceTickets)
+            .set({
+                assignedTechnicianId: technicianId,
+                status: "assigned",
+                updatedAt: new Date(),
+            })
+            .where(eq(serviceTickets.id, ticketId))
+            .returning();
+
+        return updatedTicket ?? null;
+    } catch (error) {
+        console.error(
+            "Failed to assign technician to service ticket:",
+            error
+        );
+
+        throw new Error(
+            "Failed to assign technician to service ticket"
+        );
+    }
+}

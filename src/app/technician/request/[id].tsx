@@ -1,3 +1,4 @@
+import { useUser } from "@clerk/expo";
 import { Feather } from "@expo/vector-icons";
 import {
     router,
@@ -45,12 +46,16 @@ interface ServiceTicket {
 }
 
 const TicketDetailsScreen = () => {
-    const { id } = useLocalSearchParams<{ id: string }>();
+    const { id } =
+        useLocalSearchParams<{ id: string }>();
+
+    const { user } = useUser();
 
     const [ticket, setTicket] =
         useState<ServiceTicket | null>(null);
 
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] =
+        useState(true);
 
     const [error, setError] =
         useState<string | null>(null);
@@ -71,10 +76,13 @@ const TicketDetailsScreen = () => {
                 setError(null);
 
                 const response = await fetch(
-                    `/api/service-tickets/${encodeURIComponent(id)}`
+                    `/api/service-tickets/${encodeURIComponent(
+                        id
+                    )}`
                 );
 
-                const result = await response.json();
+                const result =
+                    await response.json();
 
                 if (!response.ok) {
                     throw new Error(
@@ -114,21 +122,28 @@ const TicketDetailsScreen = () => {
         fetchTicket();
     }, [id]);
 
-    const formatStatus = (status: TicketStatus) =>
+    const formatStatus = (
+        status: TicketStatus
+    ) =>
         status
             .replace("_", " ")
             .replace(/\b\w/g, (letter) =>
                 letter.toUpperCase()
             );
 
-    const formatDate = (date: string | null) => {
+    const formatDate = (
+        date: string | null
+    ) => {
         if (!date) {
             return "Not available";
         }
 
-        return new Date(date).toLocaleString();
+        return new Date(
+            date
+        ).toLocaleString();
     };
 
+    // CESA-201 - Update ticket status
     const updateStatus = async (
         newStatus: TicketStatus
     ) => {
@@ -140,7 +155,9 @@ const TicketDetailsScreen = () => {
             setUpdatingStatus(true);
 
             const response = await fetch(
-                `/api/service-tickets/${encodeURIComponent(ticket.id)}`,
+                `/api/service-tickets/${encodeURIComponent(
+                    ticket.id
+                )}`,
                 {
                     method: "PATCH",
                     headers: {
@@ -153,7 +170,8 @@ const TicketDetailsScreen = () => {
                 }
             );
 
-            const result = await response.json();
+            const result =
+                await response.json();
 
             if (!response.ok) {
                 throw new Error(
@@ -198,6 +216,85 @@ const TicketDetailsScreen = () => {
         }
     };
 
+    // CESA-202 - Assign ticket to
+    // currently logged-in technician
+    const assignToMe = async () => {
+        if (!ticket) {
+            return;
+        }
+
+        if (!user?.id) {
+            Alert.alert(
+                "Assignment Failed",
+                "Unable to identify the logged-in technician."
+            );
+            return;
+        }
+
+        try {
+            setUpdatingStatus(true);
+
+            const response = await fetch(
+                `/api/service-tickets/${encodeURIComponent(
+                    ticket.id
+                )}`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+                    },
+                    body: JSON.stringify({
+                        technicianId:
+                            user.id,
+                    }),
+                }
+            );
+
+            const result =
+                await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    result.message ??
+                        "Failed to assign ticket"
+                );
+            }
+
+            const updatedTicket =
+                result.data?.ticket ??
+                result.ticket ??
+                null;
+
+            if (!updatedTicket) {
+                throw new Error(
+                    "Updated ticket was not returned"
+                );
+            }
+
+            setTicket(updatedTicket);
+
+            Alert.alert(
+                "Ticket Assigned",
+                "This service ticket has been assigned to you."
+            );
+        } catch (err) {
+            console.error(
+                "Failed to assign ticket:",
+                err
+            );
+
+            Alert.alert(
+                "Assignment Failed",
+                err instanceof Error
+                    ? err.message
+                    : "Failed to assign ticket"
+            );
+        } finally {
+            setUpdatingStatus(false);
+        }
+    };
+
     const getPriorityStyle = (
         priority: TicketPriority
     ) => {
@@ -226,7 +323,9 @@ const TicketDetailsScreen = () => {
     if (loading) {
         return (
             <View className="flex-1 items-center justify-center bg-background">
-                <ActivityIndicator size="large" />
+                <ActivityIndicator
+                    size="large"
+                />
 
                 <Text className="mt-4 text-sm text-muted-foreground">
                     Loading ticket details...
@@ -254,7 +353,9 @@ const TicketDetailsScreen = () => {
                 </Text>
 
                 <Pressable
-                    onPress={() => router.back()}
+                    onPress={() =>
+                        router.back()
+                    }
                     className="mt-6 rounded-xl bg-primary px-6 py-3"
                 >
                     <Text className="font-bold text-primary-foreground">
@@ -265,9 +366,10 @@ const TicketDetailsScreen = () => {
         );
     }
 
-    const priorityStyle = getPriorityStyle(
-        ticket.priority
-    );
+    const priorityStyle =
+        getPriorityStyle(
+            ticket.priority
+        );
 
     const statuses: TicketStatus[] = [
         "open",
@@ -277,13 +379,19 @@ const TicketDetailsScreen = () => {
         "closed",
     ];
 
+    const assignedToCurrentUser =
+        ticket.assignedTechnicianId ===
+        user?.id;
+
     return (
         <View className="flex-1 bg-background">
             {/* Header */}
             <View className="border-b border-border bg-card px-5 pb-4 pt-5">
                 <View className="flex-row items-center">
                     <Pressable
-                        onPress={() => router.back()}
+                        onPress={() =>
+                            router.back()
+                        }
                         className="mr-3 h-10 w-10 items-center justify-center rounded-xl bg-muted"
                     >
                         <Feather
@@ -316,7 +424,9 @@ const TicketDetailsScreen = () => {
             </View>
 
             <ScrollView
-                showsVerticalScrollIndicator={false}
+                showsVerticalScrollIndicator={
+                    false
+                }
                 contentContainerStyle={{
                     paddingHorizontal: 20,
                     paddingTop: 20,
@@ -379,7 +489,9 @@ const TicketDetailsScreen = () => {
                             ticket.priority
                                 .charAt(0)
                                 .toUpperCase() +
-                            ticket.priority.slice(1)
+                            ticket.priority.slice(
+                                1
+                            )
                         }
                     />
 
@@ -407,8 +519,10 @@ const TicketDetailsScreen = () => {
                     <InfoRow
                         label="Assigned Technician"
                         value={
-                            ticket.assignedTechnicianId ??
-                            "Not assigned"
+                            assignedToCurrentUser
+                                ? "Assigned to me"
+                                : ticket.assignedTechnicianId ??
+                                  "Not assigned"
                         }
                     />
 
@@ -416,7 +530,9 @@ const TicketDetailsScreen = () => {
 
                     <InfoRow
                         label="Reported By"
-                        value={ticket.reportedBy}
+                        value={
+                            ticket.reportedBy
+                        }
                     />
                 </View>
 
@@ -457,7 +573,80 @@ const TicketDetailsScreen = () => {
                     Technician Actions
                 </Text>
 
+                {/* Assignment */}
                 <View className="rounded-[24px] border border-border bg-card p-5">
+                    <View className="flex-row items-center">
+                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-muted">
+                            <Feather
+                                name="user-check"
+                                size={18}
+                                color="#6B7280"
+                            />
+                        </View>
+
+                        <View className="ml-3 flex-1">
+                            <Text className="text-sm font-bold text-foreground">
+                                Ticket Assignment
+                            </Text>
+
+                            <Text className="mt-1 text-xs text-muted-foreground">
+                                {assignedToCurrentUser
+                                    ? "This ticket is assigned to you."
+                                    : ticket.assignedTechnicianId
+                                      ? "This ticket is already assigned."
+                                      : "Take responsibility for this service ticket."}
+                            </Text>
+                        </View>
+                    </View>
+
+                    {!ticket.assignedTechnicianId && (
+                        <Pressable
+                            disabled={
+                                updatingStatus ||
+                                !user?.id
+                            }
+                            onPress={
+                                assignToMe
+                            }
+                            className={`mt-4 items-center rounded-xl px-4 py-3 ${
+                                updatingStatus ||
+                                !user?.id
+                                    ? "bg-muted"
+                                    : "bg-primary"
+                            }`}
+                        >
+                            <Text
+                                className={`font-bold ${
+                                    updatingStatus ||
+                                    !user?.id
+                                        ? "text-muted-foreground"
+                                        : "text-primary-foreground"
+                                }`}
+                            >
+                                {updatingStatus
+                                    ? "Assigning..."
+                                    : "Assign to Me"}
+                            </Text>
+                        </Pressable>
+                    )}
+
+                    {assignedToCurrentUser && (
+                        <View className="mt-4 flex-row items-center rounded-xl bg-muted p-3">
+                            <Feather
+                                name="check-circle"
+                                size={18}
+                                color="#6B7280"
+                            />
+
+                            <Text className="ml-2 text-sm font-bold text-foreground">
+                                Assigned to Me
+                            </Text>
+                        </View>
+                    )}
+                </View>
+
+                {/* Status Update */}
+                <View className="mt-4 rounded-[24px] border border-border bg-card p-5">
                     <View className="mb-4 flex-row items-center">
                         <View className="h-10 w-10 items-center justify-center rounded-xl bg-muted">
                             <Feather
@@ -482,50 +671,57 @@ const TicketDetailsScreen = () => {
                     </View>
 
                     <View className="flex-row flex-wrap gap-2">
-                        {statuses.map((status) => {
-                            const selected =
-                                ticket.status === status;
+                        {statuses.map(
+                            (status) => {
+                                const selected =
+                                    ticket.status ===
+                                    status;
 
-                            return (
-                                <Pressable
-                                    key={status}
-                                    disabled={
-                                        updatingStatus ||
-                                        selected
-                                    }
-                                    onPress={() =>
-                                        updateStatus(
+                                return (
+                                    <Pressable
+                                        key={
                                             status
-                                        )
-                                    }
-                                    className={`rounded-xl border px-4 py-3 ${
-                                        selected
-                                            ? "border-primary bg-primary"
-                                            : "border-border bg-card"
-                                    }`}
-                                >
-                                    <Text
-                                        className={`text-xs font-bold ${
+                                        }
+                                        disabled={
+                                            updatingStatus ||
                                             selected
-                                                ? "text-primary-foreground"
-                                                : "text-foreground"
+                                        }
+                                        onPress={() =>
+                                            updateStatus(
+                                                status
+                                            )
+                                        }
+                                        className={`rounded-xl border px-4 py-3 ${
+                                            selected
+                                                ? "border-primary bg-primary"
+                                                : "border-border bg-card"
                                         }`}
                                     >
-                                        {formatStatus(
-                                            status
-                                        )}
-                                    </Text>
-                                </Pressable>
-                            );
-                        })}
+                                        <Text
+                                            className={`text-xs font-bold ${
+                                                selected
+                                                    ? "text-primary-foreground"
+                                                    : "text-foreground"
+                                            }`}
+                                        >
+                                            {formatStatus(
+                                                status
+                                            )}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            }
+                        )}
                     </View>
 
                     {updatingStatus && (
                         <View className="mt-4 flex-row items-center">
-                            <ActivityIndicator size="small" />
+                            <ActivityIndicator
+                                size="small"
+                            />
 
                             <Text className="ml-2 text-xs text-muted-foreground">
-                                Updating status...
+                                Updating...
                             </Text>
                         </View>
                     )}

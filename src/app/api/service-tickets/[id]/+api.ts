@@ -1,7 +1,9 @@
 import {
+    assignServiceTicketTechnician,
     getServiceTicketById,
     updateServiceTicketStatus,
 } from "@/lib/server/services/maintenanceService";
+
 import {
     errorResponse,
     successResponse,
@@ -46,6 +48,30 @@ export async function PATCH(
 ) {
     try {
         const body = await request.json();
+
+        // CESA-202 - Assign technician
+        if (body.technicianId) {
+            const ticket =
+                await assignServiceTicketTechnician(
+                    id,
+                    body.technicianId
+                );
+
+            if (!ticket) {
+                return Response.json(
+                    {
+                        success: false,
+                        message:
+                            "Service ticket not found",
+                    },
+                    { status: 404 }
+                );
+            }
+
+            return successResponse({ ticket });
+        }
+
+        // CESA-201 - Update ticket status
         const status = body.status as TicketStatus;
 
         if (
@@ -71,7 +97,8 @@ export async function PATCH(
             return Response.json(
                 {
                     success: false,
-                    message: "Service ticket not found",
+                    message:
+                        "Service ticket not found",
                 },
                 { status: 404 }
             );
