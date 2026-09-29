@@ -1,4 +1,3 @@
-
 import { desc, eq } from "drizzle-orm";
 import { db } from "../db/client";
 import { serviceTickets, users } from "../db/schema";
@@ -88,4 +87,89 @@ export async function getAllServiceTickets() {
         console.error("Error fetching all service tickets:", error);
         return [];
     }
-}
+}
+
+
+// ============================================================
+// TECHNICIAN - US-24 SERVICE TICKET MANAGEMENT
+// ============================================================
+
+// CESA-197 - Retrieve service tickets for technician
+export async function getServiceTickets() {
+    try {
+        const tickets = await db
+            .select()
+            .from(serviceTickets)
+            .orderBy(desc(serviceTickets.createdAt));
+
+        return tickets;
+    } catch (error) {
+        console.error("Failed to retrieve service tickets:", error);
+        throw new Error("Failed to retrieve service tickets");
+    }
+}
+
+
+// CESA-200 - Retrieve one service ticket by ID
+export async function getServiceTicketById(ticketId: string) {
+    try {
+        const [ticket] = await db
+            .select()
+            .from(serviceTickets)
+            .where(eq(serviceTickets.id, ticketId))
+            .limit(1);
+
+        return ticket ?? null;
+    } catch (error) {
+        console.error("Failed to retrieve service ticket:", error);
+        throw new Error("Failed to retrieve service ticket");
+    }
+}
+
+
+// CESA-201 - Update service ticket status
+export async function updateServiceTicketStatus(
+    ticketId: string,
+    status: "open" | "assigned" | "in_progress" | "resolved" | "closed"
+) {
+    try {
+        const [updatedTicket] = await db
+            .update(serviceTickets)
+            .set({
+                status,
+                updatedAt: new Date(),
+                resolvedAt: status === "resolved" ? new Date() : null,
+            })
+            .where(eq(serviceTickets.id, ticketId))
+            .returning();
+
+        return updatedTicket ?? null;
+    } catch (error) {
+        console.error("Failed to update service ticket status:", error);
+        throw new Error("Failed to update service ticket status");
+    }
+}
+
+
+// CESA-202 - Assign service ticket to technician
+export async function assignServiceTicketTechnician(
+    ticketId: string,
+    technicianId: string
+) {
+    try {
+        const [updatedTicket] = await db
+            .update(serviceTickets)
+            .set({
+                assignedTechnicianId: technicianId,
+                status: "assigned",
+                updatedAt: new Date(),
+            })
+            .where(eq(serviceTickets.id, ticketId))
+            .returning();
+
+        return updatedTicket ?? null;
+    } catch (error) {
+        console.error("Failed to assign technician to service ticket:", error);
+        throw new Error("Failed to assign technician to service ticket");
+    }
+}

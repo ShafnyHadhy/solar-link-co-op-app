@@ -1,33 +1,340 @@
-import {
-    faultDetails,
-    serviceRequests,
-} from '@/data/technicianData';
-import { Feather } from '@expo/vector-icons';
+import { useUser } from "@clerk/expo";
+import { Feather } from "@expo/vector-icons";
 import {
     router,
     useLocalSearchParams,
-} from 'expo-router';
-import React from 'react';
+} from "expo-router";
+import React, {
+    useEffect,
+    useState,
+} from "react";
 import {
+    ActivityIndicator,
     Alert,
     Pressable,
     ScrollView,
     Text,
     View,
-} from 'react-native';
+} from "react-native";
 
-const FaultDetailsScreen = () => {
-    const { id } = useLocalSearchParams<{ id: string }>();
+type TicketPriority =
+    | "critical"
+    | "high"
+    | "medium"
+    | "low";
 
-    const request = serviceRequests.find(
-        (item) => item.id === id
-    );
+type TicketStatus =
+    | "open"
+    | "assigned"
+    | "in_progress"
+    | "resolved"
+    | "closed";
 
-    const details = faultDetails.find(
-        (item) => item.requestId === id
-    );
+interface ServiceTicket {
+    id: string;
+    assetId: string | null;
+    reportedBy: string;
+    assignedTechnicianId: string | null;
+    title: string;
+    description: string | null;
+    priority: TicketPriority;
+    status: TicketStatus;
+    location: string | null;
+    createdAt: string;
+    updatedAt: string;
+    resolvedAt: string | null;
+}
 
-    if (!request || !details) {
+const TicketDetailsScreen = () => {
+    const { id } =
+        useLocalSearchParams<{ id: string }>();
+
+    const { user } = useUser();
+
+    const [ticket, setTicket] =
+        useState<ServiceTicket | null>(null);
+
+    const [loading, setLoading] =
+        useState(true);
+
+    const [error, setError] =
+        useState<string | null>(null);
+
+    const [updatingStatus, setUpdatingStatus] =
+        useState(false);
+
+    useEffect(() => {
+        if (!id) {
+            setError("Ticket ID is missing.");
+            setLoading(false);
+            return;
+        }
+
+        const fetchTicket = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+
+                const response = await fetch(
+                    `/api/service-tickets/${encodeURIComponent(
+                        id
+                    )}`
+                );
+
+                const result =
+                    await response.json();
+
+                if (!response.ok) {
+                    throw new Error(
+                        result.message ??
+                            "Failed to load service ticket"
+                    );
+                }
+
+                const fetchedTicket =
+                    result.data?.ticket ??
+                    result.ticket ??
+                    null;
+
+                if (!fetchedTicket) {
+                    throw new Error(
+                        "Service ticket not found"
+                    );
+                }
+
+                setTicket(fetchedTicket);
+            } catch (err) {
+                console.error(
+                    "Failed to load service ticket:",
+                    err
+                );
+
+                setError(
+                    err instanceof Error
+                        ? err.message
+                        : "Failed to load service ticket"
+                );
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchTicket();
+    }, [id]);
+
+    const formatStatus = (
+        status: TicketStatus
+    ) =>
+        status
+            .replace("_", " ")
+            .replace(/\b\w/g, (letter) =>
+                letter.toUpperCase()
+            );
+
+    const formatDate = (
+        date: string | null
+    ) => {
+        if (!date) {
+            return "Not available";
+        }
+
+        return new Date(
+            date
+        ).toLocaleString();
+    };
+
+    // CESA-201 - Update ticket status
+    const updateStatus = async (
+        newStatus: TicketStatus
+    ) => {
+        if (!ticket || updatingStatus) {
+            return;
+        }
+
+        try {
+            setUpdatingStatus(true);
+
+            const response = await fetch(
+                `/api/service-tickets/${encodeURIComponent(
+                    ticket.id
+                )}`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+                    },
+                    body: JSON.stringify({
+                        status: newStatus,
+                    }),
+                }
+            );
+
+            const result =
+                await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    result.message ??
+                        "Failed to update ticket status"
+                );
+            }
+
+            const updatedTicket =
+                result.data?.ticket ??
+                result.ticket ??
+                null;
+
+            if (!updatedTicket) {
+                throw new Error(
+                    "Updated ticket was not returned"
+                );
+            }
+
+            setTicket(updatedTicket);
+
+            Alert.alert(
+                "Status Updated",
+                `Ticket status changed to ${formatStatus(
+                    newStatus
+                )}.`
+            );
+        } catch (err) {
+            console.error(
+                "Failed to update ticket status:",
+                err
+            );
+
+            Alert.alert(
+                "Update Failed",
+                err instanceof Error
+                    ? err.message
+                    : "Failed to update ticket status"
+            );
+        } finally {
+            setUpdatingStatus(false);
+        }
+    };
+
+    // CESA-202 - Assign ticket to
+    // currently logged-in technician
+    const assignToMe = async () => {
+        if (!ticket) {
+            return;
+        }
+
+        if (!user?.id) {
+            Alert.alert(
+                "Assignment Failed",
+                "Unable to identify the logged-in technician."
+            );
+            return;
+        }
+
+        try {
+            setUpdatingStatus(true);
+
+            const response = await fetch(
+                `/api/service-tickets/${encodeURIComponent(
+                    ticket.id
+                )}`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+                    },
+                    body: JSON.stringify({
+                        technicianId:
+                            user.id,
+                    }),
+                }
+            );
+
+            const result =
+                await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    result.message ??
+                        "Failed to assign ticket"
+                );
+            }
+
+            const updatedTicket =
+                result.data?.ticket ??
+                result.ticket ??
+                null;
+
+            if (!updatedTicket) {
+                throw new Error(
+                    "Updated ticket was not returned"
+                );
+            }
+
+            setTicket(updatedTicket);
+
+            Alert.alert(
+                "Ticket Assigned",
+                "This service ticket has been assigned to you."
+            );
+        } catch (err) {
+            console.error(
+                "Failed to assign ticket:",
+                err
+            );
+
+            Alert.alert(
+                "Assignment Failed",
+                err instanceof Error
+                    ? err.message
+                    : "Failed to assign ticket"
+            );
+        } finally {
+            setUpdatingStatus(false);
+        }
+    };
+
+    const getPriorityStyle = (
+        priority: TicketPriority
+    ) => {
+        switch (priority) {
+            case "critical":
+            case "high":
+                return {
+                    box: "bg-priority-high",
+                    text: "text-priority-high-foreground",
+                };
+
+            case "medium":
+                return {
+                    box: "bg-priority-medium",
+                    text: "text-priority-medium-foreground",
+                };
+
+            case "low":
+                return {
+                    box: "bg-priority-low",
+                    text: "text-priority-low-foreground",
+                };
+        }
+    };
+
+    if (loading) {
+        return (
+            <View className="flex-1 items-center justify-center bg-background">
+                <ActivityIndicator
+                    size="large"
+                />
+
+                <Text className="mt-4 text-sm text-muted-foreground">
+                    Loading ticket details...
+                </Text>
+            </View>
+        );
+    }
+
+    if (error || !ticket) {
         return (
             <View className="flex-1 items-center justify-center bg-background px-6">
                 <Feather
@@ -37,11 +344,18 @@ const FaultDetailsScreen = () => {
                 />
 
                 <Text className="mt-4 text-xl font-bold text-foreground">
-                    Request not found
+                    Ticket not found
+                </Text>
+
+                <Text className="mt-2 text-center text-sm text-muted-foreground">
+                    {error ??
+                        "The requested service ticket could not be found."}
                 </Text>
 
                 <Pressable
-                    onPress={() => router.back()}
+                    onPress={() =>
+                        router.back()
+                    }
                     className="mt-6 rounded-xl bg-primary px-6 py-3"
                 >
                     <Text className="font-bold text-primary-foreground">
@@ -52,42 +366,22 @@ const FaultDetailsScreen = () => {
         );
     }
 
-    const getStatusStyle = () => {
-        if (request.status === 'Critical') {
-            return {
-                box: 'bg-priority-high',
-                text: 'text-priority-high-foreground',
-            };
-        }
-
-        if (request.status === 'Warning') {
-            return {
-                box: 'bg-priority-medium',
-                text: 'text-priority-medium-foreground',
-            };
-        }
-
-        if (request.status === 'Normal') {
-            return {
-                box: 'bg-priority-low',
-                text: 'text-priority-low-foreground',
-            };
-        }
-
-        return {
-            box: 'bg-secondary',
-            text: 'text-secondary-foreground',
-        };
-    };
-
-    const statusStyle = getStatusStyle();
-
-    const showFrontendMessage = (title: string) => {
-        Alert.alert(
-            title,
-            'Frontend demonstration only. No backend action is performed.'
+    const priorityStyle =
+        getPriorityStyle(
+            ticket.priority
         );
-    };
+
+    const statuses: TicketStatus[] = [
+        "open",
+        "assigned",
+        "in_progress",
+        "resolved",
+        "closed",
+    ];
+
+    const assignedToCurrentUser =
+        ticket.assignedTechnicianId ===
+        user?.id;
 
     return (
         <View className="flex-1 bg-background">
@@ -95,7 +389,9 @@ const FaultDetailsScreen = () => {
             <View className="border-b border-border bg-card px-5 pb-4 pt-5">
                 <View className="flex-row items-center">
                     <Pressable
-                        onPress={() => router.back()}
+                        onPress={() =>
+                            router.back()
+                        }
                         className="mr-3 h-10 w-10 items-center justify-center rounded-xl bg-muted"
                     >
                         <Feather
@@ -107,37 +403,39 @@ const FaultDetailsScreen = () => {
 
                     <View className="flex-1">
                         <Text className="text-xl font-extrabold text-foreground">
-                            Fault Details
+                            Ticket Details
                         </Text>
 
                         <Text className="mt-0.5 text-xs text-muted-foreground">
-                            {request.id}
+                            {ticket.id}
                         </Text>
                     </View>
 
                     <View
-                        className={`rounded-full px-3 py-1.5 ${statusStyle.box}`}
+                        className={`rounded-full px-3 py-1.5 ${priorityStyle.box}`}
                     >
                         <Text
-                            className={`text-[10px] font-extrabold uppercase ${statusStyle.text}`}
+                            className={`text-[10px] font-extrabold uppercase ${priorityStyle.text}`}
                         >
-                            {request.status}
+                            {ticket.priority}
                         </Text>
                     </View>
                 </View>
             </View>
 
             <ScrollView
-                showsVerticalScrollIndicator={false}
+                showsVerticalScrollIndicator={
+                    false
+                }
                 contentContainerStyle={{
                     paddingHorizontal: 20,
                     paddingTop: 20,
                     paddingBottom: 50,
                 }}
             >
-                {/* Main fault information */}
+                {/* Main Ticket */}
                 <View className="rounded-[24px] border border-border bg-card p-5">
-                    <View className="mb-4 h-12 w-12 items-center justify-center rounded-2xl bg-priority-high">
+                    <View className="mb-4 h-12 w-12 items-center justify-center rounded-2xl bg-muted">
                         <Feather
                             name="alert-triangle"
                             size={23}
@@ -146,11 +444,11 @@ const FaultDetailsScreen = () => {
                     </View>
 
                     <Text className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Fault Type
+                        Service Ticket
                     </Text>
 
                     <Text className="mt-1 text-2xl font-extrabold text-foreground">
-                        {details.faultType}
+                        {ticket.title}
                     </Text>
 
                     <View className="mt-4 flex-row items-center">
@@ -161,331 +459,272 @@ const FaultDetailsScreen = () => {
                         />
 
                         <Text className="ml-2 text-sm text-muted-foreground">
-                            {request.systemName} • {request.location}
+                            {ticket.location ??
+                                "Location not provided"}
                         </Text>
                     </View>
                 </View>
 
-                {/* Fault information */}
+                {/* Issue Description */}
                 <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
-                    Fault Information
+                    Issue Description
+                </Text>
+
+                <View className="rounded-[24px] border border-border bg-card p-5">
+                    <Text className="text-sm leading-6 text-foreground">
+                        {ticket.description ??
+                            "No description provided."}
+                    </Text>
+                </View>
+
+                {/* Ticket Information */}
+                <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
+                    Ticket Information
                 </Text>
 
                 <View className="rounded-[24px] border border-border bg-card p-5">
                     <InfoRow
-                        label="Severity"
-                        value={request.severity}
+                        label="Priority"
+                        value={
+                            ticket.priority
+                                .charAt(0)
+                                .toUpperCase() +
+                            ticket.priority.slice(
+                                1
+                            )
+                        }
                     />
 
                     <Divider />
 
                     <InfoRow
-                        label="Error Code"
-                        value={details.errorCode}
+                        label="Status"
+                        value={formatStatus(
+                            ticket.status
+                        )}
                     />
 
                     <Divider />
 
                     <InfoRow
-                        label="Detected"
-                        value={details.detectedTime}
+                        label="Solar Asset"
+                        value={
+                            ticket.assetId ??
+                            "No asset linked"
+                        }
                     />
 
                     <Divider />
 
                     <InfoRow
-                        label="Affected Equipment"
-                        value={request.equipment}
+                        label="Assigned Technician"
+                        value={
+                            assignedToCurrentUser
+                                ? "Assigned to me"
+                                : ticket.assignedTechnicianId ??
+                                  "Not assigned"
+                        }
+                    />
+
+                    <Divider />
+
+                    <InfoRow
+                        label="Reported By"
+                        value={
+                            ticket.reportedBy
+                        }
                     />
                 </View>
 
-                {/* Performance */}
+                {/* Ticket Timeline */}
                 <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
-                    System Performance
-                </Text>
-
-                <View className="flex-row gap-3">
-                    <View className="flex-1 rounded-[22px] border border-border bg-card p-4">
-                        <Text className="text-xs text-muted-foreground">
-                            Current
-                        </Text>
-
-                        <Text className="mt-2 text-2xl font-extrabold text-foreground">
-                            {details.currentPerformance}
-                        </Text>
-
-                        <Text className="mt-1 text-xs text-muted-foreground">
-                            Current output
-                        </Text>
-                    </View>
-
-                    <View className="flex-1 rounded-[22px] border border-border bg-card p-4">
-                        <Text className="text-xs text-muted-foreground">
-                            Expected
-                        </Text>
-
-                        <Text className="mt-2 text-2xl font-extrabold text-foreground">
-                            {details.expectedPerformance}
-                        </Text>
-
-                        <Text className="mt-1 text-xs text-muted-foreground">
-                            Normal output
-                        </Text>
-                    </View>
-                </View>
-
-                {/* Equipment details */}
-                <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
-                    Equipment Details
+                    Ticket Timeline
                 </Text>
 
                 <View className="rounded-[24px] border border-border bg-card p-5">
-                    <View className="mb-4 flex-row items-center">
-                        <View className="h-11 w-11 items-center justify-center rounded-xl bg-muted">
+                    <InfoRow
+                        label="Created"
+                        value={formatDate(
+                            ticket.createdAt
+                        )}
+                    />
+
+                    <Divider />
+
+                    <InfoRow
+                        label="Last Updated"
+                        value={formatDate(
+                            ticket.updatedAt
+                        )}
+                    />
+
+                    <Divider />
+
+                    <InfoRow
+                        label="Resolved"
+                        value={formatDate(
+                            ticket.resolvedAt
+                        )}
+                    />
+                </View>
+
+                {/* Technician Actions */}
+                <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
+                    Technician Actions
+                </Text>
+
+                {/* Assignment */}
+                <View className="rounded-[24px] border border-border bg-card p-5">
+                    <View className="flex-row items-center">
+                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-muted">
                             <Feather
-                                name="cpu"
-                                size={20}
+                                name="user-check"
+                                size={18}
                                 color="#6B7280"
                             />
                         </View>
 
                         <View className="ml-3 flex-1">
-                            <Text className="text-xs text-muted-foreground">
-                                Equipment
+                            <Text className="text-sm font-bold text-foreground">
+                                Ticket Assignment
                             </Text>
 
-                            <Text className="mt-1 text-base font-bold text-foreground">
-                                {request.equipment}
+                            <Text className="mt-1 text-xs text-muted-foreground">
+                                {assignedToCurrentUser
+                                    ? "This ticket is assigned to you."
+                                    : ticket.assignedTechnicianId
+                                      ? "This ticket is already assigned."
+                                      : "Take responsibility for this service ticket."}
                             </Text>
                         </View>
                     </View>
 
-                    <InfoRow
-                        label="Model"
-                        value={details.equipmentModel}
-                    />
+                    {!ticket.assignedTechnicianId && (
+                        <Pressable
+                            disabled={
+                                updatingStatus ||
+                                !user?.id
+                            }
+                            onPress={
+                                assignToMe
+                            }
+                            className={`mt-4 items-center rounded-xl px-4 py-3 ${
+                                updatingStatus ||
+                                !user?.id
+                                    ? "bg-muted"
+                                    : "bg-primary"
+                            }`}
+                        >
+                            <Text
+                                className={`font-bold ${
+                                    updatingStatus ||
+                                    !user?.id
+                                        ? "text-muted-foreground"
+                                        : "text-primary-foreground"
+                                }`}
+                            >
+                                {updatingStatus
+                                    ? "Assigning..."
+                                    : "Assign to Me"}
+                            </Text>
+                        </Pressable>
+                    )}
 
-                    <Divider />
-
-                    <InfoRow
-                        label="Serial Number"
-                        value={details.equipmentSerial}
-                    />
-
-                    <Divider />
-
-                    <InfoRow
-                        label="Installed"
-                        value={details.installationDate}
-                    />
-                </View>
-
-                {/* Previous fault history */}
-                <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
-                    Previous Fault History
-                </Text>
-
-                <View className="rounded-[24px] border border-border bg-card p-5">
-                    {details.previousFaults.length === 0 ? (
-                        <View className="items-center py-5">
+                    {assignedToCurrentUser && (
+                        <View className="mt-4 flex-row items-center rounded-xl bg-muted p-3">
                             <Feather
                                 name="check-circle"
-                                size={26}
-                                color="#16A34A"
+                                size={18}
+                                color="#6B7280"
                             />
 
-                            <Text className="mt-3 text-sm font-semibold text-foreground">
-                                No previous faults
+                            <Text className="ml-2 text-sm font-bold text-foreground">
+                                Assigned to Me
                             </Text>
                         </View>
-                    ) : (
-                        details.previousFaults.map(
-                            (fault, index) => (
-                                <View key={`${fault.date}-${index}`}>
-                                    <View className="flex-row">
-                                        <View className="mt-1 h-9 w-9 items-center justify-center rounded-xl bg-muted">
-                                            <Feather
-                                                name="clock"
-                                                size={16}
-                                                color="#6B7280"
-                                            />
-                                        </View>
-
-                                        <View className="ml-3 flex-1">
-                                            <View className="flex-row items-start justify-between">
-                                                <Text className="mr-3 flex-1 text-sm font-bold text-foreground">
-                                                    {fault.issue}
-                                                </Text>
-
-                                                <Text className="text-xs font-semibold text-muted-foreground">
-                                                    {fault.status}
-                                                </Text>
-                                            </View>
-
-                                            <Text className="mt-1 text-xs text-muted-foreground">
-                                                {fault.date}
-                                            </Text>
-                                        </View>
-                                    </View>
-
-                                    {index <
-                                        details.previousFaults
-                                            .length -
-                                            1 && (
-                                        <View className="my-4 h-px bg-border" />
-                                    )}
-                                </View>
-                            )
-                        )
                     )}
                 </View>
 
-                {/* Maintenance history */}
-                <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
-                    Maintenance History
-                </Text>
-
-                <View className="rounded-[24px] border border-border bg-card p-5">
-                    {details.maintenanceHistory.map(
-                        (item, index) => (
-                            <View key={`${item.date}-${index}`}>
-                                <View className="flex-row">
-                                    <View className="mt-1 h-9 w-9 items-center justify-center rounded-xl bg-muted">
-                                        <Feather
-                                            name="tool"
-                                            size={16}
-                                            color="#6B7280"
-                                        />
-                                    </View>
-
-                                    <View className="ml-3 flex-1">
-                                        <Text className="text-sm font-bold text-foreground">
-                                            {item.action}
-                                        </Text>
-
-                                        <Text className="mt-1 text-xs text-muted-foreground">
-                                            {item.date}
-                                        </Text>
-
-                                        <Text className="mt-1 text-xs text-muted-foreground">
-                                            {item.technician}
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                {index <
-                                    details.maintenanceHistory
-                                        .length -
-                                        1 && (
-                                    <View className="my-4 h-px bg-border" />
-                                )}
-                            </View>
-                        )
-                    )}
-                </View>
-
-                {/* Recommended Action */}
-                <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
-                    Recommended Action
-                </Text>
-
-                <View className="rounded-[24px] border border-border bg-card p-5">
-                    <View className="flex-row">
-                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-secondary">
+                {/* Status Update */}
+                <View className="mt-4 rounded-[24px] border border-border bg-card p-5">
+                    <View className="mb-4 flex-row items-center">
+                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-muted">
                             <Feather
-                                name="info"
+                                name="refresh-cw"
                                 size={18}
-                                color="#D97706"
+                                color="#6B7280"
                             />
                         </View>
 
-                        <Text className="ml-3 flex-1 text-sm leading-6 text-foreground">
-                            {details.recommendedAction}
-                        </Text>
+                        <View className="ml-3 flex-1">
+                            <Text className="text-sm font-bold text-foreground">
+                                Update Status
+                            </Text>
+
+                            <Text className="mt-1 text-xs text-muted-foreground">
+                                Current:{" "}
+                                {formatStatus(
+                                    ticket.status
+                                )}
+                            </Text>
+                        </View>
                     </View>
-                </View>
 
-                {/* Technician actions */}
-                <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
-                    Technician Actions
-                </Text>
+                    <View className="flex-row flex-wrap gap-2">
+                        {statuses.map(
+                            (status) => {
+                                const selected =
+                                    ticket.status ===
+                                    status;
 
-                <Pressable
-                    onPress={() =>
-                        showFrontendMessage(
-                            'Resolve Remotely'
-                        )
-                    }
-                    className="mb-3 flex-row items-center justify-center rounded-2xl bg-primary py-4 active:opacity-80"
-                >
-                    <Feather
-                        name="wifi"
-                        size={18}
-                        color="#1F1F1F"
-                    />
+                                return (
+                                    <Pressable
+                                        key={
+                                            status
+                                        }
+                                        disabled={
+                                            updatingStatus ||
+                                            selected
+                                        }
+                                        onPress={() =>
+                                            updateStatus(
+                                                status
+                                            )
+                                        }
+                                        className={`rounded-xl border px-4 py-3 ${
+                                            selected
+                                                ? "border-primary bg-primary"
+                                                : "border-border bg-card"
+                                        }`}
+                                    >
+                                        <Text
+                                            className={`text-xs font-bold ${
+                                                selected
+                                                    ? "text-primary-foreground"
+                                                    : "text-foreground"
+                                            }`}
+                                        >
+                                            {formatStatus(
+                                                status
+                                            )}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            }
+                        )}
+                    </View>
 
-                    <Text className="ml-2 font-extrabold text-primary-foreground">
-                        Resolve Remotely
-                    </Text>
-                </Pressable>
+                    {updatingStatus && (
+                        <View className="mt-4 flex-row items-center">
+                            <ActivityIndicator
+                                size="small"
+                            />
 
-                <Pressable
-                    onPress={() =>
-                        showFrontendMessage(
-                            'Start Maintenance'
-                        )
-                    }
-                    className="mb-3 flex-row items-center justify-center rounded-2xl bg-foreground py-4 active:opacity-80"
-                >
-                    <Feather
-                        name="tool"
-                        size={18}
-                        color="#FFFFFF"
-                    />
-
-                    <Text className="ml-2 font-extrabold text-background">
-                        Start Maintenance
-                    </Text>
-                </Pressable>
-
-                <View className="flex-row gap-3">
-                    <Pressable
-                        onPress={() =>
-                            showFrontendMessage(
-                                'Update Status'
-                            )
-                        }
-                        className="flex-1 items-center rounded-2xl border border-border bg-card py-4"
-                    >
-                        <Feather
-                            name="refresh-cw"
-                            size={18}
-                            color="#6B7280"
-                        />
-
-                        <Text className="mt-2 text-xs font-bold text-foreground">
-                            Update Status
-                        </Text>
-                    </Pressable>
-
-                    <Pressable
-                        onPress={() =>
-                            showFrontendMessage(
-                                'Technician Notes'
-                            )
-                        }
-                        className="flex-1 items-center rounded-2xl border border-border bg-card py-4"
-                    >
-                        <Feather
-                            name="edit-3"
-                            size={18}
-                            color="#6B7280"
-                        />
-
-                        <Text className="mt-2 text-xs font-bold text-foreground">
-                            Add Notes
-                        </Text>
-                    </Pressable>
+                            <Text className="ml-2 text-xs text-muted-foreground">
+                                Updating...
+                            </Text>
+                        </View>
+                    )}
                 </View>
             </ScrollView>
         </View>
@@ -516,4 +755,4 @@ const Divider = () => (
     <View className="my-4 h-px bg-border" />
 );
 
-export default FaultDetailsScreen;
+export default TicketDetailsScreen;
