@@ -380,10 +380,10 @@ export const SolarOwnerShare = () => {
                                                     <Pressable
                                                         onPress={() => handleCancelOffer(offer.id)}
                                                         disabled={isCancelling}
-                                                        className="px-3 py-1 rounded-xl bg-destructive/15 border border-destructive/30 active:opacity-70 flex-row items-center"
+                                                        className="px-3.5 py-1.5 rounded-xl bg-red-600 border border-red-700 active:bg-red-700 flex-row items-center shadow-sm"
                                                     >
-                                                        <Feather name="x-circle" size={11} color="#EF4444" style={{ marginRight: 4 }} />
-                                                        <Text className="text-xs font-bold text-destructive">
+                                                        <Feather name="x-circle" size={13} color="#FFFFFF" style={{ marginRight: 5 }} />
+                                                        <Text className="text-xs font-black text-white">
                                                             {isCancelling ? 'Cancelling...' : 'Cancel Offer'}
                                                         </Text>
                                                     </Pressable>
@@ -510,9 +510,9 @@ export const SolarOwnerShare = () => {
                                         <View className="flex-row gap-2 mt-3 pt-2 border-t border-border/40">
                                             <Pressable
                                                 onPress={() => rejectRequest(req.id)}
-                                                className="flex-1 rounded-xl bg-destructive/15 border border-destructive/30 py-2.5 items-center active:opacity-70"
+                                                className="flex-1 rounded-xl bg-red-500/20 border border-red-500/50 py-2.5 items-center active:opacity-70"
                                             >
-                                                <Text className="text-xs font-bold text-destructive">
+                                                <Text className="text-xs font-bold text-red-500">
                                                     Reject
                                                 </Text>
                                             </Pressable>
