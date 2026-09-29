@@ -9,7 +9,6 @@
     "@neondatabase/serverless": "^1.1.0",
     "@react-navigation/native": "^7.3.16",
     "babel-preset-expo": "^57.0.5",
-    "dotenv": "^18.0.4",
     "drizzle-orm": "^0.45.2",
     "expo": "~57.0.10",
     "expo-auth-session": "~57.0.6",
@@ -44,7 +43,9 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "dotenv": "^18.0.4",
     "drizzle-kit": "^0.31.10",
+    "pg": "^8.23.0",
     "typescript": "~6.0.3"
   },
   "scripts": {

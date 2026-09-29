@@ -1,12 +1,50 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "../db/client";
 import { auditLogs, solarOffers, users } from "../db/schema";
+import type { NewSolarOffer } from "../db/schema";
 import {
     BadRequestError,
     ForbiddenError,
     NotFoundError,
     UnauthorizedError,
 } from "../utils/errors";
+
+// ==========================================
+// SOLAR OWNER SERVICES (US-04B)
+// ==========================================
+
+export async function createSolarOffer(offer: NewSolarOffer) {
+    const result = await db.insert(solarOffers).values(offer).returning();
+    return result[0];
+}
+
+export async function getOffersByOwner(ownerId: string) {
+    return db.select().from(solarOffers).where(eq(solarOffers.ownerId, ownerId));
+}
+
+export async function getOfferById(offerId: string) {
+    const result = await db
+        .select()
+        .from(solarOffers)
+        .where(eq(solarOffers.id, offerId))
+        .limit(1);
+
+    return result[0] ?? null;
+}
+
+export async function cancelSolarOffer(offerId: string) {
+    const result = await db
+        .update(solarOffers)
+        .set({ status: "cancelled" })
+        .where(eq(solarOffers.id, offerId))
+        .returning();
+
+    return result[0] ?? null;
+}
+
+// ==========================================
+// MANAGER SOLAR OFFER SERVICES
+// ==========================================
 
 /**
  * Retrieve all solar offers for the manager.
@@ -143,19 +181,12 @@ export function validateManagerOfferStatusTransition(
 
 /**
  * Approve a pending solar offer.
- * 1. Verify acting user is a manager.
- * 2. Verify offer exists.
- * 3. Verify status transition (strictly enforces pending -> approved).
- * 4. Update solar_offers: status = "approved".
- * 5. Create audit log.
- * 6. Return updated offer with owner details.
  */
 export async function approveSolarOffer(offerId: string, managerId: string) {
     if (!managerId) {
         throw new UnauthorizedError("Manager identity is required to approve a solar offer.");
     }
 
-    // 1. Verify acting user is a manager
     const managerResults = await db
         .select({
             id: users.id,
@@ -175,7 +206,6 @@ export async function approveSolarOffer(offerId: string, managerId: string) {
         throw new ForbiddenError("Forbidden: Only managers can approve solar offers.");
     }
 
-    // 2. Verify offer exists
     const offerResults = await db
         .select()
         .from(solarOffers)
@@ -188,12 +218,10 @@ export async function approveSolarOffer(offerId: string, managerId: string) {
 
     const existingOffer = offerResults[0];
 
-    // 3. Verify status transition (strictly enforces pending -> approved)
     validateManagerOfferStatusTransition(existingOffer.status, "approved");
 
     const now = new Date();
 
-    // 4. Update solar_offers
     await db
         .update(solarOffers)
         .set({
@@ -201,7 +229,6 @@ export async function approveSolarOffer(offerId: string, managerId: string) {
         })
         .where(eq(solarOffers.id, offerId));
 
-    // 5. Create audit log
     const auditId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     await db.insert(auditLogs).values({
         id: auditId,
@@ -223,25 +250,17 @@ export async function approveSolarOffer(offerId: string, managerId: string) {
         createdAt: now,
     });
 
-    // 6. Return updated offer with owner details
     return getSolarOfferById(offerId);
 }
 
 /**
  * Reject a pending solar offer.
- * 1. Verify acting user is a manager.
- * 2. Verify offer exists.
- * 3. Verify status transition (strictly enforces pending -> rejected).
- * 4. Update solar_offers: status = "rejected".
- * 5. Create audit log.
- * 6. Return updated offer with owner details.
  */
 export async function rejectSolarOffer(offerId: string, managerId: string) {
     if (!managerId) {
         throw new UnauthorizedError("Manager identity is required to reject a solar offer.");
     }
 
-    // 1. Verify acting user is a manager
     const managerResults = await db
         .select({
             id: users.id,
@@ -261,7 +280,6 @@ export async function rejectSolarOffer(offerId: string, managerId: string) {
         throw new ForbiddenError("Forbidden: Only managers can reject solar offers.");
     }
 
-    // 2. Verify offer exists
     const offerResults = await db
         .select()
         .from(solarOffers)
@@ -274,12 +292,10 @@ export async function rejectSolarOffer(offerId: string, managerId: string) {
 
     const existingOffer = offerResults[0];
 
-    // 3. Verify status transition (strictly enforces pending -> rejected)
     validateManagerOfferStatusTransition(existingOffer.status, "rejected");
 
     const now = new Date();
 
-    // 4. Update solar_offers
     await db
         .update(solarOffers)
         .set({
@@ -287,7 +303,6 @@ export async function rejectSolarOffer(offerId: string, managerId: string) {
         })
         .where(eq(solarOffers.id, offerId));
 
-    // 5. Create audit log
     const auditId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     await db.insert(auditLogs).values({
         id: auditId,
@@ -309,7 +324,6 @@ export async function rejectSolarOffer(offerId: string, managerId: string) {
         createdAt: now,
     });
 
-    // 6. Return updated offer with owner details
     return getSolarOfferById(offerId);
 }
 

@@ -7,7 +7,11 @@ import { SolarToast } from '../shared/SolarToast';
 import { ViewHeader } from '../shared/ViewHeader';
 import { useSolarOwnerStore } from '../store/useSolarOwnerStore';
 
-export const SolarOwnerPrediction = () => {
+interface SolarOwnerPredictionProps {
+    onBack?: () => void;
+}
+
+export const SolarOwnerPrediction: React.FC<SolarOwnerPredictionProps> = ({ onBack }) => {
     const insets = useSafeAreaInsets();
     const { weather, suggestions, setActiveView } = useSolarOwnerStore();
 
@@ -32,6 +36,7 @@ export const SolarOwnerPrediction = () => {
                     title="Weather & Solar Forecast"
                     subtitle="AI solar irradiance & generation predictions"
                     showBack={true}
+                    onBack={onBack}
                 />
 
                 {/* 1. WEATHER & EXPECTED GENERATION HERO */}

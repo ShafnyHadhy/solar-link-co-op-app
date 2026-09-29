@@ -1,10 +1,10 @@
 import { getApiUrl } from "@/lib/api";
-import type { SolarAsset, NewSolarAsset } from "@/lib/server/db/schema";
+import type { SolarAsset } from "@/lib/server/db/schema";
 
 /**
- * Fetch all solar assets belonging to a specific owner.
+ * Fetch all solar assets owned by a user.
  */
-export async function fetchSolarAssets(ownerId: string): Promise<SolarAsset[]> {
+export async function getSolarAssets(ownerId: string): Promise<SolarAsset[]> {
     const response = await fetch(
         `${getApiUrl("/api/solar-assets")}?ownerId=${ownerId}`
     );
@@ -18,9 +18,9 @@ export async function fetchSolarAssets(ownerId: string): Promise<SolarAsset[]> {
 }
 
 /**
- * Fetch a single solar asset by its ID.
+ * Fetch a single solar asset by ID.
  */
-export async function fetchSolarAssetById(assetId: string): Promise<SolarAsset> {
+export async function getSolarAssetById(assetId: string): Promise<SolarAsset> {
     const response = await fetch(
         getApiUrl(`/api/solar-assets/${assetId}`)
     );
@@ -36,9 +36,15 @@ export async function fetchSolarAssetById(assetId: string): Promise<SolarAsset> 
 /**
  * Create a new solar asset.
  */
-export async function createSolarAsset(
-    asset: NewSolarAsset
-): Promise<SolarAsset> {
+export async function createSolarAsset(asset: {
+    id: string;
+    ownerId: string;
+    assetType: string;
+    name: string;
+    capacityKw?: string;
+    location?: string;
+    installedAt?: string;
+}): Promise<SolarAsset> {
     const response = await fetch(getApiUrl("/api/solar-assets"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -54,11 +60,18 @@ export async function createSolarAsset(
 }
 
 /**
- * Update an existing solar asset by ID.
+ * Update an existing solar asset.
  */
 export async function updateSolarAsset(
     assetId: string,
-    updates: Partial<NewSolarAsset>
+    updates: {
+        name?: string;
+        assetType?: string;
+        capacityKw?: string;
+        status?: string;
+        location?: string;
+        installedAt?: string;
+    }
 ): Promise<SolarAsset> {
     const response = await fetch(
         getApiUrl(`/api/solar-assets/${assetId}`),
