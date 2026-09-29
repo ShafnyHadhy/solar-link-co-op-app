@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { getApiUrl } from '@/lib/api';
 import { appStorage } from '@/lib/storage';
+import { addServiceRequest } from '@/data/technicianData';
 import {
     BatteryState,
     CommunityEnergyRequest,
@@ -40,6 +41,22 @@ export interface SolarOfferData {
     createdAt: string;
 }
 
+/** Shape of a maintenance service ticket */
+export interface ServiceTicketData {
+    id: string;
+    reportedBy: string;
+    assetId?: string;
+    systemName?: string;
+    title: string;
+    description?: string;
+    priority: 'critical' | 'high' | 'medium' | 'low';
+    status: 'open' | 'assigned' | 'in_progress' | 'resolved' | 'closed';
+    location?: string;
+    technicianName?: string;
+    createdAt?: string;
+}
+
+
 export type SolarOwnerActiveView = 
     | 'dashboard'
     | 'energy'
@@ -77,6 +94,20 @@ interface SolarOwnerState {
     cancelSolarOfferAction: (offerId: string, ownerId: string) => Promise<boolean>;
     createSolarAssetAction: (ownerId: string, asset: { name: string; assetType: string; capacityKw: number; location?: string }) => Promise<boolean>;
     updateSolarAssetAction: (assetId: string, ownerId: string, updates: { name?: string; assetType?: string; capacityKw?: number; status?: string; location?: string }) => Promise<boolean>;
+
+    // ── Maintenance & Service Tickets ──
+    serviceTickets: ServiceTicketData[];
+    fetchServiceTickets: (ownerId: string) => Promise<void>;
+    submitMaintenanceTicketAction: (ticket: {
+        reportedBy: string;
+        title: string;
+        description: string;
+        priority: 'critical' | 'high' | 'medium' | 'low';
+        assetId?: string;
+        systemName?: string;
+        location?: string;
+    }) => Promise<boolean>;
+
 
     // Sharing State
     communityRequests: CommunityEnergyRequest[];
@@ -156,6 +187,22 @@ const INITIAL_HARDWARE: HardwareInfo = {
     nextServiceDue: 'Jul 15, 2026',
     installationDate: 'Aug 10, 2024',
 };
+
+const INITIAL_SERVICE_TICKETS: ServiceTicketData[] = [
+    {
+        id: 'SR-004',
+        reportedBy: 'user_3IIi0KG9N6hVutyWCIjaK2dNYey',
+        systemName: 'Home Rooftop Solar Array',
+        title: 'Quarterly Inverter Diagnostic Check',
+        description: 'Routine inverter efficiency calibration and DC fuse inspection.',
+        priority: 'low',
+        status: 'resolved',
+        location: 'Main Roof',
+        technicianName: 'Azmil Ahamed',
+        createdAt: '14 days ago',
+    },
+];
+
 
 const INITIAL_REQUESTS: CommunityEnergyRequest[] = [
     {
@@ -508,7 +555,11 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
                 set({ solarOffers: offersData.data.offers });
             }
 
+            // 4. Fetch service tickets
+            await get().fetchServiceTickets(ownerId);
+
             set({ lastFetchedAt: Date.now() });
+
         } catch (error) {
             console.error('Failed to fetch solar data:', error);
             get().showToast('Could not load live data — showing cached values', 'warning');
@@ -675,6 +726,94 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
             return false;
         }
     },
+
+    // ── Maintenance Service Tickets ──
+    serviceTickets: INITIAL_SERVICE_TICKETS,
+
+    fetchServiceTickets: async (ownerId: string) => {
+        try {
+            const res = await fetch(`${getApiUrl('/api/service-tickets')}?reportedBy=${ownerId}`);
+            const data = await res.json();
+            if (data.success && data.data?.tickets?.length > 0) {
+                set({ serviceTickets: data.data.tickets });
+            }
+        } catch (error) {
+            console.error('Failed to fetch service tickets:', error);
+        }
+    },
+
+    submitMaintenanceTicketAction: async (ticketInput) => {
+        try {
+            const ticketId = `SR-${Math.floor(100 + Math.random() * 900)}`;
+            const newTicket: ServiceTicketData = {
+                id: ticketId,
+                reportedBy: ticketInput.reportedBy,
+                assetId: ticketInput.assetId,
+                systemName: ticketInput.systemName || 'Home Rooftop Solar Array',
+                title: ticketInput.title,
+                description: ticketInput.description,
+                priority: ticketInput.priority,
+                status: 'open',
+                location: ticketInput.location || 'Main Roof',
+                technicianName: 'Azmil Ahamed',
+                createdAt: 'Just now',
+            };
+
+            const severityMap: Record<string, 'High' | 'Medium' | 'Low'> = {
+                critical: 'High',
+                high: 'High',
+                medium: 'Medium',
+                low: 'Low',
+            };
+            const statusMap: Record<string, 'Critical' | 'Warning' | 'Maintenance' | 'Normal'> = {
+                critical: 'Critical',
+                high: 'Warning',
+                medium: 'Warning',
+                low: 'Maintenance',
+            };
+
+            addServiceRequest({
+                id: ticketId,
+                systemName: ticketInput.systemName || 'Home Rooftop Solar Array',
+                location: ticketInput.location || 'Main Roof',
+                issue: ticketInput.title,
+                severity: severityMap[ticketInput.priority] || 'Medium',
+                status: statusMap[ticketInput.priority] || 'Maintenance',
+                equipment: 'Solar Panel Array / Inverter',
+            });
+
+            set((state) => ({
+                serviceTickets: [newTicket, ...state.serviceTickets],
+            }));
+
+            try {
+                await fetch(getApiUrl('/api/service-tickets'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: ticketId,
+                        reportedBy: ticketInput.reportedBy,
+                        title: ticketInput.title,
+                        description: ticketInput.description,
+                        priority: ticketInput.priority,
+                        assetId: ticketInput.assetId,
+                        location: ticketInput.location,
+                        assignedTechnicianId: 'user_3IHfICokymVrhEPN8Duj05YgYYO',
+                    }),
+                });
+            } catch (apiErr) {
+                console.warn('API sync warning for service ticket:', apiErr);
+            }
+
+            get().showToast(`Ticket ${ticketId} dispatched to Azmil Ahamed!`, 'success');
+            return true;
+        } catch (error) {
+            console.error('Failed to submit maintenance ticket:', error);
+            get().showToast('Could not submit ticket. Please try again.', 'warning');
+            return false;
+        }
+    },
+
 
     communityRequests: INITIAL_REQUESTS,
     sharingHistory: INITIAL_SHARING_HISTORY,
