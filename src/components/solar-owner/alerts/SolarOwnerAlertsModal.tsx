@@ -15,15 +15,23 @@ export const SolarOwnerAlertsModal: React.FC<SolarOwnerAlertsModalProps> = ({
     onClose,
     onNavigateToShare,
 }) => {
-    const { alerts, markAlertAsRead, markAllAlertsAsRead, dismissAlert } = useSolarOwnerStore();
+    const { alerts, markAlertAsRead, markAllAlertsAsRead, dismissAlert, notificationsEnabled } = useSolarOwnerStore();
     const [selectedCategory, setSelectedCategory] = useState<AlertCategory>('all');
 
-    const filteredAlerts = alerts.filter((alert) => {
+    // Filter alerts respecting user's active notification toggles
+    const activeAlerts = alerts.filter((alert) => {
+        if (alert.category === 'requests' && !notificationsEnabled.energyRequests) return false;
+        if (alert.category === 'battery' && !notificationsEnabled.lowBattery) return false;
+        if (alert.category === 'maintenance' && !notificationsEnabled.maintenanceReminders) return false;
+        return true;
+    });
+
+    const filteredAlerts = activeAlerts.filter((alert) => {
         if (selectedCategory === 'all') return true;
         return alert.category === selectedCategory;
     });
 
-    const unreadCount = alerts.filter((a) => !a.isRead).length;
+    const unreadCount = activeAlerts.filter((a) => !a.isRead).length;
 
     const getSeverityBadge = (severity: string) => {
         switch (severity) {

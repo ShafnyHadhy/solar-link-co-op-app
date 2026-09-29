@@ -17,13 +17,19 @@ export const SolarOwnerDashboard = () => {
     const insets = useSafeAreaInsets();
     const { user } = useUser();
     const router = useRouter();
-    const { metrics, battery, alerts, weather, fetchSolarData, lastFetchedAt } = useSolarOwnerStore();
+    const { metrics, battery, alerts, weather, fetchSolarData, lastFetchedAt, notificationsEnabled } = useSolarOwnerStore();
 
     const [alertsModalOpen, setAlertsModalOpen] = useState(false);
     const [quickShareOpen, setQuickShareOpen] = useState(false);
 
-    const unreadAlerts = alerts.filter((a) => !a.isRead);
-    const mostRecentAlert = unreadAlerts[0] || alerts[0];
+    const activeAlerts = alerts.filter((a) => {
+        if (a.category === 'requests' && !notificationsEnabled.energyRequests) return false;
+        if (a.category === 'battery' && !notificationsEnabled.lowBattery) return false;
+        if (a.category === 'maintenance' && !notificationsEnabled.maintenanceReminders) return false;
+        return true;
+    });
+    const unreadAlerts = activeAlerts.filter((a) => !a.isRead);
+    const mostRecentAlert = unreadAlerts[0] || activeAlerts[0];
 
     // Fetch real data from API on mount
     useEffect(() => {
