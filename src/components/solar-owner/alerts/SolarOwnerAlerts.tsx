@@ -98,38 +98,54 @@ export const SolarOwnerAlerts = () => {
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    className="mb-5 -mx-5 px-5"
+                    contentContainerStyle={{
+                        paddingHorizontal: 4,
+                        paddingVertical: 4,
+                        gap: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                    }}
+                    className="mb-5"
                 >
-                    <View className="flex-row gap-2">
-                        {[
-                            { id: 'all', label: 'All Alerts' },
-                            { id: 'requests', label: '⚡ Requests' },
-                            { id: 'battery', label: '🔋 Battery' },
-                            { id: 'maintenance', label: '🛠️ Maintenance' },
-                            { id: 'system', label: '🌐 System' },
-                        ].map((cat) => (
+                    {[
+                        { id: 'all', label: 'All Alerts', icon: 'bell' },
+                        { id: 'requests', label: 'Requests', icon: 'zap' },
+                        { id: 'battery', label: 'Battery', icon: 'battery-charging' },
+                        { id: 'maintenance', label: 'Maintenance', icon: 'tool' },
+                        { id: 'system', label: 'System', icon: 'activity' },
+                    ].map((cat) => {
+                        const isSelected = selectedCategory === cat.id;
+                        return (
                             <Pressable
                                 key={cat.id}
                                 onPress={() => setSelectedCategory(cat.id as AlertCategory)}
-                                className={`px-4 py-2 rounded-2xl border ${
-                                    selectedCategory === cat.id
-                                        ? 'bg-primary border-primary'
-                                        : 'bg-card/90 border-border/70'
+                                className={`flex-row items-center px-4 py-2.5 rounded-2xl border ${
+                                    isSelected
+                                        ? 'bg-primary border-primary shadow-sm'
+                                        : 'bg-card/90 border-border/70 active:bg-secondary'
                                 }`}
+
                             >
+                                <Feather
+                                    name={cat.icon as any}
+                                    size={14}
+                                    color={isSelected ? '#FFFFFF' : '#9CA3AF'}
+                                />
                                 <Text
-                                    className={`text-xs font-bold ${
-                                        selectedCategory === cat.id
-                                            ? 'text-primary-foreground'
+                                    style={{ includeFontPadding: false }}
+                                    className={`text-xs font-bold ml-1.5 leading-none ${
+                                        isSelected
+                                            ? 'text-primary-foreground font-black'
                                             : 'text-foreground'
                                     }`}
                                 >
                                     {cat.label}
                                 </Text>
                             </Pressable>
-                        ))}
-                    </View>
+                        );
+                    })}
                 </ScrollView>
+
 
                 {/* Alerts List */}
                 <View className="gap-3 mb-6">

@@ -7,7 +7,11 @@ import { SolarToast } from '../shared/SolarToast';
 import { ViewHeader } from '../shared/ViewHeader';
 import { useSolarOwnerStore } from '../store/useSolarOwnerStore';
 
-export const SolarOwnerReports = () => {
+interface SolarOwnerReportsProps {
+    onBack?: () => void;
+}
+
+export const SolarOwnerReports: React.FC<SolarOwnerReportsProps> = ({ onBack }) => {
     const insets = useSafeAreaInsets();
     const { metrics, monthlyReports, showToast } = useSolarOwnerStore();
     const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(0);
@@ -37,6 +41,7 @@ export const SolarOwnerReports = () => {
                     title="Reports & Savings"
                     subtitle="Financial savings, energy history & eco impact"
                     showBack={true}
+                    onBack={onBack}
                     rightAction={{
                         icon: 'download',
                         onPress: handleExport,

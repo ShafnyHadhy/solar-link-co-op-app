@@ -1,15 +1,61 @@
 import { create } from 'zustand';
+import { getApiUrl } from '@/lib/api';
+import { appStorage } from '@/lib/storage';
+import { addServiceRequest } from '@/data/technicianData';
 import {
     BatteryState,
     CommunityEnergyRequest,
     EnergyEfficiencySuggestion,
     HardwareInfo,
     MonthlySavingsReport,
+    RequestStatus,
     SharingHistoryRecord,
     SolarAlertItem,
     SolarMetrics,
     WeatherForecastData,
 } from '../types/solarOwner.types';
+
+/** Shape of a solar asset returned by the API */
+export interface SolarAssetData {
+    id: string;
+    ownerId: string;
+    assetType: string;
+    name: string;
+    capacityKw: string | null;
+    status: string;
+    location: string | null;
+    installedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+/** Shape of a solar offer returned by the API */
+export interface SolarOfferData {
+    id: string;
+    ownerId: string;
+    energyAmountKwh: string;
+    minimumBatteryPercent: string | null;
+    status: string;
+    offeredAt: string;
+    expiresAt: string | null;
+    createdAt: string;
+}
+
+/** Shape of a maintenance service ticket */
+export interface ServiceTicketData {
+    id: string;
+    reportedBy: string;
+    assetId?: string;
+    systemName?: string;
+    title: string;
+    description?: string;
+    priority: 'critical' | 'high' | 'medium' | 'low';
+    status: 'open' | 'assigned' | 'in_progress' | 'resolved' | 'closed';
+    location?: string;
+    technicianName?: string;
+    createdAt?: string;
+}
+
 
 export type SolarOwnerActiveView = 
     | 'dashboard'
@@ -35,6 +81,34 @@ interface SolarOwnerState {
     battery: BatteryState;
     hardware: HardwareInfo;
 
+    // ── API-Connected State ──
+    solarAssets: SolarAssetData[];
+    solarOffers: SolarOfferData[];
+    isLoading: boolean;
+    lastFetchedAt: number | null;
+
+    // API Actions
+    fetchSolarData: (ownerId: string) => Promise<void>;
+    fetchSolarOffers: (ownerId: string) => Promise<void>;
+    createSolarOffer: (ownerId: string, assetId: string, energyAmountKwh: number, minimumBatteryPercent?: number) => Promise<boolean>;
+    cancelSolarOfferAction: (offerId: string, ownerId: string) => Promise<boolean>;
+    createSolarAssetAction: (ownerId: string, asset: { name: string; assetType: string; capacityKw: number; location?: string }) => Promise<boolean>;
+    updateSolarAssetAction: (assetId: string, ownerId: string, updates: { name?: string; assetType?: string; capacityKw?: number; status?: string; location?: string }) => Promise<boolean>;
+
+    // ── Maintenance & Service Tickets ──
+    serviceTickets: ServiceTicketData[];
+    fetchServiceTickets: (ownerId: string) => Promise<void>;
+    submitMaintenanceTicketAction: (ticket: {
+        reportedBy: string;
+        title: string;
+        description: string;
+        priority: 'critical' | 'high' | 'medium' | 'low';
+        assetId?: string;
+        systemName?: string;
+        location?: string;
+    }) => Promise<boolean>;
+
+
     // Sharing State
     communityRequests: CommunityEnergyRequest[];
     sharingHistory: SharingHistoryRecord[];
@@ -42,12 +116,14 @@ interface SolarOwnerState {
     minBatteryReservePercent: number;
     toggleAutoShare: () => void;
     setMinBatteryReserve: (percent: number) => void;
-    acceptRequest: (requestId: string) => void;
+    fetchCommunityRequests: () => Promise<void>;
+    acceptRequest: (requestId: string, ownerId?: string) => Promise<void> | void;
     rejectRequest: (requestId: string) => void;
-    shareEnergyWithCommunity: (amountKWh: number, poolType?: string) => boolean;
+    shareEnergyWithCommunity: (amountKWh: number, poolType?: string, ownerId?: string) => Promise<boolean>;
 
     // Alerts State
     alerts: SolarAlertItem[];
+    addAlert: (alert: Omit<SolarAlertItem, 'id'>) => void;
     markAlertAsRead: (alertId: string) => void;
     markAllAlertsAsRead: () => void;
     dismissAlert: (alertId: string) => void;
@@ -70,23 +146,23 @@ interface SolarOwnerState {
 }
 
 const INITIAL_METRICS: SolarMetrics = {
-    generationKW: 5.8,
-    consumptionKW: 2.2,
-    excessKW: 3.6,
-    batteryPowerKW: 1.4, // charging
-    gridExportKW: 2.2,
+    generationKW: 12.5,
+    consumptionKW: 3.2,
+    excessKW: 9.3,
+    batteryPowerKW: 2.4, // charging
+    gridExportKW: 6.9,
 
-    dailyGenerationKWh: 28.4,
-    dailyConsumptionKWh: 12.6,
-    dailyExcessKWh: 15.8,
-    dailySharedKWh: 8.5,
-    dailyGridFeedKWh: 7.3,
+    dailyGenerationKWh: 350.0,
+    dailyConsumptionKWh: 50.0,
+    dailyExcessKWh: 300.0,
+    dailySharedKWh: 18.5,
+    dailyGridFeedKWh: 12.3,
     dailySelfSufficiencyPercent: 100,
 
-    dailySavingsUSD: 14.20,
-    monthlySavingsUSD: 248.50,
-    lifetimeSavingsUSD: 3420.00,
-    earningsFromSharingUSD: 53.50,
+    dailySavingsUSD: 42.50,
+    monthlySavingsUSD: 680.00,
+    lifetimeSavingsUSD: 5420.00,
+    earningsFromSharingUSD: 145.50,
 };
 
 const INITIAL_BATTERY: BatteryState = {
@@ -111,6 +187,22 @@ const INITIAL_HARDWARE: HardwareInfo = {
     nextServiceDue: 'Jul 15, 2026',
     installationDate: 'Aug 10, 2024',
 };
+
+const INITIAL_SERVICE_TICKETS: ServiceTicketData[] = [
+    {
+        id: 'SR-004',
+        reportedBy: 'user_3IIi0KG9N6hVutyWCIjaK2dNYey',
+        systemName: 'Home Rooftop Solar Array',
+        title: 'Quarterly Inverter Diagnostic Check',
+        description: 'Routine inverter efficiency calibration and DC fuse inspection.',
+        priority: 'low',
+        status: 'resolved',
+        location: 'Main Roof',
+        technicianName: 'Azmil Ahamed',
+        createdAt: '14 days ago',
+    },
+];
+
 
 const INITIAL_REQUESTS: CommunityEnergyRequest[] = [
     {
@@ -406,6 +498,323 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
     battery: INITIAL_BATTERY,
     hardware: INITIAL_HARDWARE,
 
+    // ── API-Connected State ──
+    solarAssets: [],
+    solarOffers: [],
+    isLoading: false,
+    lastFetchedAt: null,
+
+    fetchSolarData: async (ownerId: string) => {
+        if (get().isLoading) return;
+        set({ isLoading: true });
+
+        try {
+            // 1. Fetch solar assets
+            const assetsRes = await fetch(
+                `${getApiUrl('/api/solar-assets')}?ownerId=${ownerId}`
+            );
+            const assetsData = await assetsRes.json();
+
+            if (assetsData.success && assetsData.assets?.length > 0) {
+                set({ solarAssets: assetsData.assets });
+
+                // 2. Fetch energy surplus for the first asset
+                const firstAssetId = assetsData.assets[0].id;
+                const surplusRes = await fetch(
+                    `${getApiUrl('/api/energy-surplus')}?assetId=${firstAssetId}`
+                );
+                const surplusData = await surplusRes.json();
+
+                if (surplusData.success && surplusData.data?.surplus) {
+                    const s = surplusData.data.surplus;
+                    const currentMetrics = get().metrics;
+
+                    // Update metrics with real data from API
+                    set({
+                        metrics: {
+                            ...currentMetrics,
+                            dailyGenerationKWh: s.generationKwh,
+                            dailyConsumptionKWh: s.consumptionKwh,
+                            dailyExcessKWh: s.surplusKwh,
+                            // Keep computed values proportional
+                            generationKW: +(s.generationKwh / 4.9).toFixed(1),
+                            consumptionKW: +(s.consumptionKwh / 5.7).toFixed(1),
+                            excessKW: +(s.surplusKwh / 4.4).toFixed(1),
+                        },
+                    });
+                }
+            }
+
+            // 3. Fetch solar offers
+            const offersRes = await fetch(
+                `${getApiUrl('/api/solar-offers')}?ownerId=${ownerId}`
+            );
+            const offersData = await offersRes.json();
+
+            if (offersData.success && offersData.data?.offers) {
+                set({ solarOffers: offersData.data.offers });
+            }
+
+            // 4. Fetch service tickets
+            await get().fetchServiceTickets(ownerId);
+
+            set({ lastFetchedAt: Date.now() });
+
+        } catch (error) {
+            console.error('Failed to fetch solar data:', error);
+            get().showToast('Could not load live data — showing cached values', 'warning');
+        } finally {
+            set({ isLoading: false });
+        }
+    },
+
+    fetchSolarOffers: async (ownerId: string) => {
+        try {
+            const res = await fetch(
+                `${getApiUrl('/api/solar-offers')}?ownerId=${ownerId}`
+            );
+            const data = await res.json();
+            if (data.success && data.data?.offers) {
+                const offers: SolarOfferData[] = data.data.offers;
+                set({ solarOffers: offers });
+
+                // Calculate committed surplus from all active offers in DB
+                const committed = offers
+                    .filter((o) => o.status === 'pending' || o.status === 'approved' || o.status === 'completed')
+                    .reduce((sum, o) => sum + Number(o.energyAmountKwh || 0), 0);
+
+                const currentMetrics = get().metrics;
+                const newExcess = Math.max(0, +(300.0 - committed).toFixed(1));
+                set({
+                    metrics: {
+                        ...currentMetrics,
+                        dailyGenerationKWh: 350.0,
+                        dailyConsumptionKWh: 50.0,
+                        dailyExcessKWh: newExcess,
+                        generationKW: 12.5,
+                        consumptionKW: 3.2,
+                        excessKW: +(newExcess / 32).toFixed(1) || 9.3,
+                    },
+                });
+            }
+        } catch (error) {
+            console.error('Failed to fetch offers:', error);
+        }
+    },
+
+    createSolarOffer: async (ownerId, assetId, energyAmountKwh, minimumBatteryPercent) => {
+        try {
+            const offerId = `offer_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+            const res = await fetch(getApiUrl('/api/solar-offers'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: offerId,
+                    ownerId,
+                    assetId,
+                    energyAmountKwh,
+                    minimumBatteryPercent: minimumBatteryPercent ?? get().minBatteryReservePercent,
+                }),
+            });
+
+            const data = await res.json();
+
+            if (data.success !== false) {
+                get().showToast(
+                    `Offer submitted: ${energyAmountKwh} kWh → Pending manager approval`,
+                    'success'
+                );
+                // Refresh offers list and surplus from DB
+                await get().fetchSolarOffers(ownerId);
+                get().addAlert({
+                    category: 'system',
+                    severity: 'success',
+                    title: 'Solar Offer Submitted',
+                    message: `Offered ${energyAmountKwh} kWh to Co-Op. Manager review pending.`,
+                    timestamp: 'Just now',
+                    isRead: false,
+                    actionLabel: 'Viewed',
+                });
+                return true;
+            } else {
+                get().showToast(data.error || 'Failed to create offer', 'warning');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to create offer:', error);
+            get().showToast('Network error — could not submit offer', 'warning');
+            return false;
+        }
+    },
+
+    cancelSolarOfferAction: async (offerId: string, ownerId: string) => {
+        try {
+            const res = await fetch(getApiUrl(`/api/solar-offers/${offerId}/cancel`), {
+                method: 'PATCH',
+            });
+            const data = await res.json();
+            if (data.success !== false) {
+                get().showToast('Offer cancelled successfully', 'info');
+                // Refetch offers so cancelled energy is returned to available surplus!
+                await get().fetchSolarOffers(ownerId);
+                return true;
+            } else {
+                get().showToast(data.error || 'Failed to cancel offer', 'warning');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to cancel offer:', error);
+            get().showToast('Network error — could not cancel offer', 'warning');
+            return false;
+        }
+    },
+
+    createSolarAssetAction: async (ownerId: string, asset: { name: string; assetType: string; capacityKw: number; location?: string }) => {
+        try {
+            const assetId = `asset_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+            const res = await fetch(getApiUrl('/api/solar-assets'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: assetId,
+                    ownerId,
+                    name: asset.name,
+                    assetType: asset.assetType,
+                    capacityKw: asset.capacityKw.toString(),
+                    location: asset.location || 'Main Roof',
+                    status: 'active',
+                }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                get().showToast('Solar asset registered successfully!', 'success');
+                await get().fetchSolarData(ownerId);
+                return true;
+            } else {
+                get().showToast(data.error || 'Failed to register asset', 'warning');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to create asset:', error);
+            get().showToast('Network error — could not register asset', 'warning');
+            return false;
+        }
+    },
+
+    updateSolarAssetAction: async (assetId: string, ownerId: string, updates: { name?: string; assetType?: string; capacityKw?: number; status?: string; location?: string }) => {
+        try {
+            const res = await fetch(getApiUrl(`/api/solar-assets/${assetId}`), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...updates,
+                    capacityKw: updates.capacityKw !== undefined ? updates.capacityKw.toString() : undefined,
+                }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                get().showToast('Solar asset updated successfully!', 'success');
+                await get().fetchSolarData(ownerId);
+                return true;
+            } else {
+                get().showToast(data.error || 'Failed to update asset', 'warning');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to update asset:', error);
+            get().showToast('Network error — could not update asset', 'warning');
+            return false;
+        }
+    },
+
+    // ── Maintenance Service Tickets ──
+    serviceTickets: INITIAL_SERVICE_TICKETS,
+
+    fetchServiceTickets: async (ownerId: string) => {
+        try {
+            const res = await fetch(`${getApiUrl('/api/service-tickets')}?reportedBy=${ownerId}`);
+            const data = await res.json();
+            if (data.success && data.data?.tickets?.length > 0) {
+                set({ serviceTickets: data.data.tickets });
+            }
+        } catch (error) {
+            console.error('Failed to fetch service tickets:', error);
+        }
+    },
+
+    submitMaintenanceTicketAction: async (ticketInput) => {
+        try {
+            const ticketId = `SR-${Math.floor(100 + Math.random() * 900)}`;
+            const newTicket: ServiceTicketData = {
+                id: ticketId,
+                reportedBy: ticketInput.reportedBy,
+                assetId: ticketInput.assetId,
+                systemName: ticketInput.systemName || 'Home Rooftop Solar Array',
+                title: ticketInput.title,
+                description: ticketInput.description,
+                priority: ticketInput.priority,
+                status: 'open',
+                location: ticketInput.location || 'Main Roof',
+                technicianName: 'Azmil Ahamed',
+                createdAt: 'Just now',
+            };
+
+            const severityMap: Record<string, 'High' | 'Medium' | 'Low'> = {
+                critical: 'High',
+                high: 'High',
+                medium: 'Medium',
+                low: 'Low',
+            };
+            const statusMap: Record<string, 'Critical' | 'Warning' | 'Maintenance' | 'Normal'> = {
+                critical: 'Critical',
+                high: 'Warning',
+                medium: 'Warning',
+                low: 'Maintenance',
+            };
+
+            addServiceRequest({
+                id: ticketId,
+                systemName: ticketInput.systemName || 'Home Rooftop Solar Array',
+                location: ticketInput.location || 'Main Roof',
+                issue: ticketInput.title,
+                severity: severityMap[ticketInput.priority] || 'Medium',
+                status: statusMap[ticketInput.priority] || 'Maintenance',
+                equipment: 'Solar Panel Array / Inverter',
+            });
+
+            set((state) => ({
+                serviceTickets: [newTicket, ...state.serviceTickets],
+            }));
+
+            try {
+                await fetch(getApiUrl('/api/service-tickets'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: ticketId,
+                        reportedBy: ticketInput.reportedBy,
+                        title: ticketInput.title,
+                        description: ticketInput.description,
+                        priority: ticketInput.priority,
+                        assetId: ticketInput.assetId,
+                        location: ticketInput.location,
+                        assignedTechnicianId: 'user_3IHfICokymVrhEPN8Duj05YgYYO',
+                    }),
+                });
+            } catch (apiErr) {
+                console.warn('API sync warning for service ticket:', apiErr);
+            }
+
+            get().showToast(`Ticket ${ticketId} dispatched to Azmil Ahamed!`, 'success');
+            return true;
+        } catch (error) {
+            console.error('Failed to submit maintenance ticket:', error);
+            get().showToast('Could not submit ticket. Please try again.', 'warning');
+            return false;
+        }
+    },
+
+
     communityRequests: INITIAL_REQUESTS,
     sharingHistory: INITIAL_SHARING_HISTORY,
     autoShareEnabled: true,
@@ -422,18 +831,87 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
 
     setMinBatteryReserve: (percent) => set({ minBatteryReservePercent: percent }),
 
-    acceptRequest: (requestId) => {
+    fetchCommunityRequests: async () => {
+        try {
+            // 1. Restore persistent sharing history from storage if available
+            const savedHistory = await appStorage.getItem('solar_sharing_history');
+            if (savedHistory) {
+                try {
+                    const parsed = JSON.parse(savedHistory);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        set({ sharingHistory: parsed });
+                    }
+                } catch {
+                    // Ignore parse errors
+                }
+            }
+
+            // 2. Restore persistent accepted request IDs
+            const savedAccepted = await appStorage.getItem('solar_accepted_requests');
+            const acceptedIds: string[] = savedAccepted ? JSON.parse(savedAccepted) : [];
+
+            // 3. Query real requests from backend database
+            const res = await fetch(getApiUrl('/api/manager/energy-requests'));
+            const data = await res.json();
+
+            if (data.success && Array.isArray(data.requests) && data.requests.length > 0) {
+                const colors = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EC4899'];
+                const mapped: CommunityEnergyRequest[] = data.requests.map((r: any, idx: number) => {
+                    const isUrgent =
+                        r.reason?.toLowerCase().includes('medical') ||
+                        r.reason?.toLowerCase().includes('emergency') ||
+                        r.reason?.toLowerCase().includes('urgent');
+
+                    const isLocallyAccepted = acceptedIds.includes(r.id);
+                    const status: RequestStatus = isLocallyAccepted
+                        ? 'accepted'
+                        : r.status === 'approved'
+                        ? 'accepted'
+                        : r.status === 'rejected'
+                        ? 'rejected'
+                        : 'pending';
+
+                    const dateStr = r.requestedAt
+                        ? new Date(r.requestedAt).toLocaleDateString(undefined, {
+                              month: 'short',
+                              day: 'numeric',
+                          })
+                        : 'Today';
+
+                    return {
+                        id: r.id,
+                        requesterName: r.householdName || 'Household Member',
+                        requesterAddress: r.householdEmail || 'Neighborhood Microgrid',
+                        requesterType: 'neighbor',
+                        amountKWh: Number(r.requestedEnergyKwh) || 5.0,
+                        urgency: isUrgent ? 'urgent' : 'normal',
+                        purpose: r.reason || 'Household Energy Demand',
+                        offeredRateUSDPerKWh: 0.16,
+                        timestamp: dateStr,
+                        status: status,
+                        avatarBg: colors[idx % colors.length],
+                    };
+                });
+
+                set({ communityRequests: mapped });
+            }
+        } catch (error) {
+            console.error('Failed to fetch community requests:', error);
+        }
+    },
+
+    acceptRequest: async (requestId: string, ownerId?: string) => {
         const request = get().communityRequests.find((r) => r.id === requestId);
         if (!request) return;
 
         const currentMetrics = get().metrics;
-        const newExcessKWh = Math.max(0, currentMetrics.dailyExcessKWh - request.amountKWh);
-        const newSharedKWh = currentMetrics.dailySharedKWh + request.amountKWh;
-        const earned = +(request.amountKWh * request.offeredRateUSDPerKWh).toFixed(2);
+        const newExcessKWh = Math.max(0, +(currentMetrics.dailyExcessKWh - request.amountKWh).toFixed(1));
+        const newSharedKWh = +(currentMetrics.dailySharedKWh + request.amountKWh).toFixed(1);
+        const earned = +(request.amountKWh * (request.offeredRateUSDPerKWh || 0.16)).toFixed(2);
 
         const newTx: SharingHistoryRecord = {
             id: `tx-${Date.now().toString().slice(-4)}`,
-            recipientName: `${request.requesterName} (${request.requesterType})`,
+            recipientName: `${request.requesterName} (Household)`,
             amountKWh: request.amountKWh,
             creditsEarnedUSD: earned,
             co2SavedKg: +(request.amountKWh * 0.75).toFixed(1),
@@ -443,20 +921,65 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
             status: 'completed',
         };
 
+        const updatedHistory = [newTx, ...get().sharingHistory];
+        const updatedRequests = get().communityRequests.map((r) =>
+            r.id === requestId ? { ...r, status: 'accepted' as RequestStatus } : r
+        );
+
         set({
-            communityRequests: get().communityRequests.map((r) =>
-                r.id === requestId ? { ...r, status: 'accepted' } : r
-            ),
-            sharingHistory: [newTx, ...get().sharingHistory],
+            communityRequests: updatedRequests,
+            sharingHistory: updatedHistory,
             metrics: {
                 ...currentMetrics,
                 dailyExcessKWh: newExcessKWh,
                 dailySharedKWh: newSharedKWh,
                 earningsFromSharingUSD: +(currentMetrics.earningsFromSharingUSD + earned).toFixed(2),
             },
-            alerts: get().alerts.map((a) =>
-                a.relatedRequestId === requestId ? { ...a, isRead: true } : a
-            ),
+        });
+
+        // Persist accepted status and sharing history to storage
+        try {
+            const rawAccepted = await appStorage.getItem('solar_accepted_requests');
+            const acceptedList: string[] = rawAccepted ? JSON.parse(rawAccepted) : [];
+            if (!acceptedList.includes(requestId)) {
+                acceptedList.push(requestId);
+                await appStorage.setItem('solar_accepted_requests', JSON.stringify(acceptedList));
+            }
+            await appStorage.setItem('solar_sharing_history', JSON.stringify(updatedHistory));
+        } catch (e) {
+            console.error('Failed to persist accepted request:', e);
+        }
+
+        // Create an offer in backend to reflect the committed energy
+        const targetOwnerId = ownerId || (get().solarAssets.length > 0 ? get().solarAssets[0].ownerId : undefined);
+        if (targetOwnerId) {
+            const offerId = `offer_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+            const assetId = get().solarAssets.length > 0 ? get().solarAssets[0].id : 'asset_agash_001';
+            fetch(getApiUrl('/api/solar-offers'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: offerId,
+                    ownerId: targetOwnerId,
+                    assetId: assetId,
+                    energyAmountKwh: request.amountKWh,
+                    minimumBatteryPercent: get().minBatteryReservePercent,
+                }),
+            })
+                .then(async () => {
+                    await get().fetchSolarOffers(targetOwnerId);
+                })
+                .catch(() => {});
+        }
+
+        get().addAlert({
+            category: 'requests',
+            severity: 'success',
+            title: 'Energy Request Fulfilled',
+            message: `Transferred ${request.amountKWh} kWh to ${request.requesterName}. Earned +$${earned.toFixed(2)}.`,
+            timestamp: 'Just now',
+            isRead: false,
+            actionLabel: 'Viewed',
         });
 
         get().showToast(
@@ -465,7 +988,7 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
         );
     },
 
-    rejectRequest: (requestId) => {
+    rejectRequest: (requestId: string) => {
         const request = get().communityRequests.find((r) => r.id === requestId);
         set({
             communityRequests: get().communityRequests.map((r) =>
@@ -481,7 +1004,7 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
         }
     },
 
-    shareEnergyWithCommunity: (amountKWh, poolType = 'Co-Op Community Pool') => {
+    shareEnergyWithCommunity: async (amountKWh: number, poolType = 'Co-Op Community Pool', ownerId?: string) => {
         const currentMetrics = get().metrics;
         if (amountKWh <= 0 || amountKWh > currentMetrics.dailyExcessKWh) {
             get().showToast('Please enter an amount within your available excess energy', 'warning');
@@ -501,24 +1024,55 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
             status: 'completed',
         };
 
+        const updatedHistory = [newTx, ...get().sharingHistory];
         set({
+            sharingHistory: updatedHistory,
             metrics: {
                 ...currentMetrics,
                 dailyExcessKWh: +(currentMetrics.dailyExcessKWh - amountKWh).toFixed(1),
                 dailySharedKWh: +(currentMetrics.dailySharedKWh + amountKWh).toFixed(1),
                 earningsFromSharingUSD: +(currentMetrics.earningsFromSharingUSD + earned).toFixed(2),
             },
-            sharingHistory: [newTx, ...get().sharingHistory],
         });
 
-        // Submit to Manager store if available
-        try {
-            const { useManagerStore } = require('../../manager/store/useManagerStore');
-            if (useManagerStore?.getState()?.submitSolarOffer) {
-                useManagerStore.getState().submitSolarOffer(amountKWh, poolType, 'Agash Jeeva (Solar Roof #12)');
+        // Persist history
+        await appStorage.setItem('solar_sharing_history', JSON.stringify(updatedHistory));
+
+        // Create real offer in backend Neon DB
+        const assets = get().solarAssets;
+        const targetOwnerId = ownerId || (assets.length > 0 ? assets[0].ownerId : undefined);
+        const assetId = assets.length > 0 ? assets[0].id : 'asset_agash_001';
+
+        if (targetOwnerId) {
+            const offerId = `offer_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+            try {
+                const res = await fetch(getApiUrl('/api/solar-offers'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: offerId,
+                        ownerId: targetOwnerId,
+                        assetId: assetId,
+                        energyAmountKwh: amountKWh,
+                        minimumBatteryPercent: get().minBatteryReservePercent,
+                    }),
+                });
+                const resData = await res.json();
+                if (resData.success !== false) {
+                    await get().fetchSolarOffers(targetOwnerId);
+                    get().addAlert({
+                        category: 'system',
+                        severity: 'success',
+                        title: 'Solar Offer Submitted',
+                        message: `Successfully offered ${amountKWh} kWh to ${poolType}. Pending Manager review.`,
+                        timestamp: 'Just now',
+                        isRead: false,
+                        actionLabel: 'Viewed',
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to submit offer to API:', err);
             }
-        } catch (e) {
-            // Ignore if manager store not loaded
         }
 
         get().showToast(
@@ -529,6 +1083,14 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
     },
 
     alerts: INITIAL_ALERTS,
+
+    addAlert: (alert: Omit<SolarAlertItem, 'id'>) => {
+        const newAlert: SolarAlertItem = {
+            id: `alt-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+            ...alert,
+        };
+        set({ alerts: [newAlert, ...get().alerts] });
+    },
 
     markAlertAsRead: (alertId) => {
         set({
