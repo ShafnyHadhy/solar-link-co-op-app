@@ -98,38 +98,53 @@ export const SolarOwnerAlertsModal: React.FC<SolarOwnerAlertsModalProps> = ({
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
-                        className="mb-4 -mx-6 px-6"
+                        contentContainerStyle={{
+                            paddingHorizontal: 2,
+                            paddingVertical: 4,
+                            gap: 8,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                        }}
+                        className="mb-4"
                     >
-                        <View className="flex-row gap-2">
-                            {[
-                                { id: 'all', label: 'All' },
-                                { id: 'requests', label: '⚡ Requests' },
-                                { id: 'battery', label: '🔋 Battery' },
-                                { id: 'maintenance', label: '🛠️ Maintenance' },
-                                { id: 'system', label: '🌐 System' },
-                            ].map((cat) => (
+                        {[
+                            { id: 'all', label: 'All', icon: 'bell' },
+                            { id: 'requests', label: 'Requests', icon: 'zap' },
+                            { id: 'battery', label: 'Battery', icon: 'battery-charging' },
+                            { id: 'maintenance', label: 'Maintenance', icon: 'tool' },
+                            { id: 'system', label: 'System', icon: 'activity' },
+                        ].map((cat) => {
+                            const isSelected = selectedCategory === cat.id;
+                            return (
                                 <Pressable
                                     key={cat.id}
                                     onPress={() => setSelectedCategory(cat.id as AlertCategory)}
-                                    className={`px-3.5 py-1.5 rounded-xl border ${
-                                        selectedCategory === cat.id
-                                            ? 'bg-primary border-primary'
-                                            : 'bg-secondary/70 border-border/60'
+                                    className={`flex-row items-center px-3.5 py-2 rounded-2xl border ${
+                                        isSelected
+                                            ? 'bg-primary border-primary shadow-sm'
+                                            : 'bg-secondary/80 border-border/70 active:bg-secondary'
                                     }`}
                                 >
+                                    <Feather
+                                        name={cat.icon as any}
+                                        size={13}
+                                        color={isSelected ? '#FFFFFF' : '#9CA3AF'}
+                                    />
                                     <Text
-                                        className={`text-xs font-bold ${
-                                            selectedCategory === cat.id
-                                                ? 'text-primary-foreground'
+                                        style={{ includeFontPadding: false }}
+                                        className={`text-xs font-bold ml-1.5 leading-none ${
+                                            isSelected
+                                                ? 'text-primary-foreground font-black'
                                                 : 'text-foreground'
                                         }`}
                                     >
                                         {cat.label}
                                     </Text>
                                 </Pressable>
-                            ))}
-                        </View>
+                            );
+                        })}
                     </ScrollView>
+
 
                     {/* Alerts List */}
                     <ScrollView className="gap-3 mb-4" showsVerticalScrollIndicator={false}>
