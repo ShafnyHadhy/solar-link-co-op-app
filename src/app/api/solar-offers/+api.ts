@@ -48,7 +48,7 @@ export async function POST(request: Request) {
             throw new BadRequestError("Energy amount must be greater than 0");
         }
 
-        const surplus = await getAvailableSurplus(assetId);
+        const surplus = await getAvailableSurplus(assetId, ownerId);
 
         if (requestedEnergy > surplus.surplusKwh) {
             return Response.json(
