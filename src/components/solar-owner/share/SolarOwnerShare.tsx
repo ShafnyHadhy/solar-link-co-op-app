@@ -22,7 +22,9 @@ export const SolarOwnerShare = () => {
         rejectRequest,
         shareEnergyWithCommunity,
         solarOffers,
+        fetchSolarData,
         fetchSolarOffers,
+        fetchCommunityRequests,
         cancelSolarOfferAction,
     } = useSolarOwnerStore();
 
@@ -34,7 +36,9 @@ export const SolarOwnerShare = () => {
 
     useEffect(() => {
         if (user?.id) {
+            fetchSolarData(user.id);
             fetchSolarOffers(user.id);
+            fetchCommunityRequests();
         }
     }, [user?.id]);
 
@@ -259,6 +263,20 @@ export const SolarOwnerShare = () => {
 
                     {/* Offers List */}
                     {(() => {
+                        const formatDisplayOfferId = (id: string): string => {
+                            if (!id) return '#OFR-1001';
+                            const demoMatch = id.match(/demo_(\d+)/i);
+                            if (demoMatch) return `#OFR-0${demoMatch[1]}`;
+                            const parts = id.split('_');
+                            const lastPart = parts[parts.length - 1];
+                            if (lastPart && lastPart.length >= 3 && lastPart.length <= 6) {
+                                return `#OFR-${lastPart.toUpperCase()}`;
+                            }
+                            const clean = id.replace(/[^a-zA-Z0-9]/g, '');
+                            const suffix = clean.slice(-4).toUpperCase();
+                            return `#OFR-${suffix || '1001'}`;
+                        };
+
                         const filtered = solarOffers.filter(
                             (o) => offerFilter === 'all' || o.status === offerFilter
                         );
@@ -304,60 +322,73 @@ export const SolarOwnerShare = () => {
                                         : 'Today';
 
                                     const statusBadge = isPending
-                                        ? { bg: 'bg-amber-500/15 border-amber-500/40', text: 'text-amber-500', icon: 'clock' as const, label: 'Pending Review' }
+                                        ? { bg: 'bg-amber-500/15 border-amber-500/40', text: 'text-amber-500', color: '#F59E0B', icon: 'clock' as const, label: 'Pending' }
                                         : isApproved
-                                        ? { bg: 'bg-emerald-500/15 border-emerald-500/40', text: 'text-emerald-500', icon: 'check-circle' as const, label: 'Manager Approved' }
+                                        ? { bg: 'bg-emerald-500/15 border-emerald-500/40', text: 'text-emerald-500', color: '#10B981', icon: 'check-circle' as const, label: 'Approved' }
                                         : isRejected
-                                        ? { bg: 'bg-destructive/15 border-destructive/40', text: 'text-destructive', icon: 'alert-circle' as const, label: 'Rejected' }
+                                        ? { bg: 'bg-destructive/15 border-destructive/40', text: 'text-destructive', color: '#EF4444', icon: 'alert-circle' as const, label: 'Rejected' }
                                         : isCancelled
-                                        ? { bg: 'bg-secondary border-border/80', text: 'text-muted-foreground', icon: 'slash' as const, label: 'Cancelled' }
-                                        : { bg: 'bg-sky-500/15 border-sky-500/40', text: 'text-sky-500', icon: 'zap' as const, label: 'Completed' };
+                                        ? { bg: 'bg-secondary border-border/80', text: 'text-muted-foreground', color: '#94A3B8', icon: 'slash' as const, label: 'Cancelled' }
+                                        : { bg: 'bg-sky-500/15 border-sky-500/40', text: 'text-sky-500', color: '#0EA5E9', icon: 'zap' as const, label: 'Completed' };
 
                                     return (
                                         <View
                                             key={offer.id}
-                                            className="rounded-2xl border border-border/60 bg-secondary/30 p-3.5"
+                                            className="rounded-2xl border border-border/60 bg-secondary/30 p-3.5 mb-1"
                                         >
+                                            {/* Row 1: Amount & Short Status Badge */}
                                             <View className="flex-row items-center justify-between mb-2">
                                                 <View className="flex-row items-center flex-1 mr-2">
                                                     <View className="h-8 w-8 rounded-xl bg-amber-500/20 items-center justify-center mr-2.5 border border-amber-500/30">
                                                         <Feather name="upload" size={14} color="#F59E0B" />
                                                     </View>
-                                                    <View>
-                                                        <Text className="text-sm font-black text-foreground">
+                                                    <View className="flex-1">
+                                                        <Text className="text-sm font-black text-foreground" numberOfLines={1}>
                                                             {Number(offer.energyAmountKwh).toFixed(1)} kWh Offer
                                                         </Text>
-                                                        <Text className="text-[10px] text-muted-foreground">
-                                                            ID: {offer.id.slice(0, 16)}... • {dateStr}
+                                                        <Text className="text-[11px] font-bold text-amber-500">
+                                                            {formatDisplayOfferId(offer.id)}
                                                         </Text>
                                                     </View>
                                                 </View>
 
-                                                <View className={`flex-row items-center px-2 py-0.5 rounded-full border ${statusBadge.bg}`}>
-                                                    <Feather name={statusBadge.icon} size={10} color={isPending ? '#F59E0B' : isApproved ? '#10B981' : isRejected ? '#EF4444' : '#9CA3AF'} style={{ marginRight: 4 }} />
+                                                <View className={`flex-row items-center px-2.5 py-0.5 rounded-full border ${statusBadge.bg}`}>
+                                                    <Feather name={statusBadge.icon} size={11} color={statusBadge.color} style={{ marginRight: 4 }} />
                                                     <Text className={`text-[10px] font-bold ${statusBadge.text}`}>
                                                         {statusBadge.label}
                                                     </Text>
                                                 </View>
                                             </View>
 
-                                            <View className="flex-row items-center justify-between pt-2 border-t border-border/40">
-                                                <Text className="text-[11px] text-muted-foreground font-medium">
-                                                    Reserve: {offer.minimumBatteryPercent ? `${Number(offer.minimumBatteryPercent).toFixed(0)}% Min Battery` : '75% Default'}
-                                                </Text>
+                                            {/* Row 2: Metadata (Date & Safety Reserve) */}
+                                            <View className="flex-row items-center justify-between py-1.5 border-t border-border/30">
+                                                <View className="flex-row items-center">
+                                                    <Feather name="calendar" size={11} color="#9CA3AF" style={{ marginRight: 4 }} />
+                                                    <Text className="text-[11px] text-muted-foreground font-medium">
+                                                        {dateStr}
+                                                    </Text>
+                                                </View>
 
-                                                {isPending && (
+                                                <Text className="text-[11px] text-muted-foreground font-medium">
+                                                    Reserve: {offer.minimumBatteryPercent ? `${Number(offer.minimumBatteryPercent).toFixed(0)}% Min` : '75% Min'}
+                                                </Text>
+                                            </View>
+
+                                            {/* Row 3: Action Button (only if pending) */}
+                                            {isPending && (
+                                                <View className="pt-2 border-t border-border/30 flex-row justify-end">
                                                     <Pressable
                                                         onPress={() => handleCancelOffer(offer.id)}
                                                         disabled={isCancelling}
-                                                        className="px-3 py-1 rounded-xl bg-destructive/15 border border-destructive/30 active:opacity-70"
+                                                        className="px-3 py-1 rounded-xl bg-destructive/15 border border-destructive/30 active:opacity-70 flex-row items-center"
                                                     >
+                                                        <Feather name="x-circle" size={11} color="#EF4444" style={{ marginRight: 4 }} />
                                                         <Text className="text-xs font-bold text-destructive">
                                                             {isCancelling ? 'Cancelling...' : 'Cancel Offer'}
                                                         </Text>
                                                     </Pressable>
-                                                )}
-                                            </View>
+                                                </View>
+                                            )}
                                         </View>
                                     );
                                 })}
@@ -384,110 +415,122 @@ export const SolarOwnerShare = () => {
                         </View>
                     </View>
 
-                    {communityRequests.map((req) => {
-                        const isPending = req.status === 'pending';
-                        const isAccepted = req.status === 'accepted';
-                        const isRejected = req.status === 'rejected';
+                    {communityRequests.length === 0 ? (
+                        <View className="rounded-2xl border border-dashed border-border/70 p-6 items-center justify-center bg-secondary/15 my-1">
+                            <MaterialCommunityIcons name="account-group-outline" size={28} color="#9CA3AF" />
+                            <Text className="text-xs font-bold text-foreground mt-2">
+                                No incoming community requests
+                            </Text>
+                            <Text className="text-[10px] text-muted-foreground mt-0.5 text-center">
+                                Real household requests will appear here automatically.
+                            </Text>
+                        </View>
+                    ) : (
+                        communityRequests.map((req) => {
+                            const isPending = req.status === 'pending';
+                            const isAccepted = req.status === 'accepted';
+                            const isRejected = req.status === 'rejected';
 
-                        return (
-                            <View
-                                key={req.id}
-                                className="rounded-2xl border border-border/60 bg-secondary/30 p-4 mb-3"
-                            >
-                                <View className="flex-row items-start justify-between mb-2">
-                                    <View className="flex-row items-center flex-1 mr-2">
-                                        <View
-                                            className="h-9 w-9 rounded-xl items-center justify-center mr-2.5"
-                                            style={{ backgroundColor: req.avatarBg }}
-                                        >
-                                            <Text className="text-xs font-black text-white">
-                                                {req.requesterName[0]}
+                            return (
+                                <View
+                                    key={req.id}
+                                    className="rounded-2xl border border-border/60 bg-secondary/30 p-4 mb-3"
+                                >
+                                    <View className="flex-row items-start justify-between mb-2">
+                                        <View className="flex-row items-center flex-1 mr-2">
+                                            <View
+                                                className="h-9 w-9 rounded-xl items-center justify-center mr-2.5"
+                                                style={{ backgroundColor: req.avatarBg }}
+                                            >
+                                                <Text className="text-xs font-black text-white">
+                                                    {req.requesterName[0]}
+                                                </Text>
+                                            </View>
+                                            <View className="flex-1">
+                                                <Text className="text-xs font-bold text-foreground">
+                                                    {req.requesterName}
+                                                </Text>
+                                                <Text className="text-[10px] text-muted-foreground">
+                                                    {req.requesterAddress}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {req.urgency === 'urgent' && isPending && (
+                                            <View className="bg-destructive/20 border border-destructive/40 px-2 py-0.5 rounded-full">
+                                                <Text className="text-[9px] font-black text-destructive uppercase">
+                                                    Urgent
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </View>
+
+                                    <Text className="text-xs text-foreground/90 font-medium mb-3">
+                                        "{req.purpose}"
+                                    </Text>
+
+                                    <View className="flex-row items-center justify-between py-2 border-t border-border/40">
+                                        <View>
+                                            <Text className="text-[10px] uppercase font-bold text-muted-foreground">
+                                                Requested
+                                            </Text>
+                                            <Text className="text-sm font-black text-amber-500">
+                                                {req.amountKWh} kWh
                                             </Text>
                                         </View>
-                                        <View className="flex-1">
-                                            <Text className="text-xs font-bold text-foreground">
-                                                {req.requesterName}
+
+                                        <View>
+                                            <Text className="text-[10px] uppercase font-bold text-muted-foreground">
+                                                Date
                                             </Text>
-                                            <Text className="text-[10px] text-muted-foreground">
-                                                {req.requesterAddress}
+                                            <Text className="text-xs font-bold text-foreground">
+                                                {req.timestamp || 'Today'}
+                                            </Text>
+                                        </View>
+
+                                        <View>
+                                            <Text className="text-[10px] uppercase font-bold text-muted-foreground">
+                                                Status
+                                            </Text>
+                                            <Text
+                                                className={`text-xs font-bold capitalize ${
+                                                    isAccepted
+                                                        ? 'text-emerald-500'
+                                                        : isRejected
+                                                        ? 'text-destructive'
+                                                        : 'text-amber-500'
+                                                }`}
+                                            >
+                                                {req.status}
                                             </Text>
                                         </View>
                                     </View>
 
-                                    {req.urgency === 'urgent' && isPending && (
-                                        <View className="bg-destructive/20 border border-destructive/40 px-2 py-0.5 rounded-full">
-                                            <Text className="text-[9px] font-black text-destructive uppercase">
-                                                Urgent
-                                            </Text>
+                                    {isPending && (
+                                        <View className="flex-row gap-2 mt-3 pt-2 border-t border-border/40">
+                                            <Pressable
+                                                onPress={() => rejectRequest(req.id)}
+                                                className="flex-1 rounded-xl bg-destructive/15 border border-destructive/30 py-2.5 items-center active:opacity-70"
+                                            >
+                                                <Text className="text-xs font-bold text-destructive">
+                                                    Reject
+                                                </Text>
+                                            </Pressable>
+
+                                            <Pressable
+                                                onPress={() => acceptRequest(req.id, user?.id)}
+                                                className="flex-1 rounded-xl bg-emerald-500 py-2.5 items-center active:opacity-90 shadow-sm"
+                                            >
+                                                <Text className="text-xs font-bold text-white">
+                                                    Accept
+                                                </Text>
+                                            </Pressable>
                                         </View>
                                     )}
                                 </View>
-
-                                <Text className="text-xs text-foreground/90 font-medium mb-3">
-                                    "{req.purpose}"
-                                </Text>
-
-                                <View className="flex-row items-center justify-between py-2 border-t border-border/40">
-                                    <View>
-                                        <Text className="text-[10px] uppercase font-bold text-muted-foreground">
-                                            Requested
-                                        </Text>
-                                        <Text className="text-sm font-black text-amber-500">
-                                            {req.amountKWh} kWh
-                                        </Text>
-                                    </View>
-
-                                    <View>
-                                        <Text className="text-[10px] uppercase font-bold text-muted-foreground">
-                                            Date
-                                        </Text>
-                                        <Text className="text-xs font-bold text-foreground">
-                                            Today
-                                        </Text>
-                                    </View>
-
-                                    <View>
-                                        <Text className="text-[10px] uppercase font-bold text-muted-foreground">
-                                            Status
-                                        </Text>
-                                        <Text
-                                            className={`text-xs font-bold capitalize ${
-                                                isAccepted
-                                                    ? 'text-emerald-500'
-                                                    : isRejected
-                                                    ? 'text-destructive'
-                                                    : 'text-amber-500'
-                                            }`}
-                                        >
-                                            {req.status}
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                {isPending && (
-                                    <View className="flex-row gap-2 mt-3 pt-2 border-t border-border/40">
-                                        <Pressable
-                                            onPress={() => rejectRequest(req.id)}
-                                            className="flex-1 rounded-xl bg-destructive/15 border border-destructive/30 py-2.5 items-center active:opacity-70"
-                                        >
-                                            <Text className="text-xs font-bold text-destructive">
-                                                Reject
-                                            </Text>
-                                        </Pressable>
-
-                                        <Pressable
-                                            onPress={() => acceptRequest(req.id)}
-                                            className="flex-1 rounded-xl bg-emerald-500 py-2.5 items-center active:opacity-90 shadow-sm"
-                                        >
-                                            <Text className="text-xs font-bold text-white">
-                                                Accept
-                                            </Text>
-                                        </Pressable>
-                                    </View>
-                                )}
-                            </View>
-                        );
-                    })}
+                            );
+                        })
+                    )}
                 </View>
 
                 {/* 4. TRANSPARENT SHARING HISTORY */}
