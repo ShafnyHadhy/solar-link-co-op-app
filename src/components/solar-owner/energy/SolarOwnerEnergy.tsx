@@ -1,7 +1,7 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SolarToast } from '../shared/SolarToast';
 import { ViewHeader } from '../shared/ViewHeader';
@@ -9,7 +9,7 @@ import { useSolarOwnerStore } from '../store/useSolarOwnerStore';
 
 export const SolarOwnerEnergy = () => {
     const insets = useSafeAreaInsets();
-    const { metrics, battery, weather, suggestions, monthlyReports, showToast } = useSolarOwnerStore();
+    const { metrics, battery, weather, suggestions, monthlyReports, showToast, addAlert } = useSolarOwnerStore();
     const [timeframe, setTimeframe] = useState<'today' | 'week' | 'month'>('today');
 
     // Chart Data for Hourly Generation vs Consumption (Today)
@@ -37,6 +37,20 @@ export const SolarOwnerEnergy = () => {
 
     const handleDownloadReport = () => {
         showToast('Monthly Energy Statement downloaded (PDF/CSV ready in files)', 'success');
+        addAlert({
+            category: 'system',
+            severity: 'success',
+            title: 'Monthly Statement Generated',
+            message: `August 2026 Financial & Energy Report exported (Generation: ${metrics.dailyGenerationKWh.toFixed(1)} kWh, Surplus: ${metrics.dailyExcessKWh.toFixed(1)} kWh). Saved to device storage.`,
+            timestamp: 'Just now',
+            isRead: false,
+            actionLabel: 'Viewed',
+        });
+        Alert.alert(
+            'Statement Downloaded',
+            `Your Monthly Energy Statement has been generated.\n\n• Solar Generated: ${metrics.dailyGenerationKWh.toFixed(1)} kWh\n• Household Consumed: ${metrics.dailyConsumptionKWh.toFixed(1)} kWh\n• Available Surplus: ${metrics.dailyExcessKWh.toFixed(1)} kWh\n• Monthly Savings: $${metrics.monthlySavingsUSD.toFixed(2)}\n\nFile saved to device Downloads (PDF/CSV).`,
+            [{ text: 'OK' }]
+        );
     };
 
     return (
