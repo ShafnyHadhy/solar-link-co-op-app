@@ -515,6 +515,11 @@ export async function getHouseholdEnergyStats(householdId: string) {
     );
 
     const cleanEnergyUsedKwh = approvedKwh > 0 ? approvedKwh : 84; // base clean usage in kWh
+    const gridFallbackUsedKwh = Math.max(160 - Math.round(cleanEnergyUsedKwh), 35); // fallback from national grid
+    const totalConsumptionKwh = cleanEnergyUsedKwh + gridFallbackUsedKwh;
+    const cleanEnergySharePercent = Math.min(Math.round((cleanEnergyUsedKwh / totalConsumptionKwh) * 100), 100);
+    const gridFallbackSharePercent = 100 - cleanEnergySharePercent;
+
     const gridCostRateLKR = 38.0; // Standard Grid tariff
     const solarCoopRateLKR = 18.5; // Co-Op subsidized solar rate
     const unitSavingsLKR = gridCostRateLKR - solarCoopRateLKR; // Rs 19.5 per kWh saved
@@ -532,6 +537,10 @@ export async function getHouseholdEnergyStats(householdId: string) {
         totalRequestedKwh: Number(totalRequestedKwh.toFixed(2)),
         approvedKwh: Number(approvedKwh.toFixed(2)),
         cleanEnergyUsedKwh,
+        gridFallbackUsedKwh,
+        cleanEnergySharePercent,
+        gridFallbackSharePercent,
+        totalConsumptionKwh,
         monthlySavingsLKR,
         lifetimeSavingsLKR: monthlySavingsLKR * 5 + 3250,
         gridCostLKR: Math.round(cleanEnergyUsedKwh * gridCostRateLKR) + 9300,
