@@ -13,7 +13,7 @@ const MemberScreen = () => {
     }
 
     if (!isSignedIn || !user) {
-        return <Redirect href="/sign-in" />;
+        return <Redirect href="/(auth)/sign-in" />;
     }
 
     const role = getUserRole(user?.publicMetadata?.role);
