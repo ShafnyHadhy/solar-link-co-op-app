@@ -1,335 +1,406 @@
 import TabScreenBackground from "@/components/shared/TabScreenBackground";
 import { useHouseholdEnergyRequests } from "@/hooks/household/useHouseholdEnergyRequests";
 import { useUser } from "@clerk/expo";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useColorScheme } from "nativewind";
 import React from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    RefreshControl,
-    ScrollView,
-    Text,
-    View,
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
 } from "react-native";
 
 const HouseholdDashboard = () => {
-    const { colorScheme } = useColorScheme();
-    const router = useRouter();
-    const { user } = useUser();
-    const isDark = colorScheme === "dark";
+  const { colorScheme } = useColorScheme();
+  const router = useRouter();
+  const isDark = colorScheme === "dark";
+  const { user } = useUser();
 
-    const { requests, stats, loading, refetch } = useHouseholdEnergyRequests();
+  const {
+    stats,
+    requests,
+    loading: isLoadingStats,
+  } = useHouseholdEnergyRequests();
+  const pendingRequests = requests.filter(
+    (request) => request.status === "pending",
+  );
+  const approvedRequests = requests.filter(
+    (request) =>
+      request.status === "approved" || request.status === "fulfilled",
+  );
 
-    // Theme-based colors
-    const theme = {
-        background: isDark ? "bg-background" : "bg-gray-50",
-        text: isDark ? "text-white" : "text-gray-900",
-        textSecondary: isDark ? "text-zinc-300" : "text-gray-600",
-        textMuted: isDark ? "text-zinc-400" : "text-gray-500",
-        textLight: isDark ? "text-zinc-400" : "text-gray-400",
-        card: isDark ? "bg-card/90" : "bg-white",
-        cardBorder: isDark ? "border-border/60" : "border-gray-200",
-        heroCard: isDark ? "#334155" : "#E5E7EB",
-        heroText: isDark ? "text-white" : "text-gray-900",
-        heroSubText: isDark ? "text-slate-300" : "text-gray-600",
-        statCard: isDark ? "bg-card/90" : "bg-white",
-        statBorder: isDark ? "border-border/60" : "border-gray-200",
-        quickActionBg: isDark ? "bg-card/90" : "bg-white",
-        quickActionBorder: isDark ? "border-border/60" : "border-gray-200",
-        activityBg: isDark ? "bg-card/90" : "bg-white",
-        activityBorder: isDark ? "border-border/60" : "border-gray-100",
-        alertBg: isDark ? "bg-card/90" : "bg-white",
-        alertBorder: isDark ? "border-border/60" : "border-gray-200",
-    };
+  const firstName = user?.firstName || user?.fullName?.split(" ")[0] || "there";
 
-    const userName = user?.firstName || user?.fullName?.split(" ")[0] || "Member";
+  // Theme
+  const bg = isDark ? "bg-background" : "bg-gray-50";
+  const text = isDark ? "text-white" : "text-gray-900";
+  const textSecondary = isDark ? "text-zinc-300" : "text-gray-600";
+  const textMuted = isDark ? "text-zinc-400" : "text-gray-500";
+  const textLight = isDark ? "text-zinc-400" : "text-gray-400";
+  const card = isDark
+    ? "bg-black/30 border-white/10"
+    : "bg-white border-gray-200";
+  const iconBg = isDark ? "bg-white/10" : "bg-gray-200";
+  const quickActionBg = isDark
+    ? "bg-black/30 border-white/10"
+    : "bg-white border-gray-200";
 
-    const availableEnergyKwh = stats
-        ? stats.monthlyAllocationKwh + stats.approvedKwh
-        : 142;
+  const allocation = stats?.monthlyAllocationKwh ?? 0;
+  const approvedKwh = stats?.approvedKwh ?? 0;
+  const remaining = Math.max(allocation - approvedKwh, 0);
+  const pendingCount = pendingRequests.length;
 
-    const pendingRequestsCount = stats ? stats.pendingRequestsCount : requests.filter((r) => r.status === "pending").length;
+  return (
+    <ScrollView
+      className={`flex-1 ${bg}`}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{
+        paddingHorizontal: 20,
+        paddingTop: 55,
+        paddingBottom: 120,
+      }}
+    >
+      <TabScreenBackground />
 
-    // Navigation handlers
-    const handleRequestSolarPower = () => {
-        router.push("/(tabs)/energy");
-    };
+      {/* Header */}
+      <View className="flex-row items-center justify-between mb-8">
+        <View>
+          <Text className={`text-4xl font-bold ${text}`}>
+            Hello, {firstName}
+          </Text>
+          <Text className={`mt-1 text-base ${textSecondary}`}>
+            Welcome back to SolarLink
+          </Text>
+        </View>
 
-    const handleViewPendingRequests = () => {
-        router.push({
-            pathname: "/(tabs)/energy",
-            params: { tab: "pending" },
-        });
-    };
+        <View className="mr-16">
+          <Pressable
+            className={`h-12 w-12 rounded-full items-center justify-center ${
+              isDark
+                ? "bg-black/30 border border-white/10"
+                : "bg-gray-200 border border-gray-300"
+            }`}
+          >
+            <Feather
+              name="bell"
+              size={22}
+              color={isDark ? "white" : "#374151"}
+            />
+          </Pressable>
+        </View>
+      </View>
 
-    const handleReports = () => {
-        router.push("/(tabs)/saving");
-    };
+      {/* Hero Card */}
+      <Pressable
+        onPress={() => router.push("/(tabs)/energy")}
+        className="rounded-3xl p-5 mb-8"
+        style={{ backgroundColor: isDark ? "#334155" : "#1F2937" }}
+      >
+        <View className="flex-row items-center justify-between">
+          <View className="flex-1">
+            <Text className="text-xl font-bold text-white">
+              Request Solar Power
+            </Text>
+            <Text className="mt-1 text-slate-300 text-sm">
+              Submit a new energy request
+            </Text>
 
-    const handleViewMenu = () => {
-        router.push("/(tabs)/menu");
-    };
+            {/* Allocation pill */}
+            {stats && (
+              <View className="mt-3 flex-row items-center self-start bg-white/10 rounded-full px-3 py-1.5">
+                <Feather name="zap" size={12} color="#FBBF24" />
+                <Text className="text-white text-xs font-semibold ml-1.5">
+                  {remaining.toFixed(0)} kWh remaining this month
+                </Text>
+              </View>
+            )}
+          </View>
 
-    return (
-        <ScrollView
-            className={`flex-1 ${theme.background}`}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-                <RefreshControl
-                    refreshing={loading}
-                    onRefresh={refetch}
-                    tintColor={isDark ? "#F59E0B" : "#D97706"}
-                />
-            }
-            contentContainerStyle={{
-                paddingHorizontal: 20,
-                paddingTop: 55,
-                paddingBottom: 120,
-            }}
+          <View className="h-14 w-14 rounded-full bg-white/10 items-center justify-center">
+            <Feather name="plus" size={28} color="white" />
+          </View>
+        </View>
+      </Pressable>
+
+      {/* Stats */}
+      <View className="flex-row justify-between mb-8">
+        {/* Available/Allocated Energy */}
+        <View className={`w-[48%] rounded-3xl p-5 border ${card}`}>
+          <View className="h-12 w-12 rounded-xl bg-yellow-500/10 items-center justify-center mb-4">
+            <Feather name="battery-charging" size={20} color="#FBBF24" />
+          </View>
+
+          <Text className={`text-sm ${textLight}`}>Monthly Allocation</Text>
+          {isLoadingStats && !stats ? (
+            <ActivityIndicator
+              size="small"
+              color="#FBBF24"
+              style={{ marginTop: 8 }}
+            />
+          ) : (
+            <>
+              <Text className={`text-3xl font-bold mt-1 ${text}`}>
+                {allocation}
+              </Text>
+              <Text className={`${textLight}`}>kWh</Text>
+              <Text
+                className={`text-xs mt-2 ${remaining > 0 ? "text-green-400" : "text-red-400"}`}
+              >
+                {remaining.toFixed(1)} kWh remaining
+              </Text>
+            </>
+          )}
+        </View>
+
+        {/* Pending Requests */}
+        <View className={`w-[48%] rounded-3xl p-5 border ${card}`}>
+          <View className="h-12 w-12 rounded-xl bg-blue-500/10 items-center justify-center mb-4">
+            <Feather name="clock" size={20} color="#60A5FA" />
+          </View>
+
+          <Text className={`text-sm ${textLight}`}>Pending Requests</Text>
+          {isLoadingStats && !stats ? (
+            <ActivityIndicator
+              size="small"
+              color="#60A5FA"
+              style={{ marginTop: 8 }}
+            />
+          ) : (
+            <>
+              <Text className={`text-3xl font-bold mt-1 ${text}`}>
+                {pendingCount}
+              </Text>
+              <Text className={`${textLight}`}>Active</Text>
+              <Text
+                className={`text-xs mt-2 ${pendingCount > 0 ? "text-yellow-400" : "text-green-400"}`}
+              >
+                {pendingCount > 0
+                  ? `${pendingCount} awaiting approval`
+                  : "All clear"}
+              </Text>
+            </>
+          )}
+        </View>
+      </View>
+
+      {/* Energy Mix Overview */}
+      {stats && (
+        <Pressable
+          onPress={() => router.push("/(tabs)/saving")}
+          className={`rounded-3xl p-4 mb-8 border ${card}`}
         >
-            <TabScreenBackground />
-
-            {/* Header */}
-            <View className="flex-row items-center justify-between mb-8">
-                <View>
-                    <Text className={`text-4xl font-extrabold tracking-tight ${theme.text}`}>
-                        Hello, {userName} 👋
-                    </Text>
-                    <Text className={`mt-1 text-base ${theme.textSecondary}`}>
-                        Welcome back to SolarLink
-                    </Text>
-                </View>
-
-                <Pressable
-                    onPress={handleViewMenu}
-                    className={`h-12 w-12 rounded-2xl items-center justify-center border ${theme.cardBorder} ${theme.card} shadow-sm active:opacity-80`}
-                >
-                    <Feather name="user" size={22} color={isDark ? "#F59E0B" : "#D97706"} />
-                </Pressable>
+          <View className="flex-row items-center justify-between mb-2.5">
+            <View className="flex-row items-center">
+              <View className="h-8 w-8 rounded-xl bg-emerald-500/15 items-center justify-center mr-2.5">
+                <Feather name="zap" size={16} color="#34D399" />
+              </View>
+              <View>
+                <Text className={`font-semibold text-sm ${text}`}>
+                  Energy Source Mix
+                </Text>
+                <Text className={`text-xs ${textMuted}`}>
+                  {stats.cleanEnergyUsedKwh} kWh solar (
+                  {stats.cleanEnergySharePercent}%) ·{" "}
+                  {stats.gridFallbackUsedKwh} kWh grid fallback
+                </Text>
+              </View>
             </View>
+            <Feather
+              name="chevron-right"
+              size={16}
+              color={isDark ? "#71717A" : "#9CA3AF"}
+            />
+          </View>
 
-            {/* Hero Card - Request Solar Power */}
-            <Pressable
-                onPress={handleRequestSolarPower}
-                className="rounded-3xl p-5 mb-7 bg-primary shadow-md active:opacity-95"
+          {/* Micro split progress bar */}
+          <View
+            className={`h-2 rounded-full overflow-hidden flex-row ${isDark ? "bg-white/10" : "bg-gray-100"}`}
+          >
+            <View
+              style={{ width: `${stats.cleanEnergySharePercent}%` }}
+              className="h-full bg-emerald-400"
+            />
+            <View
+              style={{ width: `${stats.gridFallbackSharePercent}%` }}
+              className="h-full bg-red-400/80"
+            />
+          </View>
+        </Pressable>
+      )}
+
+      {/* Needs Attention — only shown when there are pending requests */}
+      {pendingCount > 0 && (
+        <>
+          <Text className={`text-2xl font-bold mb-4 ${text}`}>
+            Needs Attention
+          </Text>
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: "/(tabs)/energy",
+                params: { tab: "pending" },
+              })
+            }
+            className={`rounded-3xl overflow-hidden mb-8 border ${card}`}
+          >
+            <View className={`flex-row items-center p-4`}>
+              <Feather name="alert-circle" size={20} color="#FBBF24" />
+              <View className="flex-1 ml-3">
+                <Text className={`font-semibold ${text}`}>
+                  {pendingCount} request{pendingCount > 1 ? "s" : ""} awaiting
+                  review
+                </Text>
+                <Text className={`text-xs mt-0.5 ${textMuted}`}>
+                  Tap to view pending energy requests
+                </Text>
+              </View>
+              <Feather
+                name="chevron-right"
+                size={16}
+                color={isDark ? "#71717A" : "#9CA3AF"}
+              />
+            </View>
+          </Pressable>
+        </>
+      )}
+
+      {/* Quick Actions */}
+      <Text className={`text-2xl font-bold mb-4 ${text}`}>Quick Actions</Text>
+
+      <View className="flex-row justify-between mb-8">
+        <Pressable
+          onPress={() => router.push("/(tabs)/energy")}
+          className={`w-[31%] rounded-2xl py-5 items-center border ${quickActionBg}`}
+        >
+          <Feather name="plus-circle" size={24} color="#FBBF24" />
+          <Text className={`text-xs mt-2 ${text}`}>Request</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push("/(tabs)/saving")}
+          className={`w-[31%] rounded-2xl py-5 items-center border ${quickActionBg}`}
+        >
+          <Feather name="trending-up" size={24} color="#60A5FA" />
+          <Text className={`text-xs mt-2 ${text}`}>Savings</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: "/(tabs)/energy",
+              params: { tab: "requests" },
+            })
+          }
+          className={`w-[31%] rounded-2xl py-5 items-center border ${quickActionBg}`}
+        >
+          <Feather name="list" size={24} color="#22C55E" />
+          <Text className={`text-xs mt-2 ${text}`}>History</Text>
+        </Pressable>
+      </View>
+
+      {/* Recent Activity */}
+      <View className="flex-row justify-between items-center mb-4">
+        <Text className={`text-2xl font-bold ${text}`}>Recent Activity</Text>
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: "/(tabs)/energy",
+              params: { tab: "requests" },
+            })
+          }
+        >
+          <Text className="text-yellow-400 font-semibold">View All</Text>
+        </Pressable>
+      </View>
+
+      <View className={`rounded-3xl overflow-hidden border ${card}`}>
+        {/* Approved requests */}
+        {approvedRequests.slice(0, 2).map((req, idx) => (
+          <View
+            key={req.id}
+            className={`flex-row items-center px-4 py-4 ${
+              idx < Math.min(approvedRequests.length, 2) - 1 ||
+              pendingRequests.length > 0
+                ? `border-b ${isDark ? "border-white/8" : "border-gray-100"}`
+                : ""
+            }`}
+          >
+            <View className="h-10 w-10 rounded-full bg-green-500/20 items-center justify-center">
+              <Feather name="check" size={18} color="#22C55E" />
+            </View>
+            <View className="flex-1 ml-3">
+              <Text className={`font-semibold ${text}`}>Request Approved</Text>
+              <Text className={`text-xs ${textLight}`}>
+                {parseFloat(req.requestedEnergyKwh).toFixed(1)} kWh •{" "}
+                {req.reason || "Energy request"}
+              </Text>
+            </View>
+            <Text className={`text-xs ${textLight}`}>
+              {new Date(req.requestedAt).toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "short",
+              })}
+            </Text>
+          </View>
+        ))}
+
+        {/* Pending requests */}
+        {pendingRequests.slice(0, 2).map((req, idx) => (
+          <View
+            key={req.id}
+            className={`flex-row items-center px-4 py-4 ${
+              idx < Math.min(pendingRequests.length, 2) - 1
+                ? `border-b ${isDark ? "border-white/8" : "border-gray-100"}`
+                : ""
+            }`}
+          >
+            <View className="h-10 w-10 rounded-full bg-yellow-500/20 items-center justify-center">
+              <Feather name="clock" size={18} color="#FBBF24" />
+            </View>
+            <View className="flex-1 ml-3">
+              <Text className={`font-semibold ${text}`}>Request Pending</Text>
+              <Text className={`text-xs ${textLight}`}>
+                {parseFloat(req.requestedEnergyKwh).toFixed(1)} kWh • Awaiting
+                review
+              </Text>
+            </View>
+            <Text className={`text-xs ${textLight}`}>
+              {new Date(req.requestedAt).toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "short",
+              })}
+            </Text>
+          </View>
+        ))}
+
+        {/* Empty state */}
+        {approvedRequests.length === 0 && pendingRequests.length === 0 && (
+          <View className="flex-row items-center px-4 py-4">
+            <View
+              className={`h-10 w-10 rounded-full ${iconBg} items-center justify-center`}
             >
-                <View className="flex-row items-center justify-between">
-                    <View className="flex-1 pr-3">
-                        <View className="self-start px-2.5 py-0.5 rounded-full bg-black/20 mb-2">
-                            <Text className="text-[10px] font-black uppercase tracking-wider text-primary-foreground">
-                                Microgrid Share
-                            </Text>
-                        </View>
-                        <Text className="text-xl font-extrabold text-primary-foreground">
-                            Request Solar Power
-                        </Text>
-                        <Text className="mt-1 text-xs text-primary-foreground/80 font-medium">
-                            Submit a new clean energy allocation request
-                        </Text>
-                    </View>
-
-                    <View className="h-13 w-13 rounded-2xl bg-black/15 items-center justify-center">
-                        <Feather name="plus" size={26} color="#18181B" />
-                    </View>
-                </View>
-            </Pressable>
-
-            {/* Microgrid Attention Card */}
-            <View className="flex-row items-center justify-between mb-3">
-                <Text className={`text-xl font-bold ${theme.text}`}>Grid Status</Text>
-                <View className="flex-row items-center bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
-                    <View className="h-2 w-2 rounded-full bg-emerald-500 mr-1.5" />
-                    <Text className="text-[10px] font-bold text-emerald-500 uppercase">
-                        Community Grid Active
-                    </Text>
-                </View>
+              <Feather
+                name="inbox"
+                size={18}
+                color={isDark ? "#71717A" : "#9CA3AF"}
+              />
             </View>
-
-            <View className={`rounded-3xl overflow-hidden mb-7 ${theme.alertBg} border ${theme.alertBorder} shadow-sm`}>
-                <View className={`flex-row items-center p-4 border-b ${isDark ? "border-border/40" : "border-gray-200"}`}>
-                    <View className="h-9 w-9 rounded-xl bg-amber-500/15 items-center justify-center mr-3">
-                        <Feather name="sun" size={18} color="#F59E0B" />
-                    </View>
-                    <View className="flex-1">
-                        <Text className={`font-semibold text-sm ${theme.text}`}>
-                            Peak Solar Generation Window
-                        </Text>
-                        <Text className="text-xs text-muted-foreground mt-0.5">
-                            Substation capacity is high. Great time to request power!
-                        </Text>
-                    </View>
-                </View>
-
-                <View className="flex-row items-center p-4">
-                    <View className="h-9 w-9 rounded-xl bg-blue-500/15 items-center justify-center mr-3">
-                        <Feather name="shield" size={18} color="#3B82F6" />
-                    </View>
-                    <View className="flex-1">
-                        <Text className={`font-semibold text-sm ${theme.text}`}>
-                            Co-Op Protection Active
-                        </Text>
-                        <Text className="text-xs text-muted-foreground mt-0.5">
-                            Subsidized rates apply to all community allocations.
-                        </Text>
-                    </View>
-                </View>
+            <View className="flex-1 ml-3">
+              <Text className={`font-semibold ${text}`}>
+                No recent activity
+              </Text>
+              <Text className={`text-xs ${textLight}`}>
+                Submit your first energy request
+              </Text>
             </View>
-
-            {/* Stats Cards */}
-            <View className="flex-row justify-between mb-7 gap-3">
-                <View className={`flex-1 rounded-3xl p-5 border ${theme.statBorder} ${theme.statCard} shadow-sm`}>
-                    <View className="h-12 w-12 rounded-2xl bg-amber-500/15 items-center justify-center mb-3">
-                        <Feather name="zap" size={22} color="#F59E0B" />
-                    </View>
-
-                    <Text className={`text-xs font-semibold ${theme.textLight}`}>
-                        Available Energy
-                    </Text>
-                    <View className="flex-row items-baseline mt-1">
-                        <Text className={`text-3xl font-black ${theme.text}`}>
-                            {availableEnergyKwh}
-                        </Text>
-                        <Text className={`ml-1 text-xs font-bold text-amber-500`}>kWh</Text>
-                    </View>
-                    <Text className="text-emerald-500 text-[11px] font-semibold mt-1">
-                        Clean Allocation Quota
-                    </Text>
-                </View>
-
-                <Pressable
-                    onPress={handleViewPendingRequests}
-                    className={`flex-1 rounded-3xl p-5 border ${theme.statBorder} ${theme.statCard} shadow-sm active:opacity-90`}
-                >
-                    <View className="h-12 w-12 rounded-2xl bg-sky-500/15 items-center justify-center mb-3">
-                        <Feather name="clock" size={22} color="#38BDF8" />
-                    </View>
-
-                    <Text className={`text-xs font-semibold ${theme.textLight}`}>
-                        Pending Requests
-                    </Text>
-                    <View className="flex-row items-baseline mt-1">
-                        <Text className={`text-3xl font-black ${theme.text}`}>
-                            {pendingRequestsCount}
-                        </Text>
-                        <Text className={`ml-1 text-xs font-bold ${theme.textLight}`}>Active</Text>
-                    </View>
-                    <Text className="text-amber-500 text-[11px] font-semibold mt-1">
-                        {pendingRequestsCount === 1 ? "1 awaiting review" : `${pendingRequestsCount} in queue`}
-                    </Text>
-                </Pressable>
-            </View>
-
-            {/* Quick Actions */}
-            <Text className={`text-xl font-bold mb-3 ${theme.text}`}>Quick Actions</Text>
-
-            <View className="flex-row justify-between mb-7 gap-3">
-                <Pressable
-                    onPress={handleRequestSolarPower}
-                    className={`flex-1 rounded-2xl py-4 items-center border ${theme.quickActionBorder} ${theme.quickActionBg} shadow-sm active:scale-95`}
-                >
-                    <Feather name="plus-circle" size={22} color="#F59E0B" />
-                    <Text className={`text-xs font-bold mt-2 ${theme.text}`}>Request</Text>
-                </Pressable>
-
-                <Pressable
-                    onPress={handleReports}
-                    className={`flex-1 rounded-2xl py-4 items-center border ${theme.quickActionBorder} ${theme.quickActionBg} shadow-sm active:scale-95`}
-                >
-                    <Feather name="file-text" size={22} color="#3B82F6" />
-                    <Text className={`text-xs font-bold mt-2 ${theme.text}`}>Savings</Text>
-                </Pressable>
-
-                <Pressable
-                    onPress={handleViewMenu}
-                    className={`flex-1 rounded-2xl py-4 items-center border ${theme.quickActionBorder} ${theme.quickActionBg} shadow-sm active:scale-95`}
-                >
-                    <Feather name="grid" size={22} color="#10B981" />
-                    <Text className={`text-xs font-bold mt-2 ${theme.text}`}>Menu</Text>
-                </Pressable>
-            </View>
-
-            {/* Recent Activity Header */}
-            <View className="flex-row justify-between items-center mb-3">
-                <Text className={`text-xl font-bold ${theme.text}`}>Recent Activity</Text>
-                <Pressable onPress={() => router.push("/(tabs)/energy")}>
-                    <Text className="text-amber-500 font-bold text-xs">View All</Text>
-                </Pressable>
-            </View>
-
-            {/* Activity List */}
-            <View className={`rounded-3xl overflow-hidden border ${theme.activityBorder} ${theme.activityBg} shadow-sm divide-y ${isDark ? "divide-border/40" : "divide-gray-100"}`}>
-                {requests.length > 0 ? (
-                    requests.slice(0, 3).map((item) => (
-                        <Pressable
-                            key={item.id}
-                            onPress={() => router.push("/(tabs)/energy")}
-                            className="flex-row items-center px-4 py-3.5 active:bg-secondary/40"
-                        >
-                            <View
-                                className={`h-10 w-10 rounded-xl items-center justify-center mr-3 ${
-                                    item.status === "approved" || item.status === "fulfilled"
-                                        ? "bg-emerald-500/15"
-                                        : item.status === "rejected"
-                                          ? "bg-rose-500/15"
-                                          : "bg-amber-500/15"
-                                }`}
-                            >
-                                <Feather
-                                    name={
-                                        item.status === "approved" || item.status === "fulfilled"
-                                            ? "check"
-                                            : item.status === "rejected"
-                                              ? "x"
-                                              : "clock"
-                                    }
-                                    size={18}
-                                    color={
-                                        item.status === "approved" || item.status === "fulfilled"
-                                            ? "#10B981"
-                                            : item.status === "rejected"
-                                              ? "#F43F5E"
-                                              : "#F59E0B"
-                                    }
-                                />
-                            </View>
-
-                            <View className="flex-1">
-                                <Text className={`font-bold text-sm ${theme.text}`}>
-                                    Energy Request ({parseFloat(item.requestedEnergyKwh).toFixed(1)} kWh)
-                                </Text>
-                                <Text className={`text-xs ${theme.textLight}`} numberOfLines={1}>
-                                    {item.reason || "Household Energy Request"}
-                                </Text>
-                            </View>
-
-                            <View className="items-end ml-2">
-                                <Text
-                                    className={`text-[10px] font-black uppercase ${
-                                        item.status === "approved" || item.status === "fulfilled"
-                                            ? "text-emerald-500"
-                                            : item.status === "rejected"
-                                              ? "text-rose-500"
-                                              : "text-amber-500"
-                                    }`}
-                                >
-                                    {item.status}
-                                </Text>
-                            </View>
-                        </Pressable>
-                    ))
-                ) : (
-                    <View className="p-6 items-center">
-                        <Feather name="activity" size={24} color="#9CA3AF" />
-                        <Text className="text-sm font-semibold text-muted-foreground mt-2">
-                            No recent activity yet
-                        </Text>
-                    </View>
-                )}
-            </View>
-        </ScrollView>
-    );
+          </View>
+        )}
+      </View>
+    </ScrollView>
+  );
 };
 
 export default HouseholdDashboard;
