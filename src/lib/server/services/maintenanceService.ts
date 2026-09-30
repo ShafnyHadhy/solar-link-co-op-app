@@ -1,6 +1,10 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "../db/client";
-import { serviceTickets, users } from "../db/schema";
+import {
+    maintenanceRecords,
+    serviceTickets,
+    users,
+} from "../db/schema";
 
 export async function createServiceTicket(data: {
     id: string;
@@ -171,5 +175,41 @@ export async function assignServiceTicketTechnician(
     } catch (error) {
         console.error("Failed to assign technician to service ticket:", error);
         throw new Error("Failed to assign technician to service ticket");
+    }
+}
+
+
+// ============================================================
+// TECHNICIAN - US-25 MAINTENANCE RECORDS
+// ============================================================
+
+// CESA-205 - Record diagnosis for a service ticket
+export async function createMaintenanceDiagnosis(data: {
+    id: string;
+    ticketId: string;
+    technicianId: string;
+    diagnosis: string;
+}) {
+    try {
+        const [record] = await db
+            .insert(maintenanceRecords)
+            .values({
+                id: data.id,
+                ticketId: data.ticketId,
+                technicianId: data.technicianId,
+                description: data.diagnosis,
+            })
+            .returning();
+
+        return record;
+    } catch (error) {
+        console.error(
+            "Failed to record maintenance diagnosis:",
+            error
+        );
+
+        throw new Error(
+            "Failed to record maintenance diagnosis"
+        );
     }
 }

@@ -14,6 +14,7 @@ import {
     Pressable,
     ScrollView,
     Text,
+    TextInput,
     View,
 } from "react-native";
 
@@ -61,6 +62,13 @@ const TicketDetailsScreen = () => {
         useState<string | null>(null);
 
     const [updatingStatus, setUpdatingStatus] =
+        useState(false);
+
+    // CESA-205 - Maintenance diagnosis
+    const [diagnosis, setDiagnosis] =
+        useState("");
+
+    const [savingDiagnosis, setSavingDiagnosis] =
         useState(false);
 
     useEffect(() => {
@@ -292,6 +300,80 @@ const TicketDetailsScreen = () => {
             );
         } finally {
             setUpdatingStatus(false);
+        }
+    };
+
+    // CESA-205 - Save technician diagnosis
+    const saveDiagnosis = async () => {
+        if (!ticket || savingDiagnosis) {
+            return;
+        }
+
+        if (!user?.id) {
+            Alert.alert(
+                "Save Failed",
+                "Unable to identify the logged-in technician."
+            );
+            return;
+        }
+
+        const cleanedDiagnosis = diagnosis.trim();
+
+        if (!cleanedDiagnosis) {
+            Alert.alert(
+                "Diagnosis Required",
+                "Please enter the diagnosis before saving."
+            );
+            return;
+        }
+
+        try {
+            setSavingDiagnosis(true);
+
+            const response = await fetch(
+                "/api/maintenance-records",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        ticketId: ticket.id,
+                        technicianId: user.id,
+                        diagnosis: cleanedDiagnosis,
+                    }),
+                }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    result.message ??
+                        "Failed to save diagnosis"
+                );
+            }
+
+            setDiagnosis("");
+
+            Alert.alert(
+                "Diagnosis Saved",
+                "The maintenance diagnosis has been recorded successfully."
+            );
+        } catch (err) {
+            console.error(
+                "Failed to save diagnosis:",
+                err
+            );
+
+            Alert.alert(
+                "Save Failed",
+                err instanceof Error
+                    ? err.message
+                    : "Failed to save diagnosis"
+            );
+        } finally {
+            setSavingDiagnosis(false);
         }
     };
 
@@ -643,6 +725,81 @@ const TicketDetailsScreen = () => {
                             </Text>
                         </View>
                     )}
+                </View>
+
+                {/* CESA-205 - Record Diagnosis */}
+                <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
+                    Maintenance Diagnosis
+                </Text>
+
+                <View className="rounded-[24px] border border-border bg-card p-5">
+                    <View className="mb-4 flex-row items-center">
+                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-muted">
+                            <Feather
+                                name="clipboard"
+                                size={18}
+                                color="#6B7280"
+                            />
+                        </View>
+
+                        <View className="ml-3 flex-1">
+                            <Text className="text-sm font-bold text-foreground">
+                                Record Diagnosis
+                            </Text>
+
+                            <Text className="mt-1 text-xs text-muted-foreground">
+                                Record your diagnosis for this service ticket.
+                            </Text>
+                        </View>
+                    </View>
+
+                    <TextInput
+                        value={diagnosis}
+                        onChangeText={setDiagnosis}
+                        placeholder="Enter diagnosis..."
+                        placeholderTextColor="#9CA3AF"
+                        multiline
+                        textAlignVertical="top"
+                        editable={!savingDiagnosis}
+                        className="min-h-[120px] rounded-xl border border-border bg-background p-4 text-sm text-foreground"
+                    />
+
+                    <Pressable
+                        disabled={
+                            savingDiagnosis ||
+                            !diagnosis.trim() ||
+                            !user?.id
+                        }
+                        onPress={saveDiagnosis}
+                        className={`mt-4 items-center rounded-xl px-4 py-3 ${
+                            savingDiagnosis ||
+                            !diagnosis.trim() ||
+                            !user?.id
+                                ? "bg-muted"
+                                : "bg-primary"
+                        }`}
+                    >
+                        {savingDiagnosis ? (
+                            <View className="flex-row items-center">
+                                <ActivityIndicator size="small" />
+
+                                <Text className="ml-2 font-bold text-muted-foreground">
+                                    Saving...
+                                </Text>
+                            </View>
+                        ) : (
+                            <Text
+                                className={`font-bold ${
+                                    !diagnosis.trim() ||
+                                    !user?.id
+                                        ? "text-muted-foreground"
+                                        : "text-primary-foreground"
+                                }`}
+                            >
+                                Save Diagnosis
+                            </Text>
+                        )}
+                    </Pressable>
                 </View>
 
                 {/* Status Update */}
