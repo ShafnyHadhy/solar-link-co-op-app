@@ -240,3 +240,30 @@ export async function updateMaintenanceParts(
         );
     }
 }
+
+
+// CESA-207 - Record maintenance notes
+export async function updateMaintenanceNotes(
+    recordId: string,
+    notes: string
+) {
+    try {
+        const [record] = await db
+            .update(maintenanceRecords)
+            .set({
+                notes,
+            })
+            .where(eq(maintenanceRecords.id, recordId))
+            .returning();
+
+        return record ?? null;
+    } catch (error) {
+        console.error(
+            "Failed to record maintenance notes:",
+            error
+        );
+        throw new Error(
+            "Failed to record maintenance notes"
+        );
+    }
+}

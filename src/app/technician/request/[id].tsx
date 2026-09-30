@@ -81,6 +81,13 @@ const TicketDetailsScreen = () => {
     const [savingParts, setSavingParts] =
         useState(false);
 
+    // CESA-207 - Maintenance notes
+    const [maintenanceNotes, setMaintenanceNotes] =
+        useState("");
+
+    const [savingNotes, setSavingNotes] =
+        useState(false);
+
     useEffect(() => {
         if (!id) {
             setError("Ticket ID is missing.");
@@ -475,6 +482,79 @@ const TicketDetailsScreen = () => {
             );
         } finally {
             setSavingParts(false);
+        }
+    };
+
+    // CESA-207 - Save maintenance notes
+    const saveMaintenanceNotes = async () => {
+        if (savingNotes) {
+            return;
+        }
+
+        if (!maintenanceRecordId) {
+            Alert.alert(
+                "Diagnosis Required",
+                "Save the diagnosis first before recording maintenance notes."
+            );
+            return;
+        }
+
+        const cleanedNotes = maintenanceNotes.trim();
+
+        if (!cleanedNotes) {
+            Alert.alert(
+                "Notes Required",
+                "Please enter maintenance notes."
+            );
+            return;
+        }
+
+        try {
+            setSavingNotes(true);
+
+            const response = await fetch(
+                "/api/maintenance-records",
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        recordId: maintenanceRecordId,
+                        notes: cleanedNotes,
+                    }),
+                }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    result.message ??
+                        "Failed to save maintenance notes"
+                );
+            }
+
+            setMaintenanceNotes("");
+
+            Alert.alert(
+                "Notes Saved",
+                "The maintenance notes have been recorded successfully."
+            );
+        } catch (err) {
+            console.error(
+                "Failed to save maintenance notes:",
+                err
+            );
+
+            Alert.alert(
+                "Save Failed",
+                err instanceof Error
+                    ? err.message
+                    : "Failed to save maintenance notes"
+            );
+        } finally {
+            setSavingNotes(false);
         }
     };
 
@@ -976,6 +1056,83 @@ const TicketDetailsScreen = () => {
                             {savingParts
                                 ? "Saving..."
                                 : "Save Replaced Parts"}
+                        </Text>
+                    </Pressable>
+                </View>
+
+                {/* CESA-207 - Maintenance Notes */}
+                <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
+                    Maintenance Notes
+                </Text>
+
+                <View className="rounded-[24px] border border-border bg-card p-5">
+                    <View className="mb-4 flex-row items-center">
+                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-muted">
+                            <Feather
+                                name="file-text"
+                                size={18}
+                                color="#6B7280"
+                            />
+                        </View>
+
+                        <View className="ml-3 flex-1">
+                            <Text className="text-sm font-bold text-foreground">
+                                Record Maintenance Notes
+                            </Text>
+
+                            <Text className="mt-1 text-xs text-muted-foreground">
+                                Add notes about the maintenance work performed.
+                            </Text>
+                        </View>
+                    </View>
+
+                    <TextInput
+                        value={maintenanceNotes}
+                        onChangeText={setMaintenanceNotes}
+                        placeholder="Example: Inspected inverter and replaced damaged fuse..."
+                        placeholderTextColor="#9CA3AF"
+                        multiline
+                        textAlignVertical="top"
+                        editable={
+                            !savingNotes &&
+                            !!maintenanceRecordId
+                        }
+                        className="min-h-[120px] rounded-xl border border-border bg-background p-4 text-sm text-foreground"
+                    />
+
+                    {!maintenanceRecordId && (
+                        <Text className="mt-2 text-xs text-muted-foreground">
+                            Save the diagnosis first to enable maintenance notes.
+                        </Text>
+                    )}
+
+                    <Pressable
+                        disabled={
+                            savingNotes ||
+                            !maintenanceNotes.trim() ||
+                            !maintenanceRecordId
+                        }
+                        onPress={saveMaintenanceNotes}
+                        className={`mt-4 items-center rounded-xl px-4 py-3 ${
+                            savingNotes ||
+                            !maintenanceNotes.trim() ||
+                            !maintenanceRecordId
+                                ? "bg-muted"
+                                : "bg-primary"
+                        }`}
+                    >
+                        <Text
+                            className={`font-bold ${
+                                savingNotes ||
+                                !maintenanceNotes.trim() ||
+                                !maintenanceRecordId
+                                    ? "text-muted-foreground"
+                                    : "text-primary-foreground"
+                            }`}
+                        >
+                            {savingNotes
+                                ? "Saving..."
+                                : "Save Maintenance Notes"}
                         </Text>
                     </Pressable>
                 </View>

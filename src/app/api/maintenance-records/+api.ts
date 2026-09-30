@@ -3,6 +3,7 @@
 
 import {
     createMaintenanceDiagnosis,
+    updateMaintenanceNotes,
     updateMaintenanceParts,
 } from "@/lib/server/services/maintenanceService";
 import { BadRequestError } from "@/lib/server/utils/errors";
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
 }
 
 
-// CESA-206 - Record replaced parts
+// CESA-206 & CESA-207 - Update maintenance record
 export async function PATCH(request: Request) {
     try {
         const body = await request.json();
@@ -56,24 +57,49 @@ export async function PATCH(request: Request) {
         const {
             recordId,
             partsUsed,
+            notes,
         } = body;
 
-        if (!recordId || !partsUsed?.trim()) {
+        if (!recordId) {
             throw new BadRequestError(
-                "recordId and partsUsed are required"
+                "recordId is required"
             );
         }
 
-        const record = await updateMaintenanceParts(
-            recordId,
+        let record;
+
+        // CESA-206 - Record replaced parts
+        if (
+            typeof partsUsed === "string" &&
             partsUsed.trim()
-        );
+        ) {
+            record = await updateMaintenanceParts(
+                recordId,
+                partsUsed.trim()
+            );
+        }
+
+        // CESA-207 - Record maintenance notes
+        else if (
+            typeof notes === "string" &&
+            notes.trim()
+        ) {
+            record = await updateMaintenanceNotes(
+                recordId,
+                notes.trim()
+            );
+        } else {
+            throw new BadRequestError(
+                "partsUsed or notes is required"
+            );
+        }
 
         if (!record) {
             return Response.json(
                 {
                     success: false,
-                    message: "Maintenance record not found",
+                    message:
+                        "Maintenance record not found",
                 },
                 { status: 404 }
             );
