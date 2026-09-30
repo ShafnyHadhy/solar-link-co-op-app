@@ -213,3 +213,30 @@ export async function createMaintenanceDiagnosis(data: {
         );
     }
 }
+
+
+// CESA-206 - Record replaced parts
+export async function updateMaintenanceParts(
+    recordId: string,
+    partsUsed: string
+) {
+    try {
+        const [record] = await db
+            .update(maintenanceRecords)
+            .set({
+                partsUsed,
+            })
+            .where(eq(maintenanceRecords.id, recordId))
+            .returning();
+
+        return record ?? null;
+    } catch (error) {
+        console.error(
+            "Failed to record replaced parts:",
+            error
+        );
+        throw new Error(
+            "Failed to record replaced parts"
+        );
+    }
+}

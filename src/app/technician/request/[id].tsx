@@ -71,6 +71,16 @@ const TicketDetailsScreen = () => {
     const [savingDiagnosis, setSavingDiagnosis] =
         useState(false);
 
+    // CESA-206 - Replaced parts
+    const [maintenanceRecordId, setMaintenanceRecordId] =
+        useState<string | null>(null);
+
+    const [partsUsed, setPartsUsed] =
+        useState("");
+
+    const [savingParts, setSavingParts] =
+        useState(false);
+
     useEffect(() => {
         if (!id) {
             setError("Ticket ID is missing.");
@@ -346,6 +356,8 @@ const TicketDetailsScreen = () => {
             );
 
             const result = await response.json();
+            console.log("CESA-205 STATUS:", response.status);
+            console.log("CESA-205 RESPONSE:", result);
 
             if (!response.ok) {
                 throw new Error(
@@ -354,6 +366,22 @@ const TicketDetailsScreen = () => {
                 );
             }
 
+            const createdRecord =
+                result.data?.record ??
+                result.record ??
+                null;
+
+            if (!createdRecord?.id) {
+                throw new Error(
+                    "Maintenance record ID was not returned"
+                );
+            }
+
+            setMaintenanceRecordId(createdRecord.id);
+            console.log(
+                "MAINTENANCE RECORD ID:",
+                createdRecord.id
+            );
             setDiagnosis("");
 
             Alert.alert(
@@ -374,6 +402,79 @@ const TicketDetailsScreen = () => {
             );
         } finally {
             setSavingDiagnosis(false);
+        }
+    };
+
+    // CESA-206 - Save replaced parts
+    const saveReplacedParts = async () => {
+        if (savingParts) {
+            return;
+        }
+
+        if (!maintenanceRecordId) {
+            Alert.alert(
+                "Diagnosis Required",
+                "Save the diagnosis first before recording replaced parts."
+            );
+            return;
+        }
+
+        const cleanedParts = partsUsed.trim();
+
+        if (!cleanedParts) {
+            Alert.alert(
+                "Parts Required",
+                "Please enter the replaced parts."
+            );
+            return;
+        }
+
+        try {
+            setSavingParts(true);
+
+            const response = await fetch(
+                "/api/maintenance-records",
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        recordId: maintenanceRecordId,
+                        partsUsed: cleanedParts,
+                    }),
+                }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    result.message ??
+                        "Failed to save replaced parts"
+                );
+            }
+
+            setPartsUsed("");
+
+            Alert.alert(
+                "Parts Saved",
+                "The replaced parts have been recorded successfully."
+            );
+        } catch (err) {
+            console.error(
+                "Failed to save replaced parts:",
+                err
+            );
+
+            Alert.alert(
+                "Save Failed",
+                err instanceof Error
+                    ? err.message
+                    : "Failed to save replaced parts"
+            );
+        } finally {
+            setSavingParts(false);
         }
     };
 
@@ -799,6 +900,83 @@ const TicketDetailsScreen = () => {
                                 Save Diagnosis
                             </Text>
                         )}
+                    </Pressable>
+                </View>
+
+                {/* CESA-206 - Record Replaced Parts */}
+                <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
+                    Replaced Parts
+                </Text>
+
+                <View className="rounded-[24px] border border-border bg-card p-5">
+                    <View className="mb-4 flex-row items-center">
+                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-muted">
+                            <Feather
+                                name="tool"
+                                size={18}
+                                color="#6B7280"
+                            />
+                        </View>
+
+                        <View className="ml-3 flex-1">
+                            <Text className="text-sm font-bold text-foreground">
+                                Record Replaced Parts
+                            </Text>
+
+                            <Text className="mt-1 text-xs text-muted-foreground">
+                                Record any components replaced during maintenance.
+                            </Text>
+                        </View>
+                    </View>
+
+                    <TextInput
+                        value={partsUsed}
+                        onChangeText={setPartsUsed}
+                        placeholder="Example: Inverter fuse, DC cable..."
+                        placeholderTextColor="#9CA3AF"
+                        multiline
+                        textAlignVertical="top"
+                        editable={
+                            !savingParts &&
+                            !!maintenanceRecordId
+                        }
+                        className="min-h-[100px] rounded-xl border border-border bg-background p-4 text-sm text-foreground"
+                    />
+
+                    {!maintenanceRecordId && (
+                        <Text className="mt-2 text-xs text-muted-foreground">
+                            Save the diagnosis first to enable replaced parts.
+                        </Text>
+                    )}
+
+                    <Pressable
+                        disabled={
+                            savingParts ||
+                            !partsUsed.trim() ||
+                            !maintenanceRecordId
+                        }
+                        onPress={saveReplacedParts}
+                        className={`mt-4 items-center rounded-xl px-4 py-3 ${
+                            savingParts ||
+                            !partsUsed.trim() ||
+                            !maintenanceRecordId
+                                ? "bg-muted"
+                                : "bg-primary"
+                        }`}
+                    >
+                        <Text
+                            className={`font-bold ${
+                                savingParts ||
+                                !partsUsed.trim() ||
+                                !maintenanceRecordId
+                                    ? "text-muted-foreground"
+                                    : "text-primary-foreground"
+                            }`}
+                        >
+                            {savingParts
+                                ? "Saving..."
+                                : "Save Replaced Parts"}
+                        </Text>
                     </Pressable>
                 </View>
 
