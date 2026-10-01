@@ -6,10 +6,12 @@ import { Redirect, Tabs } from "expo-router";
 import { useColorScheme } from "nativewind";
 import React from "react";
 import { Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabsLayout() {
   useUserSync();
   const { user, isSignedIn, isLoaded } = useUser();
+  const insets = useSafeAreaInsets();
 
   const role = getUserRole(user?.publicMetadata?.role);
 
@@ -17,6 +19,9 @@ export default function TabsLayout() {
   const isDark = colorScheme === "dark";
   const activeColor = isDark ? "#F59E0B" : "#D97706";
   const inactiveColor = isDark ? "#71717A" : "#9CA3AF";
+
+  const bottomPadding = insets.bottom > 0 ? insets.bottom : (Platform.OS === "ios" ? 28 : 12);
+  const tabHeight = 58 + bottomPadding;
 
   if (!isLoaded) {
     return null;
@@ -35,8 +40,8 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: isDark ? "#18181B" : "#FFFFFF",
           borderTopColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
-          height: Platform.OS === "ios" ? 88 : 64,
-          paddingBottom: Platform.OS === "ios" ? 28 : 10,
+          height: tabHeight,
+          paddingBottom: bottomPadding,
           paddingTop: 8,
         },
         tabBarLabelStyle: {
