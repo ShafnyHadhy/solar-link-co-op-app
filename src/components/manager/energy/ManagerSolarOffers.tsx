@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Modal,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useUser } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
+import type { ManagerEnergyRequest } from '@/hooks/manager/useEnergyRequests';
 import {
     useSolarOffers,
     useSolarOfferDetail,
@@ -29,6 +30,38 @@ function formatOfferDate(dateStr: string) {
     } catch {
         return dateStr;
     }
+}
+
+export function isOfferDispatchable(offer: ManagerSolarOffer): boolean {
+    if (offer.status !== 'approved') return false;
+    if (offer.expiresAt) {
+        const expTime = new Date(offer.expiresAt).getTime();
+        if (!isNaN(expTime) && expTime <= Date.now()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+export function formatOfferExpiration(expiresAt: string | null | undefined): { text: string; isExpired: boolean } {
+    if (!expiresAt) {
+        return { text: 'No expiration date', isExpired: false };
+    }
+    const expDate = new Date(expiresAt);
+    if (isNaN(expDate.getTime())) {
+        return { text: 'No expiration date', isExpired: false };
+    }
+    const isExpired = expDate.getTime() <= Date.now();
+    const formatted = expDate.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+    return {
+        text: isExpired ? `Expired (${formatted})` : `Expires: ${formatted}`,
+        isExpired,
+    };
 }
 
 function getStatusBadge(status: ManagerSolarOffer['status']) {
@@ -84,7 +117,7 @@ function getStatusBadge(status: ManagerSolarOffer['status']) {
     }
 }
 
-interface ManagerSolarOffersProps {
+export interface ManagerSolarOffersProps {
     onRefreshTrigger?: () => void;
     offers?: ManagerSolarOffer[];
     loading?: boolean;
@@ -92,6 +125,12 @@ interface ManagerSolarOffersProps {
     refetch?: () => Promise<void>;
     approveOffer?: (offerId: string, managerId?: string) => Promise<ManagerSolarOffer>;
     rejectOffer?: (offerId: string, managerId?: string) => Promise<ManagerSolarOffer>;
+    selectedDispatchRequestId?: string | null;
+    selectedRequest?: ManagerEnergyRequest | null;
+    selectedDispatchOfferId?: string | null;
+    confirmedAllocation?: number | null;
+    onSelectOfferForDispatch?: (offer: ManagerSolarOffer | null) => void;
+    onOpenAllocation?: () => void;
 }
 
 export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
@@ -102,6 +141,12 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
     refetch: propRefetch,
     approveOffer: propApproveOffer,
     rejectOffer: propRejectOffer,
+    selectedDispatchRequestId,
+    selectedRequest,
+    selectedDispatchOfferId: propSelectedDispatchOfferId,
+    confirmedAllocation,
+    onSelectOfferForDispatch,
+    onOpenAllocation,
 }) => {
     const { user } = useUser();
     const internalHook = useSolarOffers({ enabled: propOffers === undefined });
@@ -130,6 +175,30 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
     const [isRejecting, setIsRejecting] = useState(false);
     const [rejectError, setRejectError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+    // Dispatch Selection State (US-12)
+    const [selectedDispatchOfferId, setSelectedDispatchOfferId] = useState<string | null>(
+        propSelectedDispatchOfferId ?? null
+    );
+
+    useEffect(() => {
+        if (propSelectedDispatchOfferId !== undefined) {
+            setSelectedDispatchOfferId(propSelectedDispatchOfferId);
+        }
+    }, [propSelectedDispatchOfferId]);
+
+    const handleSelectOfferForDispatch = (offer: ManagerSolarOffer) => {
+        // Enforce: Only approved, non-expired offers are dispatchable
+        if (!isOfferDispatchable(offer)) return;
+
+        const nextSelectedId = selectedDispatchOfferId === offer.id ? null : offer.id;
+        const nextItem = nextSelectedId ? offer : null;
+
+        setSelectedDispatchOfferId(nextSelectedId);
+        onSelectOfferForDispatch?.(nextItem);
+    };
+
+    const selectedDispatchOffer = offers.find((o) => o.id === selectedDispatchOfferId) || null;
 
     const {
         offer: detailOffer,
@@ -391,6 +460,65 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
                 </View>
             )}
 
+            {/* Target Household Request Info Banner */}
+            {selectedRequest && (
+                <View className='mb-4 rounded-xl border border-primary/40 bg-primary/10 p-3.5 flex-row items-center justify-between shadow-sm'>
+                    <View className='flex-1 mr-2'>
+                        <View className='flex-row items-center gap-1.5 mb-0.5'>
+                            <Feather name="send" size={13} color="#F59E0B" />
+                            <Text className='text-xs font-bold text-foreground'>
+                                Target Request: {selectedRequest.householdName || 'Household Member'}
+                            </Text>
+                        </View>
+                        <Text className='text-xs text-muted-foreground' numberOfLines={1}>
+                            {parseFloat(selectedRequest.requestedEnergyKwh).toFixed(1)} kWh requested • Select an approved solar offer below
+                        </Text>
+                    </View>
+                </View>
+            )}
+
+            {/* Active Solar Offer Selection Banner */}
+            {selectedDispatchOffer && (
+                <View className='mb-4 rounded-xl border border-emerald-500/50 bg-emerald-500/10 p-3.5 flex-row items-center justify-between shadow-sm'>
+                    <View className='flex-1 mr-2'>
+                        <View className='flex-row items-center gap-1.5 mb-0.5'>
+                            <Feather name="check-circle" size={13} color="#10B981" />
+                            <Text className='text-xs font-bold text-foreground'>
+                                Selected Solar Energy Source
+                            </Text>
+                        </View>
+                        <Text className='text-xs text-muted-foreground' numberOfLines={1}>
+                            {selectedDispatchOffer.ownerName || 'Solar Producer'} • {parseFloat(selectedDispatchOffer.energyAmountKwh).toFixed(1)} kWh available
+                        </Text>
+                        {confirmedAllocation !== null && confirmedAllocation !== undefined && (
+                            <Text className='text-xs font-bold text-[#F59E0B] mt-1' numberOfLines={1}>
+                                Allocated Amount: {confirmedAllocation.toFixed(1)} kWh
+                            </Text>
+                        )}
+                    </View>
+                    <View className='flex-col items-end gap-1.5'>
+                        {selectedRequest && onOpenAllocation && (
+                            <Pressable
+                                onPress={onOpenAllocation}
+                                className='px-2.5 py-1.5 rounded-lg bg-primary active:opacity-80'
+                            >
+                                <Text className='text-[11px] font-bold text-primary-foreground'>
+                                    {confirmedAllocation !== null && confirmedAllocation !== undefined ? 'Edit Allocation' : 'Allocate Energy →'}
+                                </Text>
+                            </Pressable>
+                        )}
+                        <Pressable
+                            onPress={() => handleSelectOfferForDispatch(selectedDispatchOffer)}
+                            className='px-2.5 py-1.5 rounded-lg bg-card border border-border/60 active:opacity-75'
+                        >
+                            <Text className='text-[11px] font-bold text-muted-foreground'>
+                                Deselect
+                            </Text>
+                        </Pressable>
+                    </View>
+                </View>
+            )}
+
             {/* Solar Offers List */}
             {!loading && !error && (
                 <View className='flex-col gap-4'>
@@ -400,6 +528,9 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
                         const isApproved = item.status === 'approved';
                         const isCompleted = item.status === 'completed';
                         const isCancelled = item.status === 'cancelled';
+                        const isDispatchable = isOfferDispatchable(item);
+                        const isSelectedForDispatch = selectedDispatchOfferId === item.id;
+                        const expirationInfo = formatOfferExpiration(item.expiresAt);
                         const formattedKwh = parseFloat(item.energyAmountKwh).toFixed(1);
                         const minBattery = item.minimumBatteryPercent
                             ? `${parseFloat(item.minimumBatteryPercent).toFixed(0)}%`
@@ -408,13 +539,17 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
                         return (
                             <View
                                 key={item.id}
-                                className='rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'
+                                className={`rounded-xl border p-4 shadow-sm ${
+                                    isSelectedForDispatch
+                                        ? 'border-emerald-500/80 bg-emerald-500/10'
+                                        : 'border-border/40 bg-secondary/60'
+                                }`}
                             >
                                 {/* Header Row: Owner info & Status Badge */}
                                 <View className='flex-row items-center justify-between mb-3'>
                                     <View className='flex-row items-center gap-3 flex-1 mr-2'>
                                         <View className='h-10 w-10 items-center justify-center rounded-xl bg-card border border-border/60'>
-                                            <Feather name="sun" size={18} color="#F59E0B" />
+                                            <Feather name="sun" size={18} color={isSelectedForDispatch ? "#10B981" : "#F59E0B"} />
                                         </View>
                                         <View className='flex-1'>
                                             <Text className='text-base font-bold text-foreground' numberOfLines={1}>
@@ -426,12 +561,22 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
                                         </View>
                                     </View>
 
-                                    {/* Status Badge */}
-                                    <View className={`flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border ${badge.bg} ${badge.border}`}>
-                                        <Feather name={badge.icon} size={11} color={badge.text.includes('10B981') ? '#10B981' : badge.text.includes('EF4444') ? '#EF4444' : '#F59E0B'} />
-                                        <Text className={`text-[11px] font-bold ${badge.text}`}>
-                                            {badge.label}
-                                        </Text>
+                                    {/* Status Badge + Selected Pill */}
+                                    <View className='flex-row items-center gap-1.5'>
+                                        {isSelectedForDispatch && (
+                                            <View className='flex-row items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/50'>
+                                                <Feather name="check" size={10} color="#10B981" />
+                                                <Text className='text-[10px] font-bold text-[#10B981]'>
+                                                    Selected
+                                                </Text>
+                                            </View>
+                                        )}
+                                        <View className={`flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border ${badge.bg} ${badge.border}`}>
+                                            <Feather name={badge.icon} size={11} color={badge.text.includes('10B981') ? '#10B981' : badge.text.includes('EF4444') ? '#EF4444' : '#F59E0B'} />
+                                            <Text className={`text-[11px] font-bold ${badge.text}`}>
+                                                {badge.label}
+                                            </Text>
+                                        </View>
                                     </View>
                                 </View>
 
@@ -472,6 +617,26 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
                                     </View>
                                 </View>
 
+                                {/* Expiration Info if available */}
+                                {item.expiresAt ? (
+                                    <View className='flex-row items-center gap-1.5 mb-3 px-1'>
+                                        <Feather
+                                            name={expirationInfo.isExpired ? "alert-circle" : "clock"}
+                                            size={12}
+                                            color={expirationInfo.isExpired ? "#EF4444" : "#9CA3AF"}
+                                        />
+                                        <Text
+                                            className={`text-xs ${
+                                                expirationInfo.isExpired
+                                                    ? 'text-red-500 font-semibold'
+                                                    : 'text-muted-foreground'
+                                            }`}
+                                        >
+                                            {expirationInfo.text}
+                                        </Text>
+                                    </View>
+                                ) : null}
+
                                 {/* Bottom Metadata & Action Buttons */}
                                 {isPending ? (
                                     <View className='flex-row items-center justify-between pt-1'>
@@ -504,9 +669,6 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
                                     </View>
                                 ) : isApproved ? (
                                     <View className='flex-row items-center justify-between pt-1'>
-                                        <Text className='text-xs font-semibold text-[#10B981]'>
-                                            Solar allocation approved ({formattedKwh} kWh)
-                                        </Text>
                                         <Pressable
                                             onPress={() => openOfferModal(item.id)}
                                             className='px-3.5 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
@@ -515,6 +677,36 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
                                                 Details
                                             </Text>
                                         </Pressable>
+
+                                        {isDispatchable ? (
+                                            <Pressable
+                                                onPress={() => handleSelectOfferForDispatch(item)}
+                                                className={`flex-row items-center gap-1.5 px-3.5 py-1.5 rounded-lg border shadow-sm active:opacity-80 ${
+                                                    isSelectedForDispatch
+                                                        ? 'bg-emerald-500 border-emerald-600'
+                                                        : 'bg-primary border-primary/40'
+                                                }`}
+                                            >
+                                                <Feather
+                                                    name={isSelectedForDispatch ? "check" : "sun"}
+                                                    size={12}
+                                                    color={isSelectedForDispatch ? "#FFFFFF" : "#000000"}
+                                                />
+                                                <Text
+                                                    className={`text-xs font-bold ${
+                                                        isSelectedForDispatch
+                                                            ? 'text-white'
+                                                            : 'text-primary-foreground'
+                                                    }`}
+                                                >
+                                                    {isSelectedForDispatch ? 'Selected for Dispatch' : 'Select for Dispatch'}
+                                                </Text>
+                                            </Pressable>
+                                        ) : (
+                                            <Text className='text-xs font-semibold text-red-500'>
+                                                Offer expired
+                                            </Text>
+                                        )}
                                     </View>
                                 ) : isCompleted ? (
                                     <View className='flex-row items-center justify-between pt-1'>
@@ -816,6 +1008,57 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
                                                 Approve
                                             </Text>
                                         </Pressable>
+                                    </View>
+                                ) : detailOffer.status === 'approved' ? (
+                                    <View className='flex-row gap-2.5'>
+                                        <Pressable
+                                            onPress={closeOfferModal}
+                                            className='flex-1 py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
+                                        >
+                                            <Text className='text-xs font-bold text-foreground'>
+                                                Close
+                                            </Text>
+                                        </Pressable>
+
+                                        {isOfferDispatchable(detailOffer) ? (
+                                            <Pressable
+                                                onPress={() => {
+                                                    const offerItem = offers.find((o) => o.id === detailOffer.id);
+                                                    if (offerItem) {
+                                                        handleSelectOfferForDispatch(offerItem);
+                                                    }
+                                                    closeOfferModal();
+                                                }}
+                                                className={`flex-1 py-2.5 flex-row items-center justify-center gap-1.5 rounded-xl border shadow-sm active:opacity-80 ${
+                                                    selectedDispatchOfferId === detailOffer.id
+                                                        ? 'bg-emerald-500 border-emerald-600'
+                                                        : 'bg-primary border-primary/40'
+                                                }`}
+                                            >
+                                                <Feather
+                                                    name={selectedDispatchOfferId === detailOffer.id ? "check" : "sun"}
+                                                    size={13}
+                                                    color={selectedDispatchOfferId === detailOffer.id ? "#FFFFFF" : "#000000"}
+                                                />
+                                                <Text
+                                                    className={`text-xs font-bold ${
+                                                        selectedDispatchOfferId === detailOffer.id
+                                                            ? 'text-white'
+                                                            : 'text-primary-foreground'
+                                                    }`}
+                                                >
+                                                    {selectedDispatchOfferId === detailOffer.id
+                                                        ? 'Deselect'
+                                                        : 'Select for Dispatch'}
+                                                </Text>
+                                            </Pressable>
+                                        ) : (
+                                            <View className='flex-1 py-2.5 items-center justify-center rounded-xl bg-red-500/10 border border-red-500/30'>
+                                                <Text className='text-xs font-bold text-red-500'>
+                                                    Offer Expired
+                                                </Text>
+                                            </View>
+                                        )}
                                     </View>
                                 ) : (
                                     <Pressable
