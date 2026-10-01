@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "../db/client";
-import { auditLogs, dispatches, solarOffers, users } from "../db/schema";
 import type { NewSolarOffer } from "../db/schema";
+import { auditLogs, dispatches, energyRequests, notifications, solarOffers, users } from "../db/schema";
 import {
     BadRequestError,
     ForbiddenError,
@@ -19,7 +19,11 @@ export async function createSolarOffer(offer: NewSolarOffer) {
 }
 
 export async function getOffersByOwner(ownerId: string) {
-    return db.select().from(solarOffers).where(eq(solarOffers.ownerId, ownerId));
+    return db
+        .select()
+        .from(solarOffers)
+        .where(eq(solarOffers.ownerId, ownerId))
+        .orderBy(desc(solarOffers.offeredAt));
 }
 
 export async function getOfferById(offerId: string) {
@@ -42,7 +46,82 @@ export async function cancelSolarOffer(offerId: string) {
     return result[0] ?? null;
 }
 
-// ==========================================
+/**
+ * Retrieve completed sharing dispatches for a solar owner.
+ */
+export async function getOwnerSharingHistory(ownerId: string) {
+    const records = await db
+        .select({
+            id: dispatches.id,
+            offerId: solarOffers.id,
+            amountKWh: dispatches.dispatchedEnergyKwh,
+            dispatchedAt: dispatches.dispatchedAt,
+            notes: dispatches.notes,
+            recipientName: users.name,
+            reason: energyRequests.reason,
+        })
+        .from(dispatches)
+        .innerJoin(solarOffers, eq(dispatches.offerId, solarOffers.id))
+        .leftJoin(energyRequests, eq(dispatches.requestId, energyRequests.id))
+        .leftJoin(users, eq(energyRequests.householdId, users.id))
+        .where(eq(solarOffers.ownerId, ownerId))
+        .orderBy(desc(dispatches.dispatchedAt));
+
+    const ratePerKwh = 0.15; // Standard co-op credit rate ($0.15 / kWh)
+
+    return records.map((record) => {
+        const kwh = Number(record.amountKWh || 0);
+        const dateObj = record.dispatchedAt ? new Date(record.dispatchedAt) : new Date();
+
+        return {
+            id: record.id,
+            recipientName: record.recipientName || "Community Member",
+            amountKWh: kwh,
+            creditsEarnedUSD: +(kwh * ratePerKwh).toFixed(2),
+            co2SavedKg: +(kwh * 0.4).toFixed(1),
+            date: dateObj.toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+            }),
+            time: dateObj.toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+            }),
+            type: "request_fulfillment" as const,
+            status: "completed" as const,
+            notes: record.notes,
+        };
+    });
+}
+
+/**
+ * Retrieve aggregated sharing & credit metrics for a solar owner.
+ */
+export async function getOwnerOfferSummary(ownerId: string, ratePerKwh = 0.15) {
+    const history = await getOwnerSharingHistory(ownerId);
+    const offers = await getOffersByOwner(ownerId);
+
+    const totalSharedKWh = history.reduce((sum, h) => sum + h.amountKWh, 0);
+    const totalCreditsEarned = +(totalSharedKWh * ratePerKwh).toFixed(2);
+    const uniqueHouseholdsSupported = new Set(history.map((h) => h.recipientName)).size;
+
+    const pendingCount = offers.filter((o) => o.status === "pending").length;
+    const approvedCount = offers.filter((o) => o.status === "approved").length;
+    const completedCount = offers.filter((o) => o.status === "completed").length;
+
+    return {
+        totalSharedKWh: +totalSharedKWh.toFixed(1),
+        totalCreditsEarned,
+        uniqueHouseholdsSupported,
+        activeOffersCount: pendingCount + approvedCount,
+        pendingCount,
+        approvedCount,
+        completedCount,
+        totalOffersCount: offers.length,
+        ratePerKwh,
+    };
+}
 // MANAGER SOLAR OFFER SERVICES
 // ==========================================
 
@@ -294,6 +373,18 @@ export async function approveSolarOffer(offerId: string, managerId: string) {
         createdAt: now,
     });
 
+    // Notify solar owner of approval
+    const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    await db.insert(notifications).values({
+        id: notifId,
+        userId: existingOffer.ownerId,
+        type: "energy",
+        title: "Sharing Offer Approved",
+        message: `Your ${existingOffer.energyAmountKwh} kWh solar offer has been approved by the co-op manager.`,
+        isRead: false,
+        createdAt: now,
+    });
+
     return getSolarOfferById(offerId);
 }
 
@@ -365,6 +456,18 @@ export async function rejectSolarOffer(offerId: string, managerId: string) {
             managerName: manager.name,
             rejectedAt: now.toISOString(),
         }),
+        createdAt: now,
+    });
+
+    // Notify solar owner of rejection
+    const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    await db.insert(notifications).values({
+        id: notifId,
+        userId: existingOffer.ownerId,
+        type: "energy",
+        title: "Sharing Offer Rejected",
+        message: `Your ${existingOffer.energyAmountKwh} kWh solar offer was rejected by the co-op manager.`,
+        isRead: false,
         createdAt: now,
     });
 
