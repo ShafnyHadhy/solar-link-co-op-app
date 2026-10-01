@@ -7,6 +7,8 @@ export interface ManagerSolarOffer {
     ownerName: string | null;
     ownerEmail: string | null;
     energyAmountKwh: string;
+    totalDispatchedKwh?: number;
+    remainingEnergyKwh?: number;
     minimumBatteryPercent: string | null;
     status: "pending" | "approved" | "rejected" | "completed" | "cancelled";
     offeredAt: string;
