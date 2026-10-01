@@ -1,68 +1,61 @@
 import TabScreenBackground from "@/components/shared/TabScreenBackground";
+import { useHouseholdEnergyRequests } from "@/hooks/household/useHouseholdEnergyRequests";
+import { useUser } from "@clerk/expo";
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from 'expo-router';
-import { useColorScheme } from 'nativewind';
+import { useRouter } from "expo-router";
+import { useColorScheme } from "nativewind";
 import React from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 
 const HouseholdDashboard = () => {
   const { colorScheme } = useColorScheme();
   const router = useRouter();
-  const isDark = colorScheme === 'dark';
+  const isDark = colorScheme === "dark";
+  const { user } = useUser();
 
-  // Theme-based colors
-  const theme = {
-    background: isDark ? 'bg-background' : 'bg-gray-50',
-    text: isDark ? 'text-white' : 'text-gray-900',
-    textSecondary: isDark ? 'text-zinc-300' : 'text-gray-600',
-    textMuted: isDark ? 'text-zinc-400' : 'text-gray-500',
-    textLight: isDark ? 'text-zinc-400' : 'text-gray-400',
-    card: isDark ? 'bg-black/30' : 'bg-white',
-    cardBorder: isDark ? 'border-white/10' : 'border-gray-200',
-    heroCard: isDark ? '#334155' : '#E5E7EB',
-    heroText: isDark ? 'text-white' : 'text-gray-900',
-    heroSubText: isDark ? 'text-slate-300' : 'text-gray-600',
-    iconBg: isDark ? 'bg-white/10' : 'bg-gray-200',
-    badgeBg: isDark ? 'bg-white/5' : 'bg-gray-100',
-    statCard: isDark ? 'bg-black/30' : 'bg-white',
-    statBorder: isDark ? 'border-white/10' : 'border-gray-200',
-    quickActionBg: isDark ? 'bg-black/30' : 'bg-white',
-    quickActionBorder: isDark ? 'border-white/10' : 'border-gray-200',
-    activityBg: isDark ? 'bg-black/30' : 'bg-white',
-    activityBorder: isDark ? 'border-white/10' : 'border-gray-100',
-    alertBg: isDark ? 'bg-black/30' : 'bg-white',
-    alertBorder: isDark ? 'border-white/10' : 'border-gray-200',
-  };
+  const {
+    stats,
+    requests,
+    loading: isLoadingStats,
+  } = useHouseholdEnergyRequests();
+  const pendingRequests = requests.filter(
+    (request) => request.status === "pending",
+  );
+  const approvedRequests = requests.filter(
+    (request) =>
+      request.status === "approved" || request.status === "fulfilled",
+  );
 
-  // Navigation handlers
-  const handleRequestSolarPower = () => {
-    router.push('/(tabs)/energy');
-    console.log('Navigating to Energy page from Hero Card');
-  };
+  const firstName = user?.firstName || user?.fullName?.split(" ")[0] || "there";
 
-  const handleQuickActionRequest = () => {
-    router.push('/(tabs)/energy');
-    console.log('Navigating to Energy page from Quick Action');
-  };
+  // Theme
+  const bg = isDark ? "bg-background" : "bg-gray-50";
+  const text = isDark ? "text-white" : "text-gray-900";
+  const textSecondary = isDark ? "text-zinc-300" : "text-gray-600";
+  const textMuted = isDark ? "text-zinc-400" : "text-gray-500";
+  const textLight = isDark ? "text-zinc-400" : "text-gray-400";
+  const card = isDark
+    ? "bg-black/30 border-white/10"
+    : "bg-white border-gray-200";
+  const iconBg = isDark ? "bg-white/10" : "bg-gray-200";
+  const quickActionBg = isDark
+    ? "bg-black/30 border-white/10"
+    : "bg-white border-gray-200";
 
-  const handleReports = () => {
-    router.push('/(tabs)/saving');
-    console.log('Navigating to Savings page');
-  };
-
-  const handleMembers = () => {
-    // Navigate to members page (create if needed)
-    console.log('Navigate to Members page');
-  };
-
-  const handleNotification = () => {
-    // Navigate to notifications (create if needed)
-    console.log('Navigate to Notifications');
-  };
+  const allocation = stats?.monthlyAllocationKwh ?? 0;
+  const approvedKwh = stats?.approvedKwh ?? 0;
+  const remaining = Math.max(allocation - approvedKwh, 0);
+  const pendingCount = pendingRequests.length;
 
   return (
     <ScrollView
-      className={`flex-1 ${theme.background}`}
+      className={`flex-1 ${bg}`}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{
         paddingHorizontal: 20,
@@ -75,181 +68,336 @@ const HouseholdDashboard = () => {
       {/* Header */}
       <View className="flex-row items-center justify-between mb-8">
         <View>
-          <Text className={`text-4xl font-bold ${theme.text}`}>
-            Hello, Shyamika
+          <Text className={`text-4xl font-bold ${text}`}>
+            Hello, {firstName}
           </Text>
-          <Text className={`mt-1 text-base ${theme.textSecondary}`}>
+          <Text className={`mt-1 text-base ${textSecondary}`}>
             Welcome back to SolarLink
           </Text>
         </View>
 
         <View className="mr-16">
-          <Pressable 
-            onPress={handleNotification}
+          <Pressable
             className={`h-12 w-12 rounded-full items-center justify-center ${
-              isDark 
-                ? 'bg-black/30 border border-white/10' 
-                : 'bg-gray-200 border border-gray-300'
+              isDark
+                ? "bg-black/30 border border-white/10"
+                : "bg-gray-200 border border-gray-300"
             }`}
           >
-            <Feather name="bell" size={28} color={isDark ? 'white' : '#374151'} />
+            <Feather
+              name="bell"
+              size={22}
+              color={isDark ? "white" : "#374151"}
+            />
           </Pressable>
         </View>
       </View>
 
-      {/* Hero Card - Request Solar Power */}
+      {/* Hero Card */}
       <Pressable
-        onPress={handleRequestSolarPower}
+        onPress={() => router.push("/(tabs)/energy")}
         className="rounded-3xl p-5 mb-8"
-        style={{
-          backgroundColor: isDark ? '#334155' : '#E5E7EB',
-        }}
+        style={{ backgroundColor: isDark ? "#334155" : "#1F2937" }}
       >
         <View className="flex-row items-center justify-between">
-          <View>
-            <Text className={`text-xl font-bold ${theme.heroText}`}>
+          <View className="flex-1">
+            <Text className="text-xl font-bold text-white">
               Request Solar Power
             </Text>
-            <Text className={`mt-1 ${theme.heroSubText}`}>
+            <Text className="mt-1 text-slate-300 text-sm">
               Submit a new energy request
             </Text>
+
+            {/* Allocation pill */}
+            {stats && (
+              <View className="mt-3 flex-row items-center self-start bg-white/10 rounded-full px-3 py-1.5">
+                <Feather name="zap" size={12} color="#FBBF24" />
+                <Text className="text-white text-xs font-semibold ml-1.5">
+                  {remaining.toFixed(0)} kWh remaining this month
+                </Text>
+              </View>
+            )}
           </View>
 
-          <View className={`h-14 w-14 rounded-full items-center justify-center ${
-            isDark ? 'bg-white/10' : 'bg-gray-300'
-          }`}>
-            <Feather name="plus" size={28} color={isDark ? 'white' : '#374151'} />
+          <View className="h-14 w-14 rounded-full bg-white/10 items-center justify-center">
+            <Feather name="plus" size={28} color="white" />
           </View>
         </View>
       </Pressable>
 
-      {/* Attention Section */}
-      <Text className={`text-2xl font-bold mb-4 ${theme.text}`}>
-        Needs Attention
-      </Text>
-
-      <View className={`rounded-3xl overflow-hidden mb-8 ${theme.alertBg} border ${theme.alertBorder}`}>
-        <View className={`flex-row items-center p-4 border-b ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
-          <Feather name="alert-triangle" size={20} color="#FBBF24" />
-          <Text className={`ml-3 flex-1 ${theme.text}`}>
-            Shared energy availability is low
-          </Text>
-        </View>
-
-        <View className="flex-row items-center p-4">
-          <Feather name="alert-triangle" size={20} color="#FBBF24" />
-          <Text className={`ml-3 flex-1 ${theme.text}`}>
-            Energy allocation may be affected
-          </Text>
-        </View>
-      </View>
-
       {/* Stats */}
       <View className="flex-row justify-between mb-8">
-        <View className={`w-[48%] rounded-3xl p-5 border ${theme.statBorder} ${theme.statCard}`}>
+        {/* Available/Allocated Energy */}
+        <View className={`w-[48%] rounded-3xl p-5 border ${card}`}>
           <View className="h-12 w-12 rounded-xl bg-yellow-500/10 items-center justify-center mb-4">
-            <Feather name="zap" size={20} color="#FBBF24" />
+            <Feather name="battery-charging" size={20} color="#FBBF24" />
           </View>
 
-          <Text className={`text-sm ${theme.textLight}`}>Available Energy</Text>
-          <Text className={`text-3xl font-bold mt-1 ${theme.text}`}>142</Text>
-          <Text className={`${theme.textLight}`}>kWh</Text>
-          <Text className="text-green-400 text-xs mt-2">+12% this week</Text>
+          <Text className={`text-sm ${textLight}`}>Monthly Allocation</Text>
+          {isLoadingStats && !stats ? (
+            <ActivityIndicator
+              size="small"
+              color="#FBBF24"
+              style={{ marginTop: 8 }}
+            />
+          ) : (
+            <>
+              <Text className={`text-3xl font-bold mt-1 ${text}`}>
+                {allocation}
+              </Text>
+              <Text className={`${textLight}`}>kWh</Text>
+              <Text
+                className={`text-xs mt-2 ${remaining > 0 ? "text-green-400" : "text-red-400"}`}
+              >
+                {remaining.toFixed(1)} kWh remaining
+              </Text>
+            </>
+          )}
         </View>
 
-        <View className={`w-[48%] rounded-3xl p-5 border ${theme.statBorder} ${theme.statCard}`}>
+        {/* Pending Requests */}
+        <View className={`w-[48%] rounded-3xl p-5 border ${card}`}>
           <View className="h-12 w-12 rounded-xl bg-blue-500/10 items-center justify-center mb-4">
             <Feather name="clock" size={20} color="#60A5FA" />
           </View>
 
-          <Text className={`text-sm ${theme.textLight}`}>Pending Requests</Text>
-          <Text className={`text-3xl font-bold mt-1 ${theme.text}`}>2</Text>
-          <Text className={`${theme.textLight}`}>Active</Text>
-          <Text className="text-yellow-400 text-xs mt-2">1 awaiting approval</Text>
+          <Text className={`text-sm ${textLight}`}>Pending Requests</Text>
+          {isLoadingStats && !stats ? (
+            <ActivityIndicator
+              size="small"
+              color="#60A5FA"
+              style={{ marginTop: 8 }}
+            />
+          ) : (
+            <>
+              <Text className={`text-3xl font-bold mt-1 ${text}`}>
+                {pendingCount}
+              </Text>
+              <Text className={`${textLight}`}>Active</Text>
+              <Text
+                className={`text-xs mt-2 ${pendingCount > 0 ? "text-yellow-400" : "text-green-400"}`}
+              >
+                {pendingCount > 0
+                  ? `${pendingCount} awaiting approval`
+                  : "All clear"}
+              </Text>
+            </>
+          )}
         </View>
       </View>
 
+      {/* Energy Mix Overview */}
+      {stats && (
+        <Pressable
+          onPress={() => router.push("/(tabs)/saving")}
+          className={`rounded-3xl p-4 mb-8 border ${card}`}
+        >
+          <View className="flex-row items-center justify-between mb-2.5">
+            <View className="flex-row items-center">
+              <View className="h-8 w-8 rounded-xl bg-emerald-500/15 items-center justify-center mr-2.5">
+                <Feather name="zap" size={16} color="#34D399" />
+              </View>
+              <View>
+                <Text className={`font-semibold text-sm ${text}`}>
+                  Energy Source Mix
+                </Text>
+                <Text className={`text-xs ${textMuted}`}>
+                  {stats.cleanEnergyUsedKwh} kWh solar (
+                  {stats.cleanEnergySharePercent}%) ·{" "}
+                  {stats.gridFallbackUsedKwh} kWh grid fallback
+                </Text>
+              </View>
+            </View>
+            <Feather
+              name="chevron-right"
+              size={16}
+              color={isDark ? "#71717A" : "#9CA3AF"}
+            />
+          </View>
+
+          {/* Micro split progress bar */}
+          <View
+            className={`h-2 rounded-full overflow-hidden flex-row ${isDark ? "bg-white/10" : "bg-gray-100"}`}
+          >
+            <View
+              style={{ width: `${stats.cleanEnergySharePercent}%` }}
+              className="h-full bg-emerald-400"
+            />
+            <View
+              style={{ width: `${stats.gridFallbackSharePercent}%` }}
+              className="h-full bg-red-400/80"
+            />
+          </View>
+        </Pressable>
+      )}
+
+      {/* Needs Attention — only shown when there are pending requests */}
+      {pendingCount > 0 && (
+        <>
+          <Text className={`text-2xl font-bold mb-4 ${text}`}>
+            Needs Attention
+          </Text>
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: "/(tabs)/energy",
+                params: { tab: "pending" },
+              })
+            }
+            className={`rounded-3xl overflow-hidden mb-8 border ${card}`}
+          >
+            <View className={`flex-row items-center p-4`}>
+              <Feather name="alert-circle" size={20} color="#FBBF24" />
+              <View className="flex-1 ml-3">
+                <Text className={`font-semibold ${text}`}>
+                  {pendingCount} request{pendingCount > 1 ? "s" : ""} awaiting
+                  review
+                </Text>
+                <Text className={`text-xs mt-0.5 ${textMuted}`}>
+                  Tap to view pending energy requests
+                </Text>
+              </View>
+              <Feather
+                name="chevron-right"
+                size={16}
+                color={isDark ? "#71717A" : "#9CA3AF"}
+              />
+            </View>
+          </Pressable>
+        </>
+      )}
+
       {/* Quick Actions */}
-      <Text className={`text-2xl font-bold mb-4 ${theme.text}`}>Quick Actions</Text>
+      <Text className={`text-2xl font-bold mb-4 ${text}`}>Quick Actions</Text>
 
       <View className="flex-row justify-between mb-8">
-        <Pressable 
-          onPress={handleQuickActionRequest}
-          className={`w-[31%] rounded-2xl py-5 items-center border ${theme.quickActionBorder} ${theme.quickActionBg}`}
+        <Pressable
+          onPress={() => router.push("/(tabs)/energy")}
+          className={`w-[31%] rounded-2xl py-5 items-center border ${quickActionBg}`}
         >
           <Feather name="plus-circle" size={24} color="#FBBF24" />
-          <Text className={`text-xs mt-2 ${theme.text}`}>Request</Text>
+          <Text className={`text-xs mt-2 ${text}`}>Request</Text>
         </Pressable>
 
-        <Pressable 
-          onPress={handleReports}
-          className={`w-[31%] rounded-2xl py-5 items-center border ${theme.quickActionBorder} ${theme.quickActionBg}`}
+        <Pressable
+          onPress={() => router.push("/(tabs)/saving")}
+          className={`w-[31%] rounded-2xl py-5 items-center border ${quickActionBg}`}
         >
-          <Feather name="file-text" size={24} color="#60A5FA" />
-          <Text className={`text-xs mt-2 ${theme.text}`}>Reports</Text>
+          <Feather name="trending-up" size={24} color="#60A5FA" />
+          <Text className={`text-xs mt-2 ${text}`}>Savings</Text>
         </Pressable>
 
-        <Pressable 
-          onPress={handleMembers}
-          className={`w-[31%] rounded-2xl py-5 items-center border ${theme.quickActionBorder} ${theme.quickActionBg}`}
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: "/(tabs)/energy",
+              params: { tab: "requests" },
+            })
+          }
+          className={`w-[31%] rounded-2xl py-5 items-center border ${quickActionBg}`}
         >
-          <Feather name="users" size={24} color="#22C55E" />
-          <Text className={`text-xs mt-2 ${theme.text}`}>Members</Text>
+          <Feather name="list" size={24} color="#22C55E" />
+          <Text className={`text-xs mt-2 ${text}`}>History</Text>
         </Pressable>
       </View>
 
-      {/* Recent Activity Header */}
+      {/* Recent Activity */}
       <View className="flex-row justify-between items-center mb-4">
-        <Text className={`text-2xl font-bold ${theme.text}`}>Recent Activity</Text>
-        <Pressable>
+        <Text className={`text-2xl font-bold ${text}`}>Recent Activity</Text>
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: "/(tabs)/energy",
+              params: { tab: "requests" },
+            })
+          }
+        >
           <Text className="text-yellow-400 font-semibold">View All</Text>
         </Pressable>
       </View>
 
-      {/* Activity List */}
-      <View className={`rounded-3xl overflow-hidden border ${theme.activityBorder} ${theme.activityBg}`}>
-        <View className={`flex-row items-center px-4 py-4 border-b ${isDark ? 'border-white/10' : 'border-gray-100'}`}>
-          <View className="h-10 w-10 rounded-full bg-green-500/20 items-center justify-center">
-            <Feather name="check" size={18} color="#22C55E" />
-          </View>
-
-          <View className="flex-1 ml-3">
-            <Text className={`font-semibold ${theme.text}`}>Request Approved</Text>
-            <Text className={`text-xs ${theme.textLight}`}>
-              Sunny Valley Farm • 20 kWh
+      <View className={`rounded-3xl overflow-hidden border ${card}`}>
+        {/* Approved requests */}
+        {approvedRequests.slice(0, 2).map((req, idx) => (
+          <View
+            key={req.id}
+            className={`flex-row items-center px-4 py-4 ${
+              idx < Math.min(approvedRequests.length, 2) - 1 ||
+              pendingRequests.length > 0
+                ? `border-b ${isDark ? "border-white/8" : "border-gray-100"}`
+                : ""
+            }`}
+          >
+            <View className="h-10 w-10 rounded-full bg-green-500/20 items-center justify-center">
+              <Feather name="check" size={18} color="#22C55E" />
+            </View>
+            <View className="flex-1 ml-3">
+              <Text className={`font-semibold ${text}`}>Request Approved</Text>
+              <Text className={`text-xs ${textLight}`}>
+                {parseFloat(req.requestedEnergyKwh).toFixed(1)} kWh •{" "}
+                {req.reason || "Energy request"}
+              </Text>
+            </View>
+            <Text className={`text-xs ${textLight}`}>
+              {new Date(req.requestedAt).toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "short",
+              })}
             </Text>
           </View>
+        ))}
 
-          <Text className={`text-xs ${theme.textLight}`}>2h ago</Text>
-        </View>
-
-        <View className={`flex-row items-center px-4 py-4 border-b ${isDark ? 'border-white/10' : 'border-gray-100'}`}>
-          <View className="h-10 w-10 rounded-full bg-blue-500/20 items-center justify-center">
-            <Feather name="calendar" size={18} color="#60A5FA" />
-          </View>
-
-          <View className="flex-1 ml-3">
-            <Text className={`font-semibold ${theme.text}`}>Payment Due</Text>
-            <Text className={`text-xs ${theme.textLight}`}>Cycle ending Sept 30</Text>
-          </View>
-
-          <Text className={`text-xs ${theme.textLight}`}>5h ago</Text>
-        </View>
-
-        <View className="flex-row items-center px-4 py-4">
-          <View className="h-10 w-10 rounded-full bg-yellow-500/20 items-center justify-center">
-            <Feather name="zap" size={18} color="#FBBF24" />
-          </View>
-
-          <View className="flex-1 ml-3">
-            <Text className={`font-semibold ${theme.text}`}>New Provider Nearby</Text>
-            <Text className={`text-xs ${theme.textLight}`}>
-              EcoGrid Collective joined
+        {/* Pending requests */}
+        {pendingRequests.slice(0, 2).map((req, idx) => (
+          <View
+            key={req.id}
+            className={`flex-row items-center px-4 py-4 ${
+              idx < Math.min(pendingRequests.length, 2) - 1
+                ? `border-b ${isDark ? "border-white/8" : "border-gray-100"}`
+                : ""
+            }`}
+          >
+            <View className="h-10 w-10 rounded-full bg-yellow-500/20 items-center justify-center">
+              <Feather name="clock" size={18} color="#FBBF24" />
+            </View>
+            <View className="flex-1 ml-3">
+              <Text className={`font-semibold ${text}`}>Request Pending</Text>
+              <Text className={`text-xs ${textLight}`}>
+                {parseFloat(req.requestedEnergyKwh).toFixed(1)} kWh • Awaiting
+                review
+              </Text>
+            </View>
+            <Text className={`text-xs ${textLight}`}>
+              {new Date(req.requestedAt).toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "short",
+              })}
             </Text>
           </View>
+        ))}
 
-          <Text className={`text-xs ${theme.textLight}`}>Yesterday</Text>
-        </View>
+        {/* Empty state */}
+        {approvedRequests.length === 0 && pendingRequests.length === 0 && (
+          <View className="flex-row items-center px-4 py-4">
+            <View
+              className={`h-10 w-10 rounded-full ${iconBg} items-center justify-center`}
+            >
+              <Feather
+                name="inbox"
+                size={18}
+                color={isDark ? "#71717A" : "#9CA3AF"}
+              />
+            </View>
+            <View className="flex-1 ml-3">
+              <Text className={`font-semibold ${text}`}>
+                No recent activity
+              </Text>
+              <Text className={`text-xs ${textLight}`}>
+                Submit your first energy request
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
     </ScrollView>
   );
