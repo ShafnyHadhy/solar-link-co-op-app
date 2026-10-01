@@ -66,14 +66,14 @@ export function validateAllocationAmount(
     if (num > requestedKwh) {
         return {
             isValid: false,
-            error: `Allocation amount (${num.toFixed(1)} kWh) cannot exceed requested energy (${requestedKwh.toFixed(1)} kWh)`,
+            error: `Allocation amount (${num.toFixed(1)} kWh) cannot exceed remaining requested energy (${requestedKwh.toFixed(1)} kWh)`,
         };
     }
 
     if (num > availableOfferKwh) {
         return {
             isValid: false,
-            error: `Allocation amount (${num.toFixed(1)} kWh) cannot exceed available solar offer (${availableOfferKwh.toFixed(1)} kWh)`,
+            error: `Allocation amount (${num.toFixed(1)} kWh) cannot exceed remaining available solar offer (${availableOfferKwh.toFixed(1)} kWh)`,
         };
     }
 
@@ -194,8 +194,13 @@ export const ManagerEnergyRequests: React.FC<ManagerEnergyRequestsProps> = ({
     }, [propAllocationAmount]);
 
     const handleSelectRequestForDispatch = (request: ManagerEnergyRequest) => {
-        // Enforce: Only approved requests can be selected for dispatch
+        // Enforce: Only approved requests with remaining needed energy can be selected for dispatch
         if (request.status !== 'approved') return;
+        const totalReq = parseFloat(request.requestedEnergyKwh) || 0;
+        const rem = request.remainingEnergyKwh !== undefined
+            ? request.remainingEnergyKwh
+            : Math.max(0, totalReq - (request.totalDispatchedKwh || 0));
+        if (rem <= 0.001) return;
 
         const nextSelectedId = selectedDispatchRequestId === request.id ? null : request.id;
         const nextItem = nextSelectedId ? request : null;
@@ -297,8 +302,20 @@ export const ManagerEnergyRequests: React.FC<ManagerEnergyRequestsProps> = ({
     const selectedDispatchItem = requests.find((r) => r.id === selectedDispatchRequestId) || null;
     const selectedDispatchOffer = offers.find((o) => o.id === selectedDispatchOfferId) || null;
 
-    const requestedKwh = selectedDispatchItem ? parseFloat(selectedDispatchItem.requestedEnergyKwh) : 0;
-    const availableOfferKwh = selectedDispatchOffer ? parseFloat(selectedDispatchOffer.energyAmountKwh) : 0;
+    const totalRequestedKwh = selectedDispatchItem ? parseFloat(selectedDispatchItem.requestedEnergyKwh) : 0;
+    const requestedKwh = selectedDispatchItem
+        ? (selectedDispatchItem.remainingEnergyKwh !== undefined
+            ? selectedDispatchItem.remainingEnergyKwh
+            : Math.max(0, totalRequestedKwh - (selectedDispatchItem.totalDispatchedKwh || 0)))
+        : 0;
+
+    const totalOfferKwh = selectedDispatchOffer ? parseFloat(selectedDispatchOffer.energyAmountKwh) : 0;
+    const availableOfferKwh = selectedDispatchOffer
+        ? (selectedDispatchOffer.remainingEnergyKwh !== undefined
+            ? selectedDispatchOffer.remainingEnergyKwh
+            : Math.max(0, totalOfferKwh - (selectedDispatchOffer.totalDispatchedKwh || 0)))
+        : 0;
+
     const maxAllocatableKwh = Math.min(requestedKwh, availableOfferKwh);
     const enteredAmountNumeric = parseFloat(allocationAmount) || 0;
 
@@ -743,11 +760,11 @@ export const ManagerEnergyRequests: React.FC<ManagerEnergyRequestsProps> = ({
                                 </Text>
                             </View>
                             <Text className='text-xs text-muted-foreground' numberOfLines={1}>
-                                {selectedDispatchItem.householdName || 'Household Member'} • {parseFloat(selectedDispatchItem.requestedEnergyKwh).toFixed(1)} kWh requested
+                                {selectedDispatchItem.householdName || 'Household Member'} • {requestedKwh.toFixed(1)} kWh remaining needed ({parseFloat(selectedDispatchItem.requestedEnergyKwh).toFixed(1)} kWh total request)
                             </Text>
                             {selectedDispatchOffer && (
                                 <Text className='text-xs font-semibold text-emerald-500 mt-1' numberOfLines={1}>
-                                    Paired Solar: {selectedDispatchOffer.ownerName || 'Solar Producer'} ({parseFloat(selectedDispatchOffer.energyAmountKwh).toFixed(1)} kWh)
+                                    Paired Solar: {selectedDispatchOffer.ownerName || 'Solar Producer'} ({availableOfferKwh.toFixed(1)} kWh remaining available)
                                 </Text>
                             )}
                             {confirmedAllocation !== null && (
@@ -819,8 +836,16 @@ export const ManagerEnergyRequests: React.FC<ManagerEnergyRequestsProps> = ({
                         {filteredRequests.map((item) => {
                             const isPending = item.status === 'pending';
                             const isApproved = item.status === 'approved';
+                            const isFulfilled = item.status === 'fulfilled';
                             const isSelectedForDispatch = selectedDispatchRequestId === item.id;
-                            const formattedKwh = parseFloat(item.requestedEnergyKwh).toFixed(1);
+                            const totalReqKwh = parseFloat(item.requestedEnergyKwh) || 0;
+                            const totalDispKwh = item.totalDispatchedKwh ?? 0;
+                            const remainingKwh = item.remainingEnergyKwh !== undefined
+                                ? item.remainingEnergyKwh
+                                : Math.max(0, totalReqKwh - totalDispKwh);
+                            const isPartiallyDispatched = isApproved && totalDispKwh > 0;
+                            const isFullyFulfilled = (isApproved && remainingKwh <= 0.001) || isFulfilled;
+                            const formattedKwh = totalReqKwh.toFixed(1);
 
                             return (
                                 <View
@@ -881,12 +906,17 @@ export const ManagerEnergyRequests: React.FC<ManagerEnergyRequestsProps> = ({
                                     <View className='rounded-xl bg-card/70 border border-border/30 p-3 mb-3'>
                                         <View className='flex-row items-center justify-between mb-1.5'>
                                             <Text className='text-[11px] font-semibold text-muted-foreground'>
-                                                Requested Energy
+                                                {isApproved ? 'Remaining Needed' : 'Requested Energy'}
                                             </Text>
-                                            <Text className='text-base font-extrabold text-foreground'>
-                                                {formattedKwh} <Text className='text-[11px] font-bold text-muted-foreground'>kWh</Text>
+                                            <Text className={`text-base font-extrabold ${isApproved ? (remainingKwh > 0 ? 'text-foreground' : 'text-zinc-400') : 'text-foreground'}`}>
+                                                {isApproved ? remainingKwh.toFixed(1) : formattedKwh} <Text className='text-[11px] font-bold text-muted-foreground'>kWh</Text>
                                             </Text>
                                         </View>
+                                        {isPartiallyDispatched && (
+                                            <Text className='text-[10px] text-muted-foreground mb-1'>
+                                                {totalDispKwh.toFixed(1)} / {formattedKwh} kWh fulfilled
+                                            </Text>
+                                        )}
 
                                         {item.reason && (
                                             <View className='border-t border-border/30 pt-2 mt-1'>
@@ -938,29 +968,37 @@ export const ManagerEnergyRequests: React.FC<ManagerEnergyRequestsProps> = ({
                                                 </Text>
                                             </Pressable>
 
-                                            <Pressable
-                                                onPress={() => handleSelectRequestForDispatch(item)}
-                                                className={`flex-row items-center gap-1.5 px-3.5 py-1.5 rounded-lg border shadow-sm active:opacity-80 ${
-                                                    isSelectedForDispatch
-                                                        ? 'bg-emerald-500 border-emerald-600'
-                                                        : 'bg-primary border-primary/40'
-                                                }`}
-                                            >
-                                                <Feather
-                                                    name={isSelectedForDispatch ? "check" : "send"}
-                                                    size={12}
-                                                    color={isSelectedForDispatch ? "#FFFFFF" : "#000000"}
-                                                />
-                                                <Text
-                                                    className={`text-xs font-bold ${
+                                            {!isFullyFulfilled ? (
+                                                <Pressable
+                                                    onPress={() => handleSelectRequestForDispatch(item)}
+                                                    className={`flex-row items-center gap-1.5 px-3.5 py-1.5 rounded-lg border shadow-sm active:opacity-80 ${
                                                         isSelectedForDispatch
-                                                            ? 'text-white'
-                                                            : 'text-primary-foreground'
+                                                            ? 'bg-emerald-500 border-emerald-600'
+                                                            : 'bg-primary border-primary/40'
                                                     }`}
                                                 >
-                                                    {isSelectedForDispatch ? 'Selected for Dispatch' : 'Select for Dispatch'}
-                                                </Text>
-                                            </Pressable>
+                                                    <Feather
+                                                        name={isSelectedForDispatch ? "check" : "send"}
+                                                        size={12}
+                                                        color={isSelectedForDispatch ? "#FFFFFF" : "#000000"}
+                                                    />
+                                                    <Text
+                                                        className={`text-xs font-bold ${
+                                                            isSelectedForDispatch
+                                                                ? 'text-white'
+                                                                : 'text-primary-foreground'
+                                                        }`}
+                                                    >
+                                                        {isSelectedForDispatch ? 'Selected for Dispatch' : 'Select for Dispatch'}
+                                                    </Text>
+                                                </Pressable>
+                                            ) : (
+                                                <View className='px-3 py-1.5 rounded-lg bg-secondary/80 border border-border/80'>
+                                                    <Text className='text-xs font-bold text-muted-foreground'>
+                                                        Fully Fulfilled
+                                                    </Text>
+                                                </View>
+                                            )}
                                         </View>
                                     ) : (
                                         <View className='flex-row items-center justify-between pt-1'>
@@ -1534,11 +1572,16 @@ export const ManagerEnergyRequests: React.FC<ManagerEnergyRequestsProps> = ({
                                 </View>
                                 <View className='items-end'>
                                     <Text className='text-[10px] font-bold text-muted-foreground uppercase tracking-wider'>
-                                        Requested
+                                        Remaining Needed
                                     </Text>
                                     <Text className='text-xs font-extrabold text-foreground mt-0.5'>
                                         {requestedKwh.toFixed(1)} <Text className='text-[10px] font-semibold text-muted-foreground'>kWh</Text>
                                     </Text>
+                                    {(selectedDispatchItem?.totalDispatchedKwh ?? 0) > 0 && (
+                                        <Text className='text-[9px] text-muted-foreground'>
+                                            ({(selectedDispatchItem?.totalDispatchedKwh ?? 0).toFixed(1)} / {totalRequestedKwh.toFixed(1)} kWh fulfilled)
+                                        </Text>
+                                    )}
                                 </View>
                             </View>
 
@@ -1553,20 +1596,25 @@ export const ManagerEnergyRequests: React.FC<ManagerEnergyRequestsProps> = ({
                                 </View>
                                 <View className='items-end'>
                                     <Text className='text-[10px] font-bold text-muted-foreground uppercase tracking-wider'>
-                                        Available
+                                        Available Remaining
                                     </Text>
-                                    <Text className='text-xs font-extrabold text-foreground mt-0.5'>
+                                    <Text className='text-xs font-extrabold text-[#10B981] mt-0.5'>
                                         {availableOfferKwh.toFixed(1)} <Text className='text-[10px] font-semibold text-muted-foreground'>kWh</Text>
                                     </Text>
+                                    {(selectedDispatchOffer?.totalDispatchedKwh ?? 0) > 0 && (
+                                        <Text className='text-[9px] text-muted-foreground'>
+                                            ({(selectedDispatchOffer?.totalDispatchedKwh ?? 0).toFixed(1)} / {totalOfferKwh.toFixed(1)} kWh allocated)
+                                        </Text>
+                                    )}
                                 </View>
                             </View>
                         </View>
 
-                        {/* 3-Stat Comparison Grid: Requested vs Available vs Max Allowable */}
+                        {/* 3-Stat Comparison Grid: Needed vs Available vs Max Allowable */}
                         <View className='flex-row gap-2 mb-4'>
                             <View className='flex-1 bg-secondary/40 rounded-xl p-2.5 border border-border/30 items-center'>
                                 <Text className='text-[10px] font-semibold text-muted-foreground'>
-                                    Requested
+                                    Needed
                                 </Text>
                                 <Text className='text-sm font-extrabold text-foreground mt-1'>
                                     {requestedKwh.toFixed(1)}

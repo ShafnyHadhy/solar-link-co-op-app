@@ -32,6 +32,14 @@ function formatOfferDate(dateStr: string) {
     }
 }
 
+export function getOfferRemainingKwh(offer: ManagerSolarOffer): number {
+    const totalOffered = parseFloat(offer.energyAmountKwh) || 0;
+    const totalDispatched = offer.totalDispatchedKwh ?? 0;
+    return offer.remainingEnergyKwh !== undefined
+        ? offer.remainingEnergyKwh
+        : Math.max(0, totalOffered - totalDispatched);
+}
+
 export function isOfferDispatchable(offer: ManagerSolarOffer): boolean {
     if (offer.status !== 'approved') return false;
     if (offer.expiresAt) {
@@ -39,6 +47,10 @@ export function isOfferDispatchable(offer: ManagerSolarOffer): boolean {
         if (!isNaN(expTime) && expTime <= Date.now()) {
             return false;
         }
+    }
+    const remaining = getOfferRemainingKwh(offer);
+    if (remaining <= 0.001) {
+        return false;
     }
     return true;
 }
@@ -471,7 +483,7 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
                             </Text>
                         </View>
                         <Text className='text-xs text-muted-foreground' numberOfLines={1}>
-                            {parseFloat(selectedRequest.requestedEnergyKwh).toFixed(1)} kWh requested • Select an approved solar offer below
+                            {(selectedRequest.remainingEnergyKwh !== undefined ? selectedRequest.remainingEnergyKwh : parseFloat(selectedRequest.requestedEnergyKwh)).toFixed(1)} kWh needed • Select an approved solar offer below
                         </Text>
                     </View>
                 </View>
@@ -488,7 +500,7 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
                             </Text>
                         </View>
                         <Text className='text-xs text-muted-foreground' numberOfLines={1}>
-                            {selectedDispatchOffer.ownerName || 'Solar Producer'} • {parseFloat(selectedDispatchOffer.energyAmountKwh).toFixed(1)} kWh available
+                            {selectedDispatchOffer.ownerName || 'Solar Producer'} • {getOfferRemainingKwh(selectedDispatchOffer).toFixed(1)} kWh available remaining ({parseFloat(selectedDispatchOffer.energyAmountKwh).toFixed(1)} kWh total offer)
                         </Text>
                         {confirmedAllocation !== null && confirmedAllocation !== undefined && (
                             <Text className='text-xs font-bold text-[#F59E0B] mt-1' numberOfLines={1}>
@@ -531,7 +543,12 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
                         const isDispatchable = isOfferDispatchable(item);
                         const isSelectedForDispatch = selectedDispatchOfferId === item.id;
                         const expirationInfo = formatOfferExpiration(item.expiresAt);
-                        const formattedKwh = parseFloat(item.energyAmountKwh).toFixed(1);
+                        const totalOfferedKwh = parseFloat(item.energyAmountKwh) || 0;
+                        const remainingKwh = getOfferRemainingKwh(item);
+                        const totalDispatchedKwh = item.totalDispatchedKwh ?? 0;
+                        const isPartiallyDispatched = isApproved && totalDispatchedKwh > 0;
+                        const isFullyDispatched = isApproved && remainingKwh <= 0.001;
+                        const formattedKwh = totalOfferedKwh.toFixed(1);
                         const minBattery = item.minimumBatteryPercent
                             ? `${parseFloat(item.minimumBatteryPercent).toFixed(0)}%`
                             : 'N/A';
@@ -584,11 +601,16 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
                                 <View className='flex-row items-center justify-between bg-card/60 rounded-lg p-3 border border-border/40 mb-3'>
                                     <View className='flex-1 items-start'>
                                         <Text className='text-[11px] font-semibold text-muted-foreground uppercase tracking-wider'>
-                                            Offered Energy
+                                            {isApproved ? 'Available Energy' : 'Offered Energy'}
                                         </Text>
-                                        <Text className='text-base font-extrabold text-foreground mt-0.5'>
-                                            {formattedKwh} <Text className='text-xs font-bold text-muted-foreground'>kWh</Text>
+                                        <Text className={`text-base font-extrabold mt-0.5 ${isApproved ? (remainingKwh > 0 ? 'text-[#10B981]' : 'text-zinc-400') : 'text-foreground'}`}>
+                                            {isApproved ? remainingKwh.toFixed(1) : formattedKwh} <Text className='text-xs font-bold text-muted-foreground'>kWh</Text>
                                         </Text>
+                                        {isPartiallyDispatched && (
+                                            <Text className='text-[10px] text-muted-foreground mt-0.5'>
+                                                {totalDispatchedKwh.toFixed(1)} / {formattedKwh} kWh shared
+                                            </Text>
+                                        )}
                                     </View>
 
                                     <View className='h-8 w-[1px] bg-border/40 mx-2' />
@@ -702,6 +724,12 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
                                                     {isSelectedForDispatch ? 'Selected for Dispatch' : 'Select for Dispatch'}
                                                 </Text>
                                             </Pressable>
+                                        ) : isFullyDispatched ? (
+                                            <View className='px-3 py-1.5 rounded-lg bg-secondary/80 border border-border/80'>
+                                                <Text className='text-xs font-bold text-muted-foreground'>
+                                                    Fully Dispatched
+                                                </Text>
+                                            </View>
                                         ) : (
                                             <Text className='text-xs font-semibold text-red-500'>
                                                 Offer expired
@@ -872,15 +900,20 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
                         {/* Offer Details Content */}
                         {!detailLoading && !detailNotFound && !detailError && detailOffer && (
                             <>
-                                {/* Power Offered Highlight */}
+                                {/* Power Offered / Available Highlight */}
                                 <View className='rounded-xl bg-secondary/60 border border-border/40 p-4 mb-4 items-center'>
                                     <Text className='text-xs font-semibold text-muted-foreground'>
-                                        Offered Clean Solar Energy
+                                        {detailOffer.status === 'approved' ? 'Remaining Available Energy' : 'Offered Clean Solar Energy'}
                                     </Text>
-                                    <Text className='text-3xl font-extrabold text-foreground mt-1'>
-                                        {parseFloat(detailOffer.energyAmountKwh).toFixed(1)}{' '}
+                                    <Text className={`text-3xl font-extrabold mt-1 ${detailOffer.status === 'approved' ? (getOfferRemainingKwh(detailOffer) > 0 ? 'text-[#10B981]' : 'text-zinc-400') : 'text-foreground'}`}>
+                                        {detailOffer.status === 'approved' ? getOfferRemainingKwh(detailOffer).toFixed(1) : parseFloat(detailOffer.energyAmountKwh).toFixed(1)}{' '}
                                         <Text className='text-base font-bold text-muted-foreground'>kWh</Text>
                                     </Text>
+                                    {(detailOffer.totalDispatchedKwh ?? 0) > 0 && (
+                                        <Text className='text-xs text-muted-foreground mt-1'>
+                                            {(detailOffer.totalDispatchedKwh ?? 0).toFixed(1)} kWh previously dispatched of {parseFloat(detailOffer.energyAmountKwh).toFixed(1)} kWh total
+                                        </Text>
+                                    )}
                                 </View>
 
                                 {/* Solar Owner Information Card */}
@@ -1052,10 +1085,16 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
                                                         : 'Select for Dispatch'}
                                                 </Text>
                                             </Pressable>
-                                        ) : (
+                                        ) : detailOffer.expiresAt && new Date(detailOffer.expiresAt).getTime() <= Date.now() ? (
                                             <View className='flex-1 py-2.5 items-center justify-center rounded-xl bg-red-500/10 border border-red-500/30'>
                                                 <Text className='text-xs font-bold text-red-500'>
                                                     Offer Expired
+                                                </Text>
+                                            </View>
+                                        ) : (
+                                            <View className='flex-1 py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60'>
+                                                <Text className='text-xs font-bold text-muted-foreground'>
+                                                    Fully Dispatched
                                                 </Text>
                                             </View>
                                         )}

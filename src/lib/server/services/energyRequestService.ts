@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "../db/client";
-import { auditLogs, energyRequests, users } from "../db/schema";
+import { auditLogs, dispatches, energyRequests, users } from "../db/schema";
 import {
     BadRequestError,
     ForbiddenError,
@@ -11,9 +11,10 @@ import {
 /**
  * Retrieve all energy requests for the manager.
  * Joins energy_requests.householdId -> users.id to include household details.
+ * Computes dynamic totalDispatchedKwh and remainingEnergyKwh from the dispatches table.
  */
 export async function getEnergyRequests() {
-    return db
+    const rows = await db
         .select({
             id: energyRequests.id,
             householdId: energyRequests.householdId,
@@ -29,10 +30,36 @@ export async function getEnergyRequests() {
         .from(energyRequests)
         .innerJoin(users, eq(energyRequests.householdId, users.id))
         .orderBy(desc(energyRequests.requestedAt));
+
+    const allDispatches = await db
+        .select({
+            requestId: dispatches.requestId,
+            dispatchedEnergyKwh: dispatches.dispatchedEnergyKwh,
+        })
+        .from(dispatches);
+
+    const dispatchedMap = new Map<string, number>();
+    for (const d of allDispatches) {
+        const prev = dispatchedMap.get(d.requestId) || 0;
+        dispatchedMap.set(d.requestId, prev + parseFloat(d.dispatchedEnergyKwh));
+    }
+
+    return rows.map((row) => {
+        const totalDispatchedKwh = parseFloat((dispatchedMap.get(row.id) || 0).toFixed(3));
+        const totalRequestedKwh = parseFloat(row.requestedEnergyKwh) || 0;
+        const remainingEnergyKwh = Math.max(0, parseFloat((totalRequestedKwh - totalDispatchedKwh).toFixed(3)));
+
+        return {
+            ...row,
+            totalDispatchedKwh,
+            remainingEnergyKwh,
+        };
+    });
 }
 
 /**
  * Retrieve a single energy request by ID with household details.
+ * Computes dynamic totalDispatchedKwh and remainingEnergyKwh.
  * Throws NotFoundError (404) if not found.
  */
 export async function getEnergyRequestById(id: string) {
@@ -62,6 +89,21 @@ export async function getEnergyRequestById(id: string) {
 
     const row = results[0];
 
+    const requestDispatches = await db
+        .select({
+            dispatchedEnergyKwh: dispatches.dispatchedEnergyKwh,
+        })
+        .from(dispatches)
+        .where(eq(dispatches.requestId, id));
+
+    const totalDispatchedKwh = parseFloat(
+        requestDispatches
+            .reduce((sum, d) => sum + parseFloat(d.dispatchedEnergyKwh), 0)
+            .toFixed(3)
+    );
+    const totalRequestedKwh = parseFloat(row.requestedEnergyKwh) || 0;
+    const remainingEnergyKwh = Math.max(0, parseFloat((totalRequestedKwh - totalDispatchedKwh).toFixed(3)));
+
     return {
         id: row.id,
         householdId: row.householdId,
@@ -70,6 +112,8 @@ export async function getEnergyRequestById(id: string) {
         householdPhone: row.householdPhone,
         householdGrid: row.householdGrid,
         requestedEnergyKwh: row.requestedEnergyKwh,
+        totalDispatchedKwh,
+        remainingEnergyKwh,
         reason: row.reason,
         status: row.status,
         requestedAt: row.requestedAt,
