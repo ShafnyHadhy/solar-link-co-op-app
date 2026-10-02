@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "../db/client";
-import { auditLogs, dispatches, energyRequests, notifications, solarOffers, users } from "../db/schema";
 import type { NewSolarOffer } from "../db/schema";
+import { auditLogs, dispatches, energyRequests, notifications, solarOffers, users } from "../db/schema";
 import {
     BadRequestError,
     ForbiddenError,
@@ -128,9 +128,10 @@ export async function getOwnerOfferSummary(ownerId: string, ratePerKwh = 0.15) {
 /**
  * Retrieve all solar offers for the manager.
  * Joins solar_offers.ownerId -> users.id to include solar owner details.
+ * Computes dynamic totalDispatchedKwh and remainingEnergyKwh from the dispatches table.
  */
 export async function getSolarOffers() {
-    return db
+    const rows = await db
         .select({
             id: solarOffers.id,
             ownerId: solarOffers.ownerId,
@@ -146,10 +147,36 @@ export async function getSolarOffers() {
         .from(solarOffers)
         .innerJoin(users, eq(solarOffers.ownerId, users.id))
         .orderBy(desc(solarOffers.offeredAt));
+
+    const allDispatches = await db
+        .select({
+            offerId: dispatches.offerId,
+            dispatchedEnergyKwh: dispatches.dispatchedEnergyKwh,
+        })
+        .from(dispatches);
+
+    const dispatchedMap = new Map<string, number>();
+    for (const d of allDispatches) {
+        const prev = dispatchedMap.get(d.offerId) || 0;
+        dispatchedMap.set(d.offerId, prev + parseFloat(d.dispatchedEnergyKwh));
+    }
+
+    return rows.map((row) => {
+        const totalDispatchedKwh = parseFloat((dispatchedMap.get(row.id) || 0).toFixed(3));
+        const totalOfferedKwh = parseFloat(row.energyAmountKwh) || 0;
+        const remainingEnergyKwh = Math.max(0, parseFloat((totalOfferedKwh - totalDispatchedKwh).toFixed(3)));
+
+        return {
+            ...row,
+            totalDispatchedKwh,
+            remainingEnergyKwh,
+        };
+    });
 }
 
 /**
  * Retrieve a single solar offer by ID with solar owner details.
+ * Computes dynamic totalDispatchedKwh and remainingEnergyKwh.
  * Throws NotFoundError (404) if not found.
  */
 export async function getSolarOfferById(id: string) {
@@ -180,6 +207,21 @@ export async function getSolarOfferById(id: string) {
 
     const row = results[0];
 
+    const offerDispatches = await db
+        .select({
+            dispatchedEnergyKwh: dispatches.dispatchedEnergyKwh,
+        })
+        .from(dispatches)
+        .where(eq(dispatches.offerId, id));
+
+    const totalDispatchedKwh = parseFloat(
+        offerDispatches
+            .reduce((sum, d) => sum + parseFloat(d.dispatchedEnergyKwh), 0)
+            .toFixed(3)
+    );
+    const totalOfferedKwh = parseFloat(row.energyAmountKwh) || 0;
+    const remainingEnergyKwh = Math.max(0, parseFloat((totalOfferedKwh - totalDispatchedKwh).toFixed(3)));
+
     return {
         id: row.id,
         ownerId: row.ownerId,
@@ -189,6 +231,8 @@ export async function getSolarOfferById(id: string) {
         ownerGrid: row.ownerGrid,
         ownerSolarCapacityKw: row.ownerSolarCapacityKw,
         energyAmountKwh: row.energyAmountKwh,
+        totalDispatchedKwh,
+        remainingEnergyKwh,
         minimumBatteryPercent: row.minimumBatteryPercent,
         status: row.status,
         offeredAt: row.offeredAt,

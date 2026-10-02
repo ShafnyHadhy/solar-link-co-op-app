@@ -30,7 +30,13 @@ const EnergyScreen = () => {
         case "household":
             return (
                 <HouseholdEnergy
-                    initialTab={params.tab === "pending" || params.tab === "requests" ? "requests" : "create"}
+                    initialTab={
+                        params.tab === "pending" || params.tab === "requests"
+                            ? "requests"
+                            : params.tab === "allocations"
+                            ? "allocations"
+                            : "create"
+                    }
                     initialFilter={params.tab === "pending" ? "pending" : "all"}
                 />
             );

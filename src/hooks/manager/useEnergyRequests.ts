@@ -7,6 +7,8 @@ export interface ManagerEnergyRequest {
     householdName: string | null;
     householdEmail: string | null;
     requestedEnergyKwh: string;
+    totalDispatchedKwh?: number;
+    remainingEnergyKwh?: number;
     reason: string | null;
     status: "pending" | "approved" | "rejected" | "fulfilled" | "cancelled";
     requestedAt: string;
