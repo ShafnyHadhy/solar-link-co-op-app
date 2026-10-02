@@ -1,14 +1,17 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
-import { INITIAL_MEMBERS, calculateMemberAnalytics } from '@/lib/memberService';
+import { calculateMemberAnalytics } from '@/lib/memberService';
+import { useMembers } from '@/hooks/manager/useMembers';
 import { CommunityMember, MemberStatus } from '@/types/member';
 import { UserRole } from '@/types/role';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Modal,
     Pressable,
+    RefreshControl,
     ScrollView,
     Text,
     TextInput,
@@ -47,9 +50,16 @@ const ROLE_LABELS: Record<
 
 const ManagerMembers = () => {
     const router = useRouter();
-    const [members, setMembers] = useState<CommunityMember[]>(INITIAL_MEMBERS);
+    const { members, setMembers, loading, error, refetch } = useMembers();
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedFilter, setSelectedFilter] = useState<'all' | UserRole | 'pending'>('all');
+
+    // Auto-refresh when screen gains focus
+    useFocusEffect(
+        useCallback(() => {
+            refetch();
+        }, [refetch])
+    );
 
     // Role Edit Modal State
     const [selectedMember, setSelectedMember] = useState<CommunityMember | null>(null);
@@ -100,6 +110,13 @@ const ManagerMembers = () => {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ flexGrow: 1, padding: 20, paddingVertical: 60 }}
                 className='flex-1'
+                refreshControl={
+                    <RefreshControl
+                        refreshing={loading && members.length > 0}
+                        onRefresh={refetch}
+                        tintColor="#F59E0B"
+                    />
+                }
             >
                 {/* Header */}
                 <View className='flex-row items-center justify-between mb-6'>
@@ -286,190 +303,32 @@ const ManagerMembers = () => {
 
                 {/* Member Cards List */}
                 <View className='flex-col gap-4'>
-                    {filteredMembers.map((member) => {
-                        const roleInfo = ROLE_LABELS[member.role];
-                        const isPending = member.status === 'pending';
-                        const isActive = member.status === 'active';
-
-                        return (
-                            <View
-                                key={member.id}
-                                className='rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'
+                    {loading && members.length === 0 ? (
+                        <View className='items-center justify-center py-16 px-4'>
+                            <ActivityIndicator size="large" color="#F59E0B" />
+                            <Text className='text-sm font-semibold text-muted-foreground mt-3'>
+                                Loading community members...
+                            </Text>
+                        </View>
+                    ) : error && members.length === 0 ? (
+                        <View className='items-center justify-center py-12 px-4'>
+                            <Feather name="alert-circle" size={32} color="#EF4444" />
+                            <Text className='text-base font-bold text-foreground mt-2'>
+                                Failed to load members
+                            </Text>
+                            <Text className='text-xs text-muted-foreground text-center mt-1 mb-4'>
+                                {error}
+                            </Text>
+                            <Pressable
+                                onPress={() => refetch()}
+                                className='px-4 py-2 rounded-xl bg-secondary border border-border/60 active:opacity-75'
                             >
-                                {/* Member Header */}
-                                <View className='flex-row items-center justify-between mb-3'>
-                                    <View className='flex-row items-center gap-3 flex-1 mr-2'>
-                                        {/* Avatar Initials */}
-                                        <View className='h-10 w-10 items-center justify-center rounded-xl bg-card border border-border/60'>
-                                            <Text className='text-sm font-extrabold text-foreground'>
-                                                {member.name
-                                                    .split(' ')
-                                                    .map((n) => n[0])
-                                                    .join('')
-                                                    .substring(0, 2)
-                                                    .toUpperCase()}
-                                            </Text>
-                                        </View>
-
-                                        <View className='flex-1'>
-                                            <Text
-                                                className='text-base font-bold text-foreground'
-                                                numberOfLines={1}
-                                            >
-                                                {member.name}
-                                            </Text>
-                                            <Text
-                                                className='text-xs text-muted-foreground'
-                                                numberOfLines={1}
-                                            >
-                                                {member.email}
-                                            </Text>
-                                        </View>
-                                    </View>
-
-                                    {/* Status Badge */}
-                                    <View
-                                        className={`px-2.5 py-0.5 rounded-full border ${isActive
-                                                ? 'bg-emerald-500/15 border-emerald-500/40'
-                                                : isPending
-                                                    ? 'bg-yellow-500/15 border-yellow-500/40'
-                                                    : 'bg-zinc-500/15 border-zinc-500/40'
-                                            }`}
-                                    >
-                                        <Text
-                                            className={`text-[10px] font-bold uppercase ${isActive
-                                                    ? 'text-[#10B981]'
-                                                    : isPending
-                                                        ? 'text-[#F59E0B]'
-                                                        : 'text-[#6B7280]'
-                                                }`}
-                                        >
-                                            {member.status}
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                {/* Co-op Details Block */}
-                                <View className='flex-row items-center justify-between rounded-xl bg-card/70 border border-border/30 p-3 mb-3'>
-                                    {member.role === 'solar_owner' && (
-                                        <>
-                                            <View className='flex-1'>
-                                                <Text className='text-[11px] font-semibold text-muted-foreground'>
-                                                    Rooftop Capacity
-                                                </Text>
-                                                <Text className='text-sm font-extrabold text-foreground mt-0.5'>
-                                                    {member.solarCapacityKw ?? 0} kW System
-                                                </Text>
-                                            </View>
-                                            <View className='h-7 w-[1px] bg-border/60 mx-2' />
-                                            <View className='flex-1 pl-2'>
-                                                <Text className='text-[11px] font-semibold text-muted-foreground'>
-                                                    Member Since
-                                                </Text>
-                                                <Text className='text-sm font-extrabold text-foreground mt-0.5'>
-                                                    {member.joinedAt}
-                                                </Text>
-                                            </View>
-                                        </>
-                                    )}
-
-                                    {member.role === 'household' && (
-                                        <>
-                                            <View className='flex-1'>
-                                                <Text className='text-[11px] font-semibold text-muted-foreground'>
-                                                    Monthly Allocation
-                                                </Text>
-                                                <Text className='text-sm font-extrabold text-foreground mt-0.5'>
-                                                    {member.monthlyAllocationKwh ?? 30} kWh / mo
-                                                </Text>
-                                            </View>
-                                            <View className='h-7 w-[1px] bg-border/60 mx-2' />
-                                            <View className='flex-1 pl-2'>
-                                                <Text className='text-[11px] font-semibold text-muted-foreground'>
-                                                    Inverter Link
-                                                </Text>
-                                                <Text className='text-sm font-extrabold text-[#10B981] mt-0.5'>
-                                                    Active Feed
-                                                </Text>
-                                            </View>
-                                        </>
-                                    )}
-
-                                    {member.role === 'technician' && (
-                                        <>
-                                            <View className='flex-1'>
-                                                <Text className='text-[11px] font-semibold text-muted-foreground'>
-                                                    Assigned Grid Zone
-                                                </Text>
-                                                <Text
-                                                    className='text-sm font-extrabold text-foreground mt-0.5'
-                                                    numberOfLines={1}
-                                                >
-                                                    {member.assignedGrid ?? 'Main Substation'}
-                                                </Text>
-                                            </View>
-                                            <View className='h-7 w-[1px] bg-border/60 mx-2' />
-                                            <View className='flex-1 pl-2'>
-                                                <Text className='text-[11px] font-semibold text-muted-foreground'>
-                                                    Field Role
-                                                </Text>
-                                                <Text className='text-sm font-extrabold text-foreground mt-0.5'>
-                                                    Hardware & IoT
-                                                </Text>
-                                            </View>
-                                        </>
-                                    )}
-
-                                    {member.role === 'manager' && (
-                                        <>
-                                            <View className='flex-1'>
-                                                <Text className='text-[11px] font-semibold text-muted-foreground'>
-                                                    Access Level
-                                                </Text>
-                                                <Text className='text-sm font-extrabold text-foreground mt-0.5'>
-                                                    Full Grid Admin
-                                                </Text>
-                                            </View>
-                                            <View className='h-7 w-[1px] bg-border/60 mx-2' />
-                                            <View className='flex-1 pl-2'>
-                                                <Text className='text-[11px] font-semibold text-muted-foreground'>
-                                                    Permissions
-                                                </Text>
-                                                <Text className='text-sm font-extrabold text-foreground mt-0.5'>
-                                                    All Zones
-                                                </Text>
-                                            </View>
-                                        </>
-                                    )}
-                                </View>
-
-                                {/* Card Footer & Role Action */}
-                                <View className='flex-row items-center justify-between pt-1'>
-                                    {/* Role Pill */}
-                                    <View
-                                        className={`px-3 py-1 rounded-lg border ${roleInfo.badgeBg}`}
-                                    >
-                                        <Text className={`text-xs font-bold ${roleInfo.textColor}`}>
-                                            {roleInfo.label}
-                                        </Text>
-                                    </View>
-
-                                    {/* Change Role Button */}
-                                    <Pressable
-                                        onPress={() => openRoleModal(member)}
-                                        className='px-3.5 py-1.5 rounded-lg bg-primary border border-primary/40 active:opacity-80 shadow-sm'
-                                    >
-                                        <Text className='text-xs font-bold text-primary-foreground'>
-                                            Change Role
-                                        </Text>
-                                    </Pressable>
-                                </View>
-                            </View>
-                        );
-                    })}
-
-                    {/* Empty State */}
-                    {filteredMembers.length === 0 && (
+                                <Text className='text-xs font-semibold text-[#F59E0B]'>
+                                    Tap to Retry
+                                </Text>
+                            </Pressable>
+                        </View>
+                    ) : filteredMembers.length === 0 ? (
                         <View className='items-center justify-center py-12 px-4'>
                             <Text className='text-base font-bold text-foreground'>
                                 No members found
@@ -480,6 +339,189 @@ const ManagerMembers = () => {
                                     : 'There are no members matching the selected filter.'}
                             </Text>
                         </View>
+                    ) : (
+                        filteredMembers.map((member) => {
+                            const roleInfo = ROLE_LABELS[member.role] || ROLE_LABELS.household;
+                            const isPending = member.status === 'pending';
+                            const isActive = member.status === 'active';
+
+                            return (
+                                <View
+                                    key={member.id}
+                                    className='rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'
+                                >
+                                    {/* Member Header */}
+                                    <View className='flex-row items-center justify-between mb-3'>
+                                        <View className='flex-row items-center gap-3 flex-1 mr-2'>
+                                            {/* Avatar Initials */}
+                                            <View className='h-10 w-10 items-center justify-center rounded-xl bg-card border border-border/60'>
+                                                <Text className='text-sm font-extrabold text-foreground'>
+                                                    {(member.name || 'User')
+                                                        .split(' ')
+                                                        .map((n) => n[0])
+                                                        .filter(Boolean)
+                                                        .join('')
+                                                        .substring(0, 2)
+                                                        .toUpperCase() || 'U'}
+                                                </Text>
+                                            </View>
+
+                                            <View className='flex-1'>
+                                                <Text
+                                                    className='text-base font-bold text-foreground'
+                                                    numberOfLines={1}
+                                                >
+                                                    {member.name}
+                                                </Text>
+                                                <Text
+                                                    className='text-xs text-muted-foreground'
+                                                    numberOfLines={1}
+                                                >
+                                                    {member.email}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {/* Status Badge */}
+                                        <View
+                                            className={`px-2.5 py-0.5 rounded-full border ${isActive
+                                                    ? 'bg-emerald-500/15 border-emerald-500/40'
+                                                    : isPending
+                                                        ? 'bg-yellow-500/15 border-yellow-500/40'
+                                                        : 'bg-zinc-500/15 border-zinc-500/40'
+                                                }`}
+                                        >
+                                            <Text
+                                                className={`text-[10px] font-bold uppercase ${isActive
+                                                        ? 'text-[#10B981]'
+                                                        : isPending
+                                                            ? 'text-[#F59E0B]'
+                                                            : 'text-[#6B7280]'
+                                                    }`}
+                                            >
+                                                {member.status}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Co-op Details Block */}
+                                    <View className='flex-row items-center justify-between rounded-xl bg-card/70 border border-border/30 p-3 mb-3'>
+                                        {member.role === 'solar_owner' && (
+                                            <>
+                                                <View className='flex-1'>
+                                                    <Text className='text-[11px] font-semibold text-muted-foreground'>
+                                                        Rooftop Capacity
+                                                    </Text>
+                                                    <Text className='text-sm font-extrabold text-foreground mt-0.5'>
+                                                        {member.solarCapacityKw ?? 0} kW System
+                                                    </Text>
+                                                </View>
+                                                <View className='h-7 w-[1px] bg-border/60 mx-2' />
+                                                <View className='flex-1 pl-2'>
+                                                    <Text className='text-[11px] font-semibold text-muted-foreground'>
+                                                        Member Since
+                                                    </Text>
+                                                    <Text className='text-sm font-extrabold text-foreground mt-0.5'>
+                                                        {member.joinedAt}
+                                                    </Text>
+                                                </View>
+                                            </>
+                                        )}
+
+                                        {member.role === 'household' && (
+                                            <>
+                                                <View className='flex-1'>
+                                                    <Text className='text-[11px] font-semibold text-muted-foreground'>
+                                                        Monthly Allocation
+                                                    </Text>
+                                                    <Text className='text-sm font-extrabold text-foreground mt-0.5'>
+                                                        {member.monthlyAllocationKwh ?? 30} kWh / mo
+                                                    </Text>
+                                                </View>
+                                                <View className='h-7 w-[1px] bg-border/60 mx-2' />
+                                                <View className='flex-1 pl-2'>
+                                                    <Text className='text-[11px] font-semibold text-muted-foreground'>
+                                                        Inverter Link
+                                                    </Text>
+                                                    <Text className='text-sm font-extrabold text-[#10B981] mt-0.5'>
+                                                        Active Feed
+                                                    </Text>
+                                                </View>
+                                            </>
+                                        )}
+
+                                        {member.role === 'technician' && (
+                                            <>
+                                                <View className='flex-1'>
+                                                    <Text className='text-[11px] font-semibold text-muted-foreground'>
+                                                        Assigned Grid Zone
+                                                    </Text>
+                                                    <Text
+                                                        className='text-sm font-extrabold text-foreground mt-0.5'
+                                                        numberOfLines={1}
+                                                    >
+                                                        {member.assignedGrid ?? 'Main Substation'}
+                                                    </Text>
+                                                </View>
+                                                <View className='h-7 w-[1px] bg-border/60 mx-2' />
+                                                <View className='flex-1 pl-2'>
+                                                    <Text className='text-[11px] font-semibold text-muted-foreground'>
+                                                        Field Role
+                                                    </Text>
+                                                    <Text className='text-sm font-extrabold text-foreground mt-0.5'>
+                                                        Hardware & IoT
+                                                    </Text>
+                                                </View>
+                                            </>
+                                        )}
+
+                                        {member.role === 'manager' && (
+                                            <>
+                                                <View className='flex-1'>
+                                                    <Text className='text-[11px] font-semibold text-muted-foreground'>
+                                                        Access Level
+                                                    </Text>
+                                                    <Text className='text-sm font-extrabold text-foreground mt-0.5'>
+                                                        Full Grid Admin
+                                                    </Text>
+                                                </View>
+                                                <View className='h-7 w-[1px] bg-border/60 mx-2' />
+                                                <View className='flex-1 pl-2'>
+                                                    <Text className='text-[11px] font-semibold text-muted-foreground'>
+                                                        Permissions
+                                                    </Text>
+                                                    <Text className='text-sm font-extrabold text-foreground mt-0.5'>
+                                                        All Zones
+                                                    </Text>
+                                                </View>
+                                            </>
+                                        )}
+                                    </View>
+
+                                    {/* Card Footer & Role Action */}
+                                    <View className='flex-row items-center justify-between pt-1'>
+                                        {/* Role Pill */}
+                                        <View
+                                            className={`px-3 py-1 rounded-lg border ${roleInfo.badgeBg}`}
+                                        >
+                                            <Text className={`text-xs font-bold ${roleInfo.textColor}`}>
+                                                {roleInfo.label}
+                                            </Text>
+                                        </View>
+
+                                        {/* Change Role Button */}
+                                        <Pressable
+                                            onPress={() => openRoleModal(member)}
+                                            className='px-3.5 py-1.5 rounded-lg bg-primary border border-primary/40 active:opacity-80 shadow-sm'
+                                        >
+                                            <Text className='text-xs font-bold text-primary-foreground'>
+                                                Change Role
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                </View>
+                            );
+                        })
                     )}
                 </View>
             </ScrollView>
