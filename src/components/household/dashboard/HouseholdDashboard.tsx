@@ -1,4 +1,5 @@
 import TabScreenBackground from "@/components/shared/TabScreenBackground";
+import { useHouseholdAllocations } from "@/hooks/household/useHouseholdAllocations";
 import { useHouseholdEnergyRequests } from "@/hooks/household/useHouseholdEnergyRequests";
 import { useUser } from "@clerk/expo";
 import { Feather } from "@expo/vector-icons";
@@ -24,6 +25,7 @@ const HouseholdDashboard = () => {
     requests,
     loading: isLoadingStats,
   } = useHouseholdEnergyRequests();
+  const { allocations } = useHouseholdAllocations();
   const pendingRequests = requests.filter(
     (request) => request.status === "pending",
   );
@@ -308,7 +310,7 @@ const HouseholdDashboard = () => {
           onPress={() =>
             router.push({
               pathname: "/(tabs)/energy",
-              params: { tab: "requests" },
+              params: { tab: allocations.length > 0 ? "allocations" : "requests" },
             })
           }
         >
@@ -317,6 +319,48 @@ const HouseholdDashboard = () => {
       </View>
 
       <View className={`rounded-3xl overflow-hidden border ${card}`}>
+        {/* Dispatched energy allocations */}
+        {allocations.slice(0, 2).map((alloc, idx) => (
+          <Pressable
+            key={alloc.id}
+            onPress={() =>
+              router.push({
+                pathname: "/(tabs)/energy",
+                params: { tab: "allocations" },
+              })
+            }
+            className={`flex-row items-center px-4 py-4 ${
+              idx < Math.min(allocations.length, 2) - 1 ||
+              approvedRequests.length > 0 ||
+              pendingRequests.length > 0
+                ? `border-b ${isDark ? "border-white/8" : "border-gray-100"}`
+                : ""
+            }`}
+          >
+            <View className="h-10 w-10 rounded-full bg-emerald-500/20 items-center justify-center">
+              <Feather name="zap" size={18} color="#10B981" />
+            </View>
+            <View className="flex-1 ml-3">
+              <Text className={`font-semibold ${text}`}>Energy Allocated</Text>
+              <Text className={`text-xs ${textLight}`}>
+                +{parseFloat(alloc.dispatchedEnergyKwh).toFixed(1)} kWh • from{" "}
+                {alloc.offer?.ownerName || "Community Solar"}
+              </Text>
+            </View>
+            <View className="items-end">
+              <Text className={`text-xs ${textLight}`}>
+                {new Date(alloc.dispatchedAt).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                })}
+              </Text>
+              <Text className="text-[10px] font-bold text-emerald-500 mt-0.5">
+                Allocated
+              </Text>
+            </View>
+          </Pressable>
+        ))}
+
         {/* Approved requests */}
         {approvedRequests.slice(0, 2).map((req, idx) => (
           <View
@@ -377,7 +421,7 @@ const HouseholdDashboard = () => {
         ))}
 
         {/* Empty state */}
-        {approvedRequests.length === 0 && pendingRequests.length === 0 && (
+        {allocations.length === 0 && approvedRequests.length === 0 && pendingRequests.length === 0 && (
           <View className="flex-row items-center px-4 py-4">
             <View
               className={`h-10 w-10 rounded-full ${iconBg} items-center justify-center`}
