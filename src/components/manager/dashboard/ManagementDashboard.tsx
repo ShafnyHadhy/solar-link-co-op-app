@@ -1,9 +1,10 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
+import { useCommunityAllocation } from '@/hooks/manager/useCommunityAllocation';
 import { useCommunityGeneration } from '@/hooks/manager/useCommunityGeneration';
 import { useUser } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
     ActivityIndicator,
     Pressable,
@@ -23,6 +24,18 @@ const ManagementDashboard = () => {
         refetch: refetchGeneration,
     } = useCommunityGeneration();
 
+    const {
+        data: allocationData,
+        loading: allocationLoading,
+        error: allocationError,
+        refetch: refetchAllocation,
+    } = useCommunityAllocation();
+
+    const isRefreshing = generationLoading || allocationLoading;
+    const handleRefresh = useCallback(async () => {
+        await Promise.all([refetchGeneration(), refetchAllocation()]);
+    }, [refetchGeneration, refetchAllocation]);
+
     return (
         <View className='flex-1'>
             <TabScreenBackground />
@@ -32,8 +45,8 @@ const ManagementDashboard = () => {
                 className='flex-1'
                 refreshControl={
                     <RefreshControl
-                        refreshing={generationLoading}
-                        onRefresh={refetchGeneration}
+                        refreshing={isRefreshing}
+                        onRefresh={handleRefresh}
                         tintColor="#10B981"
                     />
                 }
@@ -130,21 +143,56 @@ const ManagementDashboard = () => {
                     <View className='flex-1 flex-col gap-2 rounded-lg border border-border/30 bg-secondary/60 p-4 shadow-sm'>
                         <View className='flex-row items-center justify-between'>
                             <View className='flex-row items-center gap-1.5'>
-                                <Feather name="zap" size={14} color="#EF4444" />
+                                <Feather name="send" size={14} color="#3B82F6" />
                                 <Text className='text-sm font-semibold text-muted-foreground'>
-                                    Consumed Today
+                                    Allocated Today
                                 </Text>
                             </View>
                         </View>
-                        <Text className='text-xl font-extrabold text-foreground mt-1'>
-                            75 kWh
-                        </Text>
-                        <View className='flex-row items-center gap-1'>
-                            <Feather name="trending-down" size={12} color="#EF4444" />
-                            <Text className='text-xs font-semibold text-[#EF4444]'>
-                                -2.1% vs yesterday
+                        {allocationLoading && !allocationData ? (
+                            <View className='h-7 justify-center mt-1'>
+                                <ActivityIndicator size="small" color="#3B82F6" />
+                            </View>
+                        ) : (
+                            <Text className='text-xl font-extrabold text-foreground mt-1'>
+                                {allocationError ? '-- kWh' : `${allocationData?.allocatedTodayKwh ?? 0} kWh`}
                             </Text>
-                        </View>
+                        )}
+                        {allocationLoading && !allocationData ? (
+                            <View className='flex-row items-center gap-1'>
+                                <Text className='text-xs font-semibold text-muted-foreground'>
+                                    Syncing...
+                                </Text>
+                            </View>
+                        ) : allocationError ? (
+                            <Pressable onPress={() => refetchAllocation()} className='flex-row items-center gap-1 active:opacity-70'>
+                                <Feather name="alert-circle" size={12} color="#EF4444" />
+                                <Text className='text-xs font-semibold text-[#EF4444]'>
+                                    Sync error • Retry
+                                </Text>
+                            </Pressable>
+                        ) : allocationData?.trend === 'up' ? (
+                            <View className='flex-row items-center gap-1'>
+                                <Feather name="trending-up" size={12} color="#10B981" />
+                                <Text className='text-xs font-semibold text-[#10B981]'>
+                                    +{allocationData.changePercentage}% vs yesterday
+                                </Text>
+                            </View>
+                        ) : allocationData?.trend === 'down' ? (
+                            <View className='flex-row items-center gap-1'>
+                                <Feather name="trending-down" size={12} color="#EF4444" />
+                                <Text className='text-xs font-semibold text-[#EF4444]'>
+                                    {allocationData.changePercentage}% vs yesterday
+                                </Text>
+                            </View>
+                        ) : (
+                            <View className='flex-row items-center gap-1'>
+                                <Feather name="minus" size={12} color="#9CA3AF" />
+                                <Text className='text-xs font-semibold text-muted-foreground'>
+                                    0.0% vs yesterday
+                                </Text>
+                            </View>
+                        )}
                     </View>
                 </View>
 
