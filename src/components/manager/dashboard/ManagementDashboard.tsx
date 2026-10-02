@@ -3,6 +3,7 @@ import { useCommunityAllocation } from '@/hooks/manager/useCommunityAllocation';
 import { useCommunityGeneration } from '@/hooks/manager/useCommunityGeneration';
 import { useCommunityReserve } from '@/hooks/manager/useCommunityReserve';
 import { useEnergyRequests } from '@/hooks/manager/useEnergyRequests';
+import { ManagerAlert, useManagerAlerts } from '@/hooks/manager/useManagerAlerts';
 import { useUser } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -15,6 +16,56 @@ import {
     Text,
     View,
 } from 'react-native';
+
+const getAlertStyle = (type: string, title?: string) => {
+    const lowerTitle = (title || '').toLowerCase();
+    if (
+        lowerTitle.includes('outage') ||
+        lowerTitle.includes('critical') ||
+        lowerTitle.includes('insufficient') ||
+        lowerTitle.includes('low') ||
+        lowerTitle.includes('fault')
+    ) {
+        return {
+            iconName: 'alert-triangle' as const,
+            iconColor: '#EF4444',
+            containerBg: 'bg-red-500/15 border border-red-500',
+        };
+    }
+    switch (type) {
+        case 'energy':
+            return {
+                iconName: 'alert-triangle' as const,
+                iconColor: '#EF4444',
+                containerBg: 'bg-red-500/15 border border-red-500',
+            };
+        case 'maintenance':
+            return {
+                iconName: 'alert-triangle' as const,
+                iconColor: '#F59E0B',
+                containerBg: 'bg-yellow-500/15 border border-yellow-500',
+            };
+        case 'request':
+            return {
+                iconName: 'clock' as const,
+                iconColor: '#F59E0B',
+                containerBg: 'bg-yellow-500/15 border border-yellow-500',
+            };
+        case 'announcement':
+            return {
+                iconName: 'bell' as const,
+                iconColor: '#3B82F6',
+                containerBg: 'bg-blue-500/15 border border-blue-500',
+            };
+        case 'system':
+        default:
+            return {
+                iconName: 'alert-circle' as const,
+                iconColor: '#F59E0B',
+                containerBg: 'bg-yellow-500/15 border border-yellow-500',
+            };
+    }
+};
 
 const ManagementDashboard = () => {
     const { user } = useUser();
@@ -47,24 +98,60 @@ const ManagementDashboard = () => {
         refetch: refetchRequests,
     } = useEnergyRequests();
 
-    // Automatically synchronize requests data when screen regains focus
+    const {
+        alerts,
+        loading: alertsLoading,
+        error: alertsError,
+        refetch: refetchAlerts,
+        markAsRead: markAlertAsRead,
+    } = useManagerAlerts({ userId: user?.id, unreadOnly: true });
+
+    // Automatically synchronize live data when screen regains focus
     useFocusEffect(
         useCallback(() => {
             refetchRequests();
-        }, [refetchRequests])
+            refetchAlerts();
+        }, [refetchRequests, refetchAlerts])
     );
 
     const pendingRequestsCount = requests.filter((r) => r.status === 'pending').length;
 
-    const isRefreshing = generationLoading || allocationLoading || reserveLoading || requestsLoading;
+    const isRefreshing =
+        generationLoading ||
+        allocationLoading ||
+        reserveLoading ||
+        requestsLoading ||
+        alertsLoading;
+
     const handleRefresh = useCallback(async () => {
         await Promise.all([
             refetchGeneration(),
             refetchAllocation(),
             refetchReserve(),
             refetchRequests(),
+            refetchAlerts(),
         ]);
-    }, [refetchGeneration, refetchAllocation, refetchReserve, refetchRequests]);
+    }, [
+        refetchGeneration,
+        refetchAllocation,
+        refetchReserve,
+        refetchRequests,
+        refetchAlerts,
+    ]);
+
+    const handleAlertPress = useCallback(
+        async (alert: ManagerAlert) => {
+            if (alert.type === 'request' || alert.title.toLowerCase().includes('request')) {
+                router.push('/energy');
+            }
+            try {
+                await markAlertAsRead(alert.id);
+            } catch (err) {
+                console.error('Failed to mark alert as read:', err);
+            }
+        },
+        [markAlertAsRead, router]
+    );
 
     return (
         <View className='flex-1'>
@@ -91,8 +178,11 @@ const ManagementDashboard = () => {
                         </Text>
                     </View>
 
-                    <View className='h-10 w-10 items-center justify-center rounded-2xl bg-secondary border border-border/60'>
+                    <View className='h-10 w-10 items-center justify-center rounded-2xl bg-secondary border border-border/60 relative'>
                         <Feather name="bell" size={20} color="#F59E0B" />
+                        {alerts.length > 0 && (
+                            <View className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-500 border border-secondary" />
+                        )}
                     </View>
                 </View>
 
@@ -300,54 +390,73 @@ const ManagementDashboard = () => {
                     <Text className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
                         Needs Attention
                     </Text>
+                    {alerts.length > 0 && (
+                        <View className="bg-red-500/15 border border-red-500/30 px-2.5 py-0.5 rounded-full">
+                            <Text className="text-[11px] font-bold text-red-500">
+                                {alerts.length} {alerts.length === 1 ? 'alert' : 'alerts'}
+                            </Text>
+                        </View>
+                    )}
                 </View>
 
                 <View className="flex-col gap-4 mt-4 p-4 border border-border rounded-2xl shadow-sm">
-                    <Pressable className="flex-row items-center gap-4 p-4 bg-secondary/60 rounded-xl border border-border active:opacity-70 shadow-sm">
-                        <View className="h-12 w-12 items-center justify-center rounded-full bg-red-500/15 border border-red-500">
-                            <Feather name="alert-triangle" size={20} color="#EF4444" />
-                        </View>
-                        <View className="flex-1 flex-col">
-                            <Text className="text-lg font-semibold text-foreground" numberOfLines={1}>
-                                Low Stock Alert
-                            </Text>
-                            <Text className="text-xs font-semibold text-muted-foreground" numberOfLines={1}>
-                                Community storage is running low
+                    {alertsLoading && alerts.length === 0 ? (
+                        <View className="py-6 items-center justify-center">
+                            <ActivityIndicator size="small" color="#F59E0B" />
+                            <Text className="text-xs font-semibold text-muted-foreground mt-2">
+                                Checking community alerts...
                             </Text>
                         </View>
-                        <Feather name="chevron-right" size={20} color="#9CA3AF" />
-                    </Pressable>
-
-                    <Pressable className="flex-row items-center gap-4 p-4 bg-secondary/60 rounded-xl border border-border active:opacity-70 shadow-sm">
-                        <View className="h-12 w-12 items-center justify-center rounded-full bg-red-500/15 border border-red-500">
-                            <Feather name="alert-triangle" size={20} color="#EF4444" />
-                        </View>
-                        <View className="flex-1 flex-col">
-                            <Text className="text-lg font-semibold text-foreground" numberOfLines={1}>
-                                Insufficient Power
+                    ) : alertsError ? (
+                        <Pressable
+                            onPress={() => refetchAlerts()}
+                            className="py-4 items-center justify-center active:opacity-70"
+                        >
+                            <Feather name="alert-circle" size={20} color="#EF4444" />
+                            <Text className="text-sm font-semibold text-foreground mt-1.5">
+                                Failed to load alerts
                             </Text>
-                            <Text className="text-xs font-semibold text-muted-foreground" numberOfLines={1}>
-                                3 households are experiencing power outages
+                            <Text className="text-xs font-semibold text-[#EF4444] mt-0.5">
+                                Sync error • Tap to retry
                             </Text>
-                        </View>
-                        <Feather name="chevron-right" size={20} color="#9CA3AF" />
-                    </Pressable>
-
-                    <Pressable className="flex-row items-center gap-4 p-4 bg-secondary/60 rounded-xl border border-border active:opacity-70 shadow-sm">
-                        <View className="h-12 w-12 items-center justify-center rounded-full bg-yellow-500/15 border border-yellow-500">
-                            <Feather name="alert-triangle" size={20} color="#F59E0B" />
-                        </View>
-                        <View className="flex-1 flex-col">
-                            <Text className="text-lg font-semibold text-foreground" numberOfLines={1}>
-                                Grid Maintenance
+                        </Pressable>
+                    ) : alerts.length === 0 ? (
+                        <View className="py-6 items-center justify-center">
+                            <View className="h-10 w-10 rounded-full bg-emerald-500/15 border border-emerald-500/40 items-center justify-center mb-2">
+                                <Feather name="check" size={20} color="#10B981" />
+                            </View>
+                            <Text className="text-sm font-semibold text-foreground">
+                                All Systems Normal
                             </Text>
-                            <Text className="text-xs font-semibold text-muted-foreground" numberOfLines={1}>
-                                Scheduled maintenance on 2024-12-31
+                            <Text className="text-xs font-semibold text-muted-foreground mt-0.5 text-center">
+                                No urgent community alerts requiring attention
                             </Text>
                         </View>
-                        <Feather name="chevron-right" size={20} color="#9CA3AF" />
-                    </Pressable>
-
+                    ) : (
+                        alerts.map((alert) => {
+                            const style = getAlertStyle(alert.type, alert.title);
+                            return (
+                                <Pressable
+                                    key={alert.id}
+                                    onPress={() => handleAlertPress(alert)}
+                                    className="flex-row items-center gap-4 p-4 bg-secondary/60 rounded-xl border border-border active:opacity-70 shadow-sm"
+                                >
+                                    <View className={`h-12 w-12 items-center justify-center rounded-full ${style.containerBg}`}>
+                                        <Feather name={style.iconName} size={20} color={style.iconColor} />
+                                    </View>
+                                    <View className="flex-1 flex-col">
+                                        <Text className="text-lg font-semibold text-foreground" numberOfLines={1}>
+                                            {alert.title}
+                                        </Text>
+                                        <Text className="text-xs font-semibold text-muted-foreground" numberOfLines={1}>
+                                            {alert.message}
+                                        </Text>
+                                    </View>
+                                    <Feather name="chevron-right" size={20} color="#9CA3AF" />
+                                </Pressable>
+                            );
+                        })
+                    )}
                 </View>
 
                 <View className="flex-row items-center justify-between mt-6">
