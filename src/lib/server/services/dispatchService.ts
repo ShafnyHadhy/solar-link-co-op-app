@@ -82,11 +82,13 @@ export async function getDispatches(filter?: {
     requestId?: string;
     offerId?: string;
     managerId?: string;
+    householdId?: string;
 }) {
     const conditions = [];
     if (filter?.requestId) conditions.push(eq(dispatches.requestId, filter.requestId));
     if (filter?.offerId) conditions.push(eq(dispatches.offerId, filter.offerId));
     if (filter?.managerId) conditions.push(eq(dispatches.managerId, filter.managerId));
+    if (filter?.householdId) conditions.push(eq(energyRequests.householdId, filter.householdId));
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -105,6 +107,7 @@ export async function getDispatches(filter?: {
         })
         .from(dispatches)
         .innerJoin(users, eq(dispatches.managerId, users.id))
+        .innerJoin(energyRequests, eq(dispatches.requestId, energyRequests.id))
         .where(whereClause)
         .orderBy(desc(dispatches.dispatchedAt));
 
@@ -116,6 +119,18 @@ export async function getDispatches(filter?: {
     );
 
     return dispatchesWithDetails;
+}
+
+/**
+ * Retrieve all energy dispatches (allocations) specifically for a given household user.
+ * Guarantees that only dispatches matching the household's energy requests are returned.
+ */
+export async function getDispatchesByHousehold(householdId: string): Promise<DispatchDetails[]> {
+    if (!householdId) {
+        throw new BadRequestError("householdId parameter is required");
+    }
+
+    return getDispatches({ householdId });
 }
 
 /**

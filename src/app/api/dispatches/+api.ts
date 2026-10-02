@@ -19,11 +19,13 @@ export async function GET(request: Request) {
         const requestId = url.searchParams.get("requestId") || undefined;
         const offerId = url.searchParams.get("offerId") || undefined;
         const managerId = url.searchParams.get("managerId") || undefined;
+        const householdId = url.searchParams.get("householdId") || request.headers.get("x-user-id") || undefined;
 
         const dispatchesList = await getDispatches({
             requestId,
             offerId,
             managerId,
+            householdId,
         });
 
         return Response.json({

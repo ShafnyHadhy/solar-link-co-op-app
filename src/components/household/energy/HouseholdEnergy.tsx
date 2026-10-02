@@ -1,5 +1,9 @@
 import TabScreenBackground from "@/components/shared/TabScreenBackground";
 import {
+    useHouseholdAllocations,
+    type HouseholdAllocationRecord,
+} from "@/hooks/household/useHouseholdAllocations";
+import {
     useHouseholdEnergyRequests,
     type HouseholdEnergyRequest,
 } from "@/hooks/household/useHouseholdEnergyRequests";
@@ -18,7 +22,7 @@ import {
     View,
 } from "react-native";
 
-type ActiveTab = "create" | "requests";
+type ActiveTab = "create" | "requests" | "allocations";
 type StatusFilter = "all" | "pending" | "approved" | "rejected" | "fulfilled" | "cancelled";
 
 const PURPOSE_OPTIONS = [
@@ -71,10 +75,48 @@ const HouseholdEnergy = ({
         cancelRequest,
     } = useHouseholdEnergyRequests();
 
+    const {
+        allocations,
+        totalAllocatedKwh,
+        loading: allocationsLoading,
+        error: allocationsError,
+        refetch: refetchAllocations,
+    } = useHouseholdAllocations();
+
     // Tab state
     const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab);
     const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialFilter);
     const [searchQuery, setSearchQuery] = useState("");
+    const [allocationsSearchQuery, setAllocationsSearchQuery] = useState("");
+    const [selectedAllocation, setSelectedAllocation] = useState<HouseholdAllocationRecord | null>(null);
+    const [showAllocationModal, setShowAllocationModal] = useState(false);
+
+    const handleRefresh = async () => {
+        await Promise.all([refetch(), refetchAllocations()]);
+    };
+
+    const filteredAllocations = useMemo(() => {
+        const q = allocationsSearchQuery.toLowerCase().trim();
+        if (!q) return allocations;
+        return allocations.filter((a) => {
+            const producer = (a.offer?.ownerName || "").toLowerCase();
+            const grid = (a.offer?.ownerGrid || "").toLowerCase();
+            const reason = (a.request?.reason || "").toLowerCase();
+            const reqId = a.requestId.toLowerCase();
+            const allocId = a.id.toLowerCase();
+            const notes = (a.notes || "").toLowerCase();
+            const kwh = a.dispatchedEnergyKwh;
+            return (
+                producer.includes(q) ||
+                grid.includes(q) ||
+                reason.includes(q) ||
+                reqId.includes(q) ||
+                allocId.includes(q) ||
+                notes.includes(q) ||
+                kwh.includes(q)
+            );
+        });
+    }, [allocations, allocationsSearchQuery]);
 
     React.useEffect(() => {
         if (initialTab) setActiveTab(initialTab);
@@ -266,8 +308,8 @@ const HouseholdEnergy = ({
                 showsVerticalScrollIndicator={false}
                 refreshControl={
                     <RefreshControl
-                        refreshing={loading}
-                        onRefresh={refetch}
+                        refreshing={loading || allocationsLoading}
+                        onRefresh={handleRefresh}
                         tintColor={isDark ? "#F59E0B" : "#D97706"}
                     />
                 }
@@ -280,10 +322,10 @@ const HouseholdEnergy = ({
                 {/* Header */}
                 <View className="mb-6">
                     <Text className={`text-4xl font-extrabold tracking-tight ${theme.text}`}>
-                        Energy Requests
+                        Energy & Allocations
                     </Text>
                     <Text className={`mt-1.5 text-base ${theme.textSecondary}`}>
-                        Request clean solar power from the community microgrid
+                        Manage your energy requests and view community solar allocations
                     </Text>
                 </View>
 
@@ -297,7 +339,7 @@ const HouseholdEnergy = ({
                     >
                         <Feather
                             name="plus-circle"
-                            size={16}
+                            size={15}
                             color={
                                 activeTab === "create"
                                     ? isDark
@@ -309,7 +351,7 @@ const HouseholdEnergy = ({
                             }
                         />
                         <Text
-                            className={`ml-2 text-sm font-bold ${
+                            className={`ml-1.5 text-xs font-bold ${
                                 activeTab === "create"
                                     ? isDark
                                         ? "text-zinc-900"
@@ -317,7 +359,7 @@ const HouseholdEnergy = ({
                                     : "text-muted-foreground"
                             }`}
                         >
-                            New Request
+                            New
                         </Text>
                     </Pressable>
 
@@ -329,7 +371,7 @@ const HouseholdEnergy = ({
                     >
                         <Feather
                             name="list"
-                            size={16}
+                            size={15}
                             color={
                                 activeTab === "requests"
                                     ? isDark
@@ -341,7 +383,7 @@ const HouseholdEnergy = ({
                             }
                         />
                         <Text
-                            className={`ml-2 text-sm font-bold ${
+                            className={`ml-1.5 text-xs font-bold ${
                                 activeTab === "requests"
                                     ? isDark
                                         ? "text-zinc-900"
@@ -349,12 +391,12 @@ const HouseholdEnergy = ({
                                     : "text-muted-foreground"
                             }`}
                         >
-                            My Requests
+                            Requests
                         </Text>
 
                         {pendingCount > 0 && (
                             <View
-                                className={`ml-2 px-2 py-0.5 rounded-full ${
+                                className={`ml-1.5 px-1.5 py-0.2 rounded-full ${
                                     activeTab === "requests"
                                         ? "bg-amber-950/30"
                                         : "bg-amber-500/20"
@@ -370,6 +412,60 @@ const HouseholdEnergy = ({
                                     }`}
                                 >
                                     {pendingCount}
+                                </Text>
+                            </View>
+                        )}
+                    </Pressable>
+
+                    <Pressable
+                        onPress={() => setActiveTab("allocations")}
+                        className={`flex-1 py-3 rounded-xl flex-row items-center justify-center ${
+                            activeTab === "allocations" ? "bg-primary shadow-sm" : ""
+                        }`}
+                    >
+                        <Feather
+                            name="check-circle"
+                            size={15}
+                            color={
+                                activeTab === "allocations"
+                                    ? isDark
+                                        ? "#18181B"
+                                        : "#FFFFFF"
+                                    : isDark
+                                      ? "#A1A1AA"
+                                      : "#6B7280"
+                            }
+                        />
+                        <Text
+                            className={`ml-1.5 text-xs font-bold ${
+                                activeTab === "allocations"
+                                    ? isDark
+                                        ? "text-zinc-900"
+                                        : "text-white"
+                                    : "text-muted-foreground"
+                            }`}
+                        >
+                            Allocations
+                        </Text>
+
+                        {allocations.length > 0 && (
+                            <View
+                                className={`ml-1.5 px-1.5 py-0.2 rounded-full ${
+                                    activeTab === "allocations"
+                                        ? "bg-amber-950/30"
+                                        : "bg-emerald-500/20"
+                                }`}
+                            >
+                                <Text
+                                    className={`text-[10px] font-black ${
+                                        activeTab === "allocations"
+                                            ? isDark
+                                                ? "text-zinc-900"
+                                                : "text-white"
+                                            : "text-emerald-500"
+                                    }`}
+                                >
+                                    {allocations.length}
                                 </Text>
                             </View>
                         )}
@@ -793,6 +889,11 @@ const HouseholdEnergy = ({
                                 {filteredRequests.map((req) => {
                                     const badge = getStatusBadge(req.status);
                                     const isCancellingThis = cancellingId === req.id;
+                                    const reqAllocations = allocations.filter((a) => a.requestId === req.id);
+                                    const totalAllocatedForThisReq = reqAllocations.reduce(
+                                        (sum, a) => sum + (parseFloat(a.dispatchedEnergyKwh) || 0),
+                                        0
+                                    );
 
                                     return (
                                         <View
@@ -836,6 +937,43 @@ const HouseholdEnergy = ({
                                                 </Text>
                                             </View>
 
+                                            {/* Energy Allocation Info for this Request */}
+                                            {reqAllocations.length > 0 && (
+                                                <View className="mb-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 p-3.5">
+                                                    <View className="flex-row items-center justify-between mb-1.5">
+                                                        <View className="flex-row items-center">
+                                                            <Feather name="zap" size={14} color="#10B981" />
+                                                            <Text className="ml-1.5 text-xs font-bold text-emerald-500">
+                                                                Energy Allocated: {totalAllocatedForThisReq.toFixed(1)} kWh
+                                                            </Text>
+                                                        </View>
+                                                        <View className="px-2 py-0.5 rounded-full bg-emerald-500/20">
+                                                            <Text className="text-[10px] font-bold text-emerald-500 uppercase">
+                                                                {req.status === "fulfilled" ? "Fully Allocated" : "Dispatched"}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+
+                                                    <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                                                        Source: <Text className="font-semibold text-foreground">{reqAllocations[0].offer?.ownerName || "Community Solar"}</Text>
+                                                        {reqAllocations.length > 1 ? ` (+${reqAllocations.length - 1} more sources)` : ""}
+                                                    </Text>
+
+                                                    <Pressable
+                                                        onPress={() => {
+                                                            setSelectedAllocation(reqAllocations[0]);
+                                                            setShowAllocationModal(true);
+                                                        }}
+                                                        className="mt-2.5 flex-row items-center justify-center py-2 px-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 active:opacity-80"
+                                                    >
+                                                        <Feather name="info" size={13} color="#10B981" />
+                                                        <Text className="ml-1.5 text-xs font-bold text-emerald-500">
+                                                            View Allocation Breakdown
+                                                        </Text>
+                                                    </Pressable>
+                                                </View>
+                                            )}
+
                                             {/* Metadata row */}
                                             <View className="flex-row items-center justify-between pt-1 border-t border-border/40">
                                                 <View className="flex-row items-center">
@@ -871,6 +1009,246 @@ const HouseholdEnergy = ({
                                                     </Pressable>
                                                 </View>
                                             )}
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        )}
+                    </View>
+                )}
+
+                {/* ========================================================================= */}
+                {/* TAB 3: ENERGY ALLOCATIONS & COMMUNITY SOLAR SOURCE */}
+                {/* ========================================================================= */}
+                {activeTab === "allocations" && (
+                    <View>
+                        {/* Top KPI Analytics Overview */}
+                        <View className="flex-row gap-3 mb-5">
+                            {/* Total Energy Allocated */}
+                            <View className="flex-1 flex-col justify-between rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
+                                <View className="flex-row items-center justify-between">
+                                    <Text className="text-2xl font-black text-emerald-500">
+                                        {totalAllocatedKwh.toFixed(1)}
+                                    </Text>
+                                    <View className="h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/30">
+                                        <Feather name="zap" size={16} color="#10B981" />
+                                    </View>
+                                </View>
+                                <Text className="text-xs font-semibold text-muted-foreground mt-2">
+                                    Allocated (kWh)
+                                </Text>
+                            </View>
+
+                            {/* Completed Dispatches */}
+                            <View className="flex-1 flex-col justify-between rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
+                                <View className="flex-row items-center justify-between">
+                                    <Text className="text-2xl font-black text-foreground">
+                                        {allocations.length}
+                                    </Text>
+                                    <View className="h-8 w-8 items-center justify-center rounded-xl bg-amber-500/15 border border-amber-500/30">
+                                        <Feather name="send" size={16} color="#F59E0B" />
+                                    </View>
+                                </View>
+                                <Text className="text-xs font-semibold text-muted-foreground mt-2">
+                                    Dispatches
+                                </Text>
+                            </View>
+
+                            {/* Clean Source */}
+                            <View className="flex-1 flex-col justify-between rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
+                                <View className="flex-row items-center justify-between">
+                                    <Text className="text-2xl font-black text-[#F59E0B]">
+                                        100%
+                                    </Text>
+                                    <View className="h-8 w-8 items-center justify-center rounded-xl bg-yellow-500/15 border border-yellow-500/30">
+                                        <Feather name="sun" size={16} color="#F59E0B" />
+                                    </View>
+                                </View>
+                                <Text className="text-xs font-semibold text-muted-foreground mt-2">
+                                    Solar Clean
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Search & Filter Bar */}
+                        <View className="mb-4 flex-row items-center rounded-2xl border border-border/80 bg-card px-4 py-2 shadow-sm">
+                            <Feather name="search" size={18} color="#9CA3AF" />
+                            <TextInput
+                                value={allocationsSearchQuery}
+                                onChangeText={setAllocationsSearchQuery}
+                                placeholder="Search by solar owner, grid, request..."
+                                placeholderTextColor="#9CA3AF"
+                                className="ml-3 flex-1 py-2 text-sm text-foreground"
+                            />
+                            {allocationsSearchQuery.length > 0 && (
+                                <Pressable onPress={() => setAllocationsSearchQuery("")}>
+                                    <Feather name="x" size={18} color="#9CA3AF" />
+                                </Pressable>
+                            )}
+                        </View>
+
+                        {/* Loading State */}
+                        {allocationsLoading && allocations.length === 0 ? (
+                            <View className="items-center justify-center py-16">
+                                <ActivityIndicator size="large" color="#F59E0B" />
+                                <Text className="mt-4 text-sm font-semibold text-muted-foreground">
+                                    Loading your energy allocations from community grid...
+                                </Text>
+                            </View>
+                        ) : allocationsError ? (
+                            <View className="items-center justify-center py-8 px-5 rounded-3xl border border-rose-500/30 bg-rose-500/10 mb-6">
+                                <Feather name="alert-triangle" size={28} color="#EF4444" />
+                                <Text className="text-base font-bold text-rose-500 mt-2">
+                                    Failed to load allocations
+                                </Text>
+                                <Text className="text-xs text-muted-foreground text-center mt-1 mb-4">
+                                    {allocationsError}
+                                </Text>
+                                <Pressable
+                                    onPress={refetchAllocations}
+                                    className="px-5 py-2.5 rounded-xl bg-primary active:opacity-90"
+                                >
+                                    <Text className="text-xs font-bold text-primary-foreground">
+                                        Retry
+                                    </Text>
+                                </Pressable>
+                            </View>
+                        ) : filteredAllocations.length === 0 ? (
+                            <View className="items-center rounded-3xl border border-border/70 bg-card/80 p-8 text-center my-4">
+                                <View className="h-16 w-16 rounded-2xl bg-secondary items-center justify-center mb-4">
+                                    <Feather name="sun" size={30} color="#F59E0B" />
+                                </View>
+                                <Text className="text-lg font-bold text-foreground">
+                                    No Energy Allocations Yet
+                                </Text>
+                                <Text className="text-center text-sm text-muted-foreground mt-1 mb-6 leading-5">
+                                    {allocationsSearchQuery
+                                        ? "No allocations matched your search query."
+                                        : "When the grid manager dispatches community solar energy to your approved requests, your allocation details will appear here."}
+                                </Text>
+                                <Pressable
+                                    onPress={() => setActiveTab("requests")}
+                                    className="rounded-2xl bg-primary px-6 py-3 shadow-sm"
+                                >
+                                    <Text className="text-sm font-bold text-primary-foreground">
+                                        View My Requests
+                                    </Text>
+                                </Pressable>
+                            </View>
+                        ) : (
+                            <View className="gap-4">
+                                {filteredAllocations.map((alloc) => {
+                                    const amountKwh = parseFloat(alloc.dispatchedEnergyKwh) || 0;
+                                    const producerName = alloc.offer?.ownerName || "Community Solar Producer";
+                                    const gridLocation = alloc.offer?.ownerGrid || "Community Microgrid";
+                                    const isFulfilled = alloc.request?.status === "fulfilled";
+
+                                    return (
+                                        <View
+                                            key={alloc.id}
+                                            className="rounded-3xl border border-border/70 bg-card/90 p-5 shadow-sm"
+                                        >
+                                            {/* Top Row: Allocated Amount & Status Badge */}
+                                            <View className="flex-row items-center justify-between mb-3.5">
+                                                <View className="flex-row items-baseline">
+                                                    <Text className="text-3xl font-black text-emerald-500">
+                                                        +{amountKwh.toFixed(1)}
+                                                    </Text>
+                                                    <Text className="ml-1 text-sm font-bold text-emerald-600">
+                                                        kWh
+                                                    </Text>
+                                                </View>
+
+                                                <View className="flex-row items-center px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30">
+                                                    <Feather name="check-circle" size={12} color="#10B981" />
+                                                    <Text className="ml-1.5 text-xs font-bold text-emerald-500 uppercase tracking-wider">
+                                                        {isFulfilled ? "Fulfilled" : "Allocated"}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            {/* Solar Producer Source Card */}
+                                            <View className="rounded-2xl bg-secondary/50 border border-border/50 p-3.5 mb-3">
+                                                <View className="flex-row items-center justify-between mb-2">
+                                                    <View className="flex-row items-center">
+                                                        <View className="h-6 w-6 rounded-lg bg-amber-500/20 items-center justify-center mr-2">
+                                                            <Feather name="sun" size={13} color="#F59E0B" />
+                                                        </View>
+                                                        <Text className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                                            Solar Source
+                                                        </Text>
+                                                    </View>
+                                                    <Text className="text-[11px] font-mono text-muted-foreground">
+                                                        Offer: {alloc.offerId.slice(-6).toUpperCase()}
+                                                    </Text>
+                                                </View>
+
+                                                <Text className="text-sm font-bold text-foreground">
+                                                    {producerName}
+                                                </Text>
+                                                <Text className="text-xs text-muted-foreground mt-0.5">
+                                                    Grid: {gridLocation}
+                                                </Text>
+                                            </View>
+
+                                            {/* Linked Energy Request Card */}
+                                            <View className="rounded-2xl bg-secondary/30 border border-border/40 p-3.5 mb-3.5">
+                                                <View className="flex-row items-center justify-between mb-2">
+                                                    <View className="flex-row items-center">
+                                                        <View className="h-6 w-6 rounded-lg bg-blue-500/20 items-center justify-center mr-2">
+                                                            <Feather name="home" size={13} color="#3B82F6" />
+                                                        </View>
+                                                        <Text className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                                            Target Request
+                                                        </Text>
+                                                    </View>
+                                                    <Text className="text-[11px] font-mono text-muted-foreground">
+                                                        Req: {alloc.requestId.slice(-6).toUpperCase()}
+                                                    </Text>
+                                                </View>
+
+                                                <Text className="text-sm font-semibold text-foreground">
+                                                    {alloc.request?.reason || "Household Energy Request"}
+                                                </Text>
+                                                <Text className="text-xs text-muted-foreground mt-0.5">
+                                                    Total Requested: {parseFloat(alloc.request?.requestedEnergyKwh || "0").toFixed(1)} kWh • Status:{" "}
+                                                    <Text className="font-bold text-foreground capitalize">
+                                                        {alloc.request?.status || "Approved"}
+                                                    </Text>
+                                                </Text>
+                                            </View>
+
+                                            {/* Notes if present */}
+                                            {alloc.notes ? (
+                                                <View className="mb-3 px-3 py-2 rounded-xl bg-card border border-border/30">
+                                                    <Text className="text-xs text-muted-foreground italic">
+                                                        "{alloc.notes}"
+                                                    </Text>
+                                                </View>
+                                            ) : null}
+
+                                            {/* Footer Row: Timestamp & Details Trigger */}
+                                            <View className="flex-row items-center justify-between pt-2 border-t border-border/40">
+                                                <View className="flex-row items-center">
+                                                    <Feather name="calendar" size={12} color="#9CA3AF" />
+                                                    <Text className="ml-1.5 text-xs text-muted-foreground">
+                                                        {formatDate(alloc.dispatchedAt)}
+                                                    </Text>
+                                                </View>
+
+                                                <Pressable
+                                                    onPress={() => {
+                                                        setSelectedAllocation(alloc);
+                                                        setShowAllocationModal(true);
+                                                    }}
+                                                    className="flex-row items-center py-1.5 px-3 rounded-xl bg-primary/10 border border-primary/25 active:opacity-80"
+                                                >
+                                                    <Text className="text-xs font-bold text-primary mr-1">
+                                                        Details
+                                                    </Text>
+                                                    <Feather name="chevron-right" size={13} color={isDark ? "#F59E0B" : "#D97706"} />
+                                                </Pressable>
+                                            </View>
                                         </View>
                                     );
                                 })}
@@ -945,6 +1323,185 @@ const HouseholdEnergy = ({
                                 </Text>
                             </Pressable>
                         </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* ========================================================================= */}
+            {/* ALLOCATION DETAIL MODAL */}
+            {/* ========================================================================= */}
+            <Modal
+                visible={showAllocationModal && !!selectedAllocation}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowAllocationModal(false)}
+            >
+                <View className="flex-1 bg-black/80 justify-center items-center px-5">
+                    <View className={`w-full max-h-[85%] rounded-3xl p-6 border ${theme.modalBorder} ${theme.modalBg} shadow-2xl`}>
+                        <View className="flex-row items-center justify-between mb-4">
+                            <View className="flex-row items-center">
+                                <View className="h-10 w-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 items-center justify-center mr-3">
+                                    <Feather name="zap" size={20} color="#10B981" />
+                                </View>
+                                <View>
+                                    <Text className={`text-xl font-black ${theme.text}`}>
+                                        Allocation Details
+                                    </Text>
+                                    <Text className="text-xs text-muted-foreground">
+                                        Community Microgrid Dispatch
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <Pressable
+                                onPress={() => setShowAllocationModal(false)}
+                                className="h-9 w-9 rounded-full bg-secondary items-center justify-center"
+                            >
+                                <Feather name="x" size={18} color="#9CA3AF" />
+                            </Pressable>
+                        </View>
+
+                        {selectedAllocation && (
+                            <ScrollView showsVerticalScrollIndicator={false} className="mb-4">
+                                {/* Allocated Amount Highlight */}
+                                <View className="items-center py-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 mb-4">
+                                    <Text className="text-xs font-bold uppercase tracking-wider text-emerald-500">
+                                        Dispatched Clean Solar Energy
+                                    </Text>
+                                    <Text className="text-4xl font-black text-emerald-500 mt-1">
+                                        {parseFloat(selectedAllocation.dispatchedEnergyKwh).toFixed(1)} kWh
+                                    </Text>
+                                    <View className="mt-2 flex-row items-center px-3 py-1 rounded-full bg-emerald-500/20">
+                                        <Feather name="check" size={12} color="#10B981" />
+                                        <Text className="ml-1 text-xs font-bold text-emerald-500 uppercase">
+                                            {selectedAllocation.request?.status === "fulfilled" ? "Fully Fulfilled" : "Allocated"}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Visual Dispatch Transfer Flow */}
+                                <View className="rounded-2xl bg-secondary/50 border border-border/50 p-4 mb-4">
+                                    <Text className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
+                                        Energy Dispatch Route
+                                    </Text>
+
+                                    {/* Source */}
+                                    <View className="flex-row items-center justify-between">
+                                        <View className="flex-row items-center flex-1 mr-2">
+                                            <Feather name="sun" size={16} color="#F59E0B" />
+                                            <View className="ml-2.5 flex-1">
+                                                <Text className="text-xs font-bold text-foreground" numberOfLines={1}>
+                                                    {selectedAllocation.offer?.ownerName || "Community Solar Producer"}
+                                                </Text>
+                                                <Text className="text-[11px] text-muted-foreground">
+                                                    Grid: {selectedAllocation.offer?.ownerGrid || "Microgrid"}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        <View className="px-2 py-0.5 rounded-md bg-amber-500/20">
+                                            <Text className="text-[10px] font-bold text-amber-500 uppercase">
+                                                Producer
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Flow Arrow */}
+                                    <View className="flex-row items-center my-2.5">
+                                        <View className="flex-1 h-px bg-border/60" />
+                                        <View className="mx-2 px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex-row items-center">
+                                            <Feather name="arrow-down" size={11} color="#10B981" />
+                                            <Text className="ml-1 text-[11px] font-black text-emerald-500">
+                                                {parseFloat(selectedAllocation.dispatchedEnergyKwh).toFixed(1)} kWh
+                                            </Text>
+                                        </View>
+                                        <View className="flex-1 h-px bg-border/60" />
+                                    </View>
+
+                                    {/* Recipient */}
+                                    <View className="flex-row items-center justify-between">
+                                        <View className="flex-row items-center flex-1 mr-2">
+                                            <Feather name="home" size={16} color="#3B82F6" />
+                                            <View className="ml-2.5 flex-1">
+                                                <Text className="text-xs font-bold text-foreground" numberOfLines={1}>
+                                                    {selectedAllocation.request?.householdName || "Your Household"}
+                                                </Text>
+                                                <Text className="text-[11px] text-muted-foreground">
+                                                    Request: {selectedAllocation.request?.reason || "Energy request"}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        <View className="px-2 py-0.5 rounded-md bg-blue-500/20">
+                                            <Text className="text-[10px] font-bold text-blue-500 uppercase">
+                                                Recipient
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </View>
+
+                                {/* Detailed Parameters Breakdown Table */}
+                                <View className="rounded-2xl bg-secondary/30 border border-border/40 p-4 mb-4 gap-2.5">
+                                    <View className="flex-row justify-between">
+                                        <Text className="text-xs text-muted-foreground">Allocation Date</Text>
+                                        <Text className="text-xs font-bold text-foreground">
+                                            {formatDate(selectedAllocation.dispatchedAt)}
+                                        </Text>
+                                    </View>
+
+                                    <View className="flex-row justify-between">
+                                        <Text className="text-xs text-muted-foreground">Requested Energy</Text>
+                                        <Text className="text-xs font-bold text-foreground">
+                                            {parseFloat(selectedAllocation.request?.requestedEnergyKwh || "0").toFixed(1)} kWh
+                                        </Text>
+                                    </View>
+
+                                    <View className="flex-row justify-between">
+                                        <Text className="text-xs text-muted-foreground">Allocated Energy</Text>
+                                        <Text className="text-xs font-bold text-emerald-500">
+                                            {parseFloat(selectedAllocation.dispatchedEnergyKwh).toFixed(1)} kWh
+                                        </Text>
+                                    </View>
+
+                                    <View className="flex-row justify-between">
+                                        <Text className="text-xs text-muted-foreground">Dispatched By</Text>
+                                        <Text className="text-xs font-bold text-foreground">
+                                            {selectedAllocation.manager?.name || "Community Grid Manager"}
+                                        </Text>
+                                    </View>
+
+                                    <View className="flex-row justify-between">
+                                        <Text className="text-xs text-muted-foreground">Dispatch ID</Text>
+                                        <Text className="text-[11px] font-mono text-muted-foreground">
+                                            {selectedAllocation.id}
+                                        </Text>
+                                    </View>
+
+                                    <View className="flex-row justify-between">
+                                        <Text className="text-xs text-muted-foreground">Request ID</Text>
+                                        <Text className="text-[11px] font-mono text-muted-foreground">
+                                            {selectedAllocation.requestId}
+                                        </Text>
+                                    </View>
+
+                                    {selectedAllocation.notes && (
+                                        <View className="pt-2 border-t border-border/40">
+                                            <Text className="text-xs text-muted-foreground mb-1">Manager Notes</Text>
+                                            <Text className="text-xs font-medium text-foreground">
+                                                {selectedAllocation.notes}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </ScrollView>
+                        )}
+
+                        <Pressable
+                            onPress={() => setShowAllocationModal(false)}
+                            className="w-full py-3.5 rounded-2xl bg-secondary border border-border/60 items-center active:opacity-80"
+                        >
+                            <Text className="text-sm font-bold text-foreground">
+                                Close
+                            </Text>
+                        </Pressable>
                     </View>
                 </View>
             </Modal>
