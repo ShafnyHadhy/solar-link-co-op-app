@@ -2,9 +2,10 @@ import TabScreenBackground from '@/components/shared/TabScreenBackground';
 import { useCommunityAllocation } from '@/hooks/manager/useCommunityAllocation';
 import { useCommunityGeneration } from '@/hooks/manager/useCommunityGeneration';
 import { useCommunityReserve } from '@/hooks/manager/useCommunityReserve';
+import { useEnergyRequests } from '@/hooks/manager/useEnergyRequests';
 import { useUser } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback } from 'react';
 import {
     ActivityIndicator,
@@ -39,10 +40,31 @@ const ManagementDashboard = () => {
         refetch: refetchReserve,
     } = useCommunityReserve();
 
-    const isRefreshing = generationLoading || allocationLoading || reserveLoading;
+    const {
+        requests,
+        loading: requestsLoading,
+        error: requestsError,
+        refetch: refetchRequests,
+    } = useEnergyRequests();
+
+    // Automatically synchronize requests data when screen regains focus
+    useFocusEffect(
+        useCallback(() => {
+            refetchRequests();
+        }, [refetchRequests])
+    );
+
+    const pendingRequestsCount = requests.filter((r) => r.status === 'pending').length;
+
+    const isRefreshing = generationLoading || allocationLoading || reserveLoading || requestsLoading;
     const handleRefresh = useCallback(async () => {
-        await Promise.all([refetchGeneration(), refetchAllocation(), refetchReserve()]);
-    }, [refetchGeneration, refetchAllocation, refetchReserve]);
+        await Promise.all([
+            refetchGeneration(),
+            refetchAllocation(),
+            refetchReserve(),
+            refetchRequests(),
+        ]);
+    }, [refetchGeneration, refetchAllocation, refetchReserve, refetchRequests]);
 
     return (
         <View className='flex-1'>
@@ -230,12 +252,37 @@ const ManagementDashboard = () => {
 
                 <View className='flex-row items-center justify-between gap-4 p-4 bg-secondary/60 rounded-xl shadow-sm'>
                     <View className='flex-col gap-1'>
-                        <Text className='text-lg font-semibold text-foreground'>
-                            3 requests
-                        </Text>
-                        <Text className='text-xs font-semibold text-muted-foreground'>
-                            pending household requests
-                        </Text>
+                        {requestsLoading && requests.length === 0 ? (
+                            <>
+                                <View className='h-7 justify-center'>
+                                    <ActivityIndicator size="small" color="#F59E0B" />
+                                </View>
+                                <Text className='text-xs font-semibold text-muted-foreground'>
+                                    pending household requests
+                                </Text>
+                            </>
+                        ) : requestsError ? (
+                            <Pressable onPress={() => refetchRequests()} className='active:opacity-70'>
+                                <Text className='text-lg font-semibold text-foreground'>
+                                    -- requests
+                                </Text>
+                                <View className='flex-row items-center gap-1'>
+                                    <Feather name="alert-circle" size={12} color="#EF4444" />
+                                    <Text className='text-xs font-semibold text-[#EF4444]'>
+                                        Sync error • Tap to retry
+                                    </Text>
+                                </View>
+                            </Pressable>
+                        ) : (
+                            <>
+                                <Text className='text-lg font-semibold text-foreground'>
+                                    {pendingRequestsCount} {pendingRequestsCount === 1 ? 'request' : 'requests'}
+                                </Text>
+                                <Text className='text-xs font-semibold text-muted-foreground'>
+                                    pending household requests
+                                </Text>
+                            </>
+                        )}
                     </View>
                     <View className='items-center justify-center'>
                         <Pressable
