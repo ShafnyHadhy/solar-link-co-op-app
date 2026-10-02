@@ -1,6 +1,7 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
 import { useCommunityAllocation } from '@/hooks/manager/useCommunityAllocation';
 import { useCommunityGeneration } from '@/hooks/manager/useCommunityGeneration';
+import { useCommunityReserve } from '@/hooks/manager/useCommunityReserve';
 import { useUser } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -31,10 +32,17 @@ const ManagementDashboard = () => {
         refetch: refetchAllocation,
     } = useCommunityAllocation();
 
-    const isRefreshing = generationLoading || allocationLoading;
+    const {
+        data: reserveData,
+        loading: reserveLoading,
+        error: reserveError,
+        refetch: refetchReserve,
+    } = useCommunityReserve();
+
+    const isRefreshing = generationLoading || allocationLoading || reserveLoading;
     const handleRefresh = useCallback(async () => {
-        await Promise.all([refetchGeneration(), refetchAllocation()]);
-    }, [refetchGeneration, refetchAllocation]);
+        await Promise.all([refetchGeneration(), refetchAllocation(), refetchReserve()]);
+    }, [refetchGeneration, refetchAllocation, refetchReserve]);
 
     return (
         <View className='flex-1'>
@@ -70,18 +78,42 @@ const ManagementDashboard = () => {
                     <Text className='text-sm font-semibold text-muted-foreground'>
                         Available Community Energy
                     </Text>
-                    <Text className='text-3xl font-extrabold text-foreground'>
-                        45 kWh
-                    </Text>
-                    <View className='w-full flex-row items-center justify-between mb-1'>
-                        <Text className='text-xs font-semibold text-muted-foreground'>
-                            12% available for sharing
+                    {reserveLoading && !reserveData ? (
+                        <View className='h-9 justify-center'>
+                            <ActivityIndicator size="small" color="#10B981" />
+                        </View>
+                    ) : (
+                        <Text className='text-3xl font-extrabold text-foreground'>
+                            {reserveError ? '-- kWh' : `${reserveData?.availableReserveKwh ?? 0} kWh`}
                         </Text>
+                    )}
+                    <View className='w-full flex-row items-center justify-between mb-1'>
+                        {reserveLoading && !reserveData ? (
+                            <Text className='text-xs font-semibold text-muted-foreground'>
+                                Calculating community reserve...
+                            </Text>
+                        ) : reserveError ? (
+                            <Pressable onPress={() => refetchReserve()} className='flex-row items-center gap-1 active:opacity-70'>
+                                <Feather name="alert-circle" size={12} color="#EF4444" />
+                                <Text className='text-xs font-semibold text-[#EF4444]'>
+                                    Sync error • Tap to retry
+                                </Text>
+                            </Pressable>
+                        ) : (
+                            <Text className='text-xs font-semibold text-muted-foreground'>
+                                {reserveData?.percentageAvailable ?? 0}% available for sharing
+                            </Text>
+                        )}
                     </View>
                     {/* Progress Bar Container */}
                     <View className='w-full h-2 rounded-full bg-secondary overflow-hidden border border-border/40'>
                         {/* Progress Bar Fill */}
-                        <View className='h-full w-[12%] bg-primary rounded-full' />
+                        <View
+                            className='h-full bg-primary rounded-full'
+                            style={{
+                                width: `${Math.min(100, Math.max(0, reserveData?.percentageAvailable ?? 0))}%`,
+                            }}
+                        />
                     </View>
                 </View>
 

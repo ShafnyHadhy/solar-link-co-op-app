@@ -476,3 +476,93 @@ export async function rejectSolarOffer(offerId: string, managerId: string) {
 
 export type ManagerSolarOffer = Awaited<ReturnType<typeof getSolarOffers>>[number];
 export type ManagerSolarOfferDetail = Awaited<ReturnType<typeof getSolarOfferById>>;
+
+// ============================================================================
+// Community Reserve Calculation (US-13 Manager Dashboard)
+// ============================================================================
+
+export interface CommunityReserveBreakdownItem {
+    id: string;
+    ownerName: string | null;
+    offeredKwh: number;
+    dispatchedKwh: number;
+    remainingKwh: number;
+    status: string;
+}
+
+export interface CommunityReserveResult {
+    availableReserveKwh: number;
+    totalPoolCapacityKwh: number;
+    totalDispatchedKwh: number;
+    percentageAvailable: number;
+    percentageAllocated: number;
+    activeOffersCount: number;
+    breakdownByOffer?: CommunityReserveBreakdownItem[];
+}
+
+/**
+ * Calculates the real-time community energy reserve from active approved solar offers
+ * and dispatched energy records.
+ * 
+ * Logic:
+ * Community Reserve = Sum of remaining available energy across all active approved solar offers.
+ * Percentage Available = (Community Reserve / Total Approved Pool Capacity) * 100
+ */
+export async function getCommunityReserve(): Promise<CommunityReserveResult> {
+    const offers = await getSolarOffers();
+
+    const now = Date.now();
+    const approvedOffers = offers.filter((o) => {
+        if (o.status !== "approved") return false;
+        if (o.expiresAt && new Date(o.expiresAt).getTime() < now) return false;
+        return true;
+    });
+
+    let availableReserveKwh = 0;
+    let totalPoolCapacityKwh = 0;
+    let totalDispatchedKwh = 0;
+
+    const breakdownByOffer = approvedOffers.map((o) => {
+        const remaining = o.remainingEnergyKwh;
+        const offered = parseFloat(o.energyAmountKwh) || 0;
+        const dispatched = o.totalDispatchedKwh;
+
+        availableReserveKwh += remaining;
+        totalPoolCapacityKwh += offered;
+        totalDispatchedKwh += dispatched;
+
+        return {
+            id: o.id,
+            ownerName: o.ownerName,
+            offeredKwh: +offered.toFixed(1),
+            dispatchedKwh: +dispatched.toFixed(1),
+            remainingKwh: +remaining.toFixed(1),
+            status: o.status,
+        };
+    });
+
+    availableReserveKwh = +availableReserveKwh.toFixed(1);
+    totalPoolCapacityKwh = +totalPoolCapacityKwh.toFixed(1);
+    totalDispatchedKwh = +totalDispatchedKwh.toFixed(1);
+
+    const percentageAvailable =
+        totalPoolCapacityKwh > 0
+            ? +((availableReserveKwh / totalPoolCapacityKwh) * 100).toFixed(1)
+            : 0;
+
+    const percentageAllocated =
+        totalPoolCapacityKwh > 0
+            ? +((totalDispatchedKwh / totalPoolCapacityKwh) * 100).toFixed(1)
+            : 0;
+
+    return {
+        availableReserveKwh,
+        totalPoolCapacityKwh,
+        totalDispatchedKwh,
+        percentageAvailable,
+        percentageAllocated,
+        activeOffersCount: approvedOffers.length,
+        breakdownByOffer,
+    };
+}
+
