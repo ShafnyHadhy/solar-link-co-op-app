@@ -1,13 +1,27 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
+import { useCommunityGeneration } from '@/hooks/manager/useCommunityGeneration';
 import { useUser } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import {
+    ActivityIndicator,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    Text,
+    View,
+} from 'react-native';
 
 const ManagementDashboard = () => {
     const { user } = useUser();
     const router = useRouter();
+    const {
+        data: generationData,
+        loading: generationLoading,
+        error: generationError,
+        refetch: refetchGeneration,
+    } = useCommunityGeneration();
 
     return (
         <View className='flex-1'>
@@ -16,6 +30,13 @@ const ManagementDashboard = () => {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ flexGrow: 1, padding: 20, paddingTop: 60 }}
                 className='flex-1'
+                refreshControl={
+                    <RefreshControl
+                        refreshing={generationLoading}
+                        onRefresh={refetchGeneration}
+                        tintColor="#10B981"
+                    />
+                }
             >
                 <View className='flex-row items-center justify-between mb-6'>
                     <View>
@@ -61,15 +82,50 @@ const ManagementDashboard = () => {
                                 </Text>
                             </View>
                         </View>
-                        <Text className='text-xl font-extrabold text-foreground mt-1'>
-                            120 kWh
-                        </Text>
-                        <View className='flex-row items-center gap-1'>
-                            <Feather name="trending-up" size={12} color="#10B981" />
-                            <Text className='text-xs font-semibold text-[#10B981]'>
-                                +5.2% vs yesterday
+                        {generationLoading && !generationData ? (
+                            <View className='h-7 justify-center mt-1'>
+                                <ActivityIndicator size="small" color="#10B981" />
+                            </View>
+                        ) : (
+                            <Text className='text-xl font-extrabold text-foreground mt-1'>
+                                {generationError ? '-- kWh' : `${generationData?.generatedTodayKwh ?? 0} kWh`}
                             </Text>
-                        </View>
+                        )}
+                        {generationLoading && !generationData ? (
+                            <View className='flex-row items-center gap-1'>
+                                <Text className='text-xs font-semibold text-muted-foreground'>
+                                    Syncing...
+                                </Text>
+                            </View>
+                        ) : generationError ? (
+                            <Pressable onPress={() => refetchGeneration()} className='flex-row items-center gap-1 active:opacity-70'>
+                                <Feather name="alert-circle" size={12} color="#EF4444" />
+                                <Text className='text-xs font-semibold text-[#EF4444]'>
+                                    Sync error • Retry
+                                </Text>
+                            </Pressable>
+                        ) : generationData?.trend === 'up' ? (
+                            <View className='flex-row items-center gap-1'>
+                                <Feather name="trending-up" size={12} color="#10B981" />
+                                <Text className='text-xs font-semibold text-[#10B981]'>
+                                    +{generationData.changePercentage}% vs yesterday
+                                </Text>
+                            </View>
+                        ) : generationData?.trend === 'down' ? (
+                            <View className='flex-row items-center gap-1'>
+                                <Feather name="trending-down" size={12} color="#EF4444" />
+                                <Text className='text-xs font-semibold text-[#EF4444]'>
+                                    {generationData.changePercentage}% vs yesterday
+                                </Text>
+                            </View>
+                        ) : (
+                            <View className='flex-row items-center gap-1'>
+                                <Feather name="minus" size={12} color="#9CA3AF" />
+                                <Text className='text-xs font-semibold text-muted-foreground'>
+                                    0.0% vs yesterday
+                                </Text>
+                            </View>
+                        )}
                     </View>
                     <View className='flex-1 flex-col gap-2 rounded-lg border border-border/30 bg-secondary/60 p-4 shadow-sm'>
                         <View className='flex-row items-center justify-between'>
