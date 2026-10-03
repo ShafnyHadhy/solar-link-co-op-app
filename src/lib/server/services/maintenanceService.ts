@@ -334,6 +334,34 @@ export async function createMaintenanceDiagnosis(data: {
 }
 
 
+// CESA-255 - Update maintenance diagnosis
+export async function updateMaintenanceDiagnosis(
+    recordId: string,
+    diagnosis: string
+) {
+    try {
+        const [updatedRecord] = await db
+            .update(maintenanceRecords)
+            .set({
+                description: diagnosis,
+            })
+            .where(eq(maintenanceRecords.id, recordId))
+            .returning();
+
+        return updatedRecord ?? null;
+    } catch (error) {
+        console.error(
+            "Failed to update maintenance diagnosis:",
+            error
+        );
+
+        throw new Error(
+            "Failed to update maintenance diagnosis"
+        );
+    }
+}
+
+
 // CESA-206 - Record replaced parts
 export async function updateMaintenanceParts(
     recordId: string,
@@ -386,6 +414,7 @@ export async function updateMaintenanceNotes(
         );
     }
 }
+
 
 // CESA-209 - Retrieve maintenance history for a service ticket
 export async function getMaintenanceHistory(
