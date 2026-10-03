@@ -3,6 +3,7 @@ import ManagerEnergyRequests from '@/components/manager/energy/ManagerEnergyRequ
 import WaitUntilRoleAssigned from '@/components/shared/WaitUntilRoleAssigned';
 import SolarOwnerEnergy from '@/components/solar-owner/energy/SolarOwnerEnergy';
 import TechnicianEnergyScreen from '@/components/technician/energy/TechnicianEnergyScreen';
+import { useUserSync } from '@/hooks/useUserSync';
 import { getUserRole } from '@/lib/getUserRole';
 import { useUser } from '@clerk/expo';
 import { useLocalSearchParams } from 'expo-router';
@@ -10,6 +11,7 @@ import React from 'react';
 
 const EnergyScreen = () => {
     const { user, isLoaded } = useUser();
+    const { dbUser } = useUserSync();
     const params = useLocalSearchParams<{ tab?: string }>();
 
     if (!isLoaded) {
@@ -17,7 +19,8 @@ const EnergyScreen = () => {
     }
 
     const role = getUserRole(
-        user?.publicMetadata?.role
+        user?.publicMetadata?.role,
+        dbUser?.role
     );
 
     switch (role) {

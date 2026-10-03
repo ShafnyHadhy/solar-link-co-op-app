@@ -12,9 +12,11 @@ export function getCachedUserRole(): UserRole | null {
 
 export function getUserRole(
     metadataRole?: unknown,
-    fallbackRole?: unknown
+    dbRole?: unknown
 ): UserRole | null {
-    const candidate = metadataRole || fallbackRole || cachedUserRole;
+    // PostgreSQL (dbRole / cachedUserRole) is the authoritative source of truth.
+    // metadataRole from Clerk acts as initial fast fallback before sync completes.
+    const candidate = dbRole || cachedUserRole || metadataRole;
     if (
         candidate === "manager" ||
         candidate === "solar_owner" ||

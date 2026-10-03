@@ -504,7 +504,26 @@ export async function updateMemberStatus(
  * Does not expose secrets to client. Gracefully handles missing key or non-Clerk test users.
  */
 export async function syncClerkUserRole(userId: string, role: string): Promise<boolean> {
-    const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+    let clerkSecretKey = process.env.CLERK_SECRET_KEY;
+    if (!clerkSecretKey) {
+        try {
+            const req = (globalThis as any).require;
+            if (typeof req === "function") {
+                const fs = req("fs");
+                const path = req("path");
+                const envPath = path.resolve(process.cwd(), ".env");
+                if (fs.existsSync(envPath)) {
+                    const content = fs.readFileSync(envPath, "utf8");
+                    const match = content.match(/^CLERK_SECRET_KEY\s*=\s*(.+)$/m);
+                    if (match && match[1]) {
+                        clerkSecretKey = match[1].trim().replace(/^["']|["']$/g, "");
+                        process.env.CLERK_SECRET_KEY = clerkSecretKey;
+                    }
+                }
+            }
+        } catch {}
+    }
+
     if (!clerkSecretKey) {
         console.warn(
             "[Clerk Sync] CLERK_SECRET_KEY is not defined in server environment. Neon role updated, skipping Clerk metadata synchronization."
@@ -531,6 +550,9 @@ export async function syncClerkUserRole(userId: string, role: string): Promise<b
                 public_metadata: {
                     role,
                 },
+                unsafe_metadata: {
+                    role,
+                },
             }),
         });
 
@@ -542,7 +564,7 @@ export async function syncClerkUserRole(userId: string, role: string): Promise<b
             return false;
         }
 
-        console.log(`[Clerk Sync Success] Synced role "${role}" to Clerk publicMetadata for user ${userId}.`);
+        console.log(`[Clerk Sync Success] Synced role "${role}" to Clerk publicMetadata & unsafeMetadata for user ${userId}.`);
         return true;
     } catch (err: any) {
         console.error(`[Clerk Sync Error] Failed to reach Clerk API:`, err?.message || err);
@@ -616,7 +638,7 @@ export async function updateMemberRole(
         .returning();
 
     // 5. Server-side Clerk role metadata synchronization (Neon role -> Clerk metadata)
-    await syncClerkUserRole(userId, typedRole);
+    const clerkSynced = await syncClerkUserRole(userId, typedRole);
 
     // 6. Record audit log entry
     const auditId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -632,9 +654,13 @@ export async function updateMemberRole(
             memberEmail: existing.email,
             memberName: existing.name,
             assignedBy: managerId,
+            clerkSynced,
             timestamp: new Date().toISOString(),
         }),
     });
 
-    return updatedUser;
+    return {
+        ...updatedUser,
+        clerkSynced,
+    };
 }
