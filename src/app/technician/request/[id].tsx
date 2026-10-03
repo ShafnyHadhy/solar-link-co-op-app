@@ -204,6 +204,17 @@ const TicketDetailsScreen = () => {
                 [];
 
             setMaintenanceHistory(records);
+
+            // CESA-255 - Restore existing maintenance record
+            if (records.length > 0) {
+                const latestRecord = records[0];
+
+                setMaintenanceRecordId(latestRecord.id);
+                setDiagnosis(latestRecord.description ?? "");
+            } else {
+                setMaintenanceRecordId(null);
+                setDiagnosis("");
+            }
         } catch (err) {
             console.error(
                 "Failed to load maintenance history:",
@@ -389,7 +400,7 @@ const TicketDetailsScreen = () => {
         }
     };
 
-    // CESA-205 - Save technician diagnosis
+    // CESA-205 / CESA-255 - Save technician diagnosis
     const saveDiagnosis = async () => {
         if (!ticket || savingDiagnosis) {
             return;
@@ -416,25 +427,41 @@ const TicketDetailsScreen = () => {
         try {
             setSavingDiagnosis(true);
 
+            // CESA-255 - Update existing record, otherwise create new one
+            const isUpdate = !!maintenanceRecordId;
+
             const response = await fetch(
                 "/api/maintenance-records",
                 {
-                    method: "POST",
+                    method: isUpdate ? "PATCH" : "POST",
                     headers: {
                         "Content-Type": "application/json",
                         ...(user?.id ? { "x-user-id": user.id } : {}),
                     },
-                    body: JSON.stringify({
-                        ticketId: ticket.id,
-                        technicianId: user.id,
-                        diagnosis: cleanedDiagnosis,
-                    }),
+                    body: JSON.stringify(
+                        isUpdate
+                            ? {
+                                  recordId: maintenanceRecordId,
+                                  diagnosis: cleanedDiagnosis,
+                              }
+                            : {
+                                  ticketId: ticket.id,
+                                  technicianId: user.id,
+                                  diagnosis: cleanedDiagnosis,
+                              }
+                    ),
                 }
             );
 
             const result = await response.json();
-            console.log("CESA-205 STATUS:", response.status);
-            console.log("CESA-205 RESPONSE:", result);
+            console.log(
+                "CESA-205/255 STATUS:",
+                response.status
+            );
+            console.log(
+                "CESA-205/255 RESPONSE:",
+                result
+            );
 
             if (!response.ok) {
                 throw new Error(
@@ -443,29 +470,31 @@ const TicketDetailsScreen = () => {
                 );
             }
 
-            const createdRecord =
+            const savedRecord =
                 result.data?.record ??
                 result.record ??
                 null;
 
-            if (!createdRecord?.id) {
+            if (!savedRecord?.id) {
                 throw new Error(
                     "Maintenance record ID was not returned"
                 );
             }
 
-            setMaintenanceRecordId(createdRecord.id);
+            setMaintenanceRecordId(savedRecord.id);
             console.log(
                 "MAINTENANCE RECORD ID:",
-                createdRecord.id
+                savedRecord.id
             );
-            setDiagnosis("");
+            setDiagnosis(savedRecord.description ?? "");
 
             await fetchMaintenanceHistory();
 
             Alert.alert(
-                "Diagnosis Saved",
-                "The maintenance diagnosis has been recorded successfully."
+                isUpdate ? "Diagnosis Updated" : "Diagnosis Saved",
+                isUpdate
+                    ? "The maintenance diagnosis has been updated successfully."
+                    : "The maintenance diagnosis has been recorded successfully."
             );
         } catch (err) {
             console.error(
@@ -1003,7 +1032,7 @@ const TicketDetailsScreen = () => {
                     )}
                 </View>
 
-                {/* CESA-205 - Record Diagnosis */}
+                {/* CESA-205 / CESA-255 - Record Diagnosis */}
                 <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
                     Maintenance Diagnosis
                 </Text>
@@ -1020,11 +1049,15 @@ const TicketDetailsScreen = () => {
 
                         <View className="ml-3 flex-1">
                             <Text className="text-sm font-bold text-foreground">
-                                Record Diagnosis
+                                {maintenanceRecordId
+                                    ? "Update Diagnosis"
+                                    : "Record Diagnosis"}
                             </Text>
 
                             <Text className="mt-1 text-xs text-muted-foreground">
-                                Record your diagnosis for this service ticket.
+                                {maintenanceRecordId
+                                    ? "Update your diagnosis for this service ticket."
+                                    : "Record your diagnosis for this service ticket."}
                             </Text>
                         </View>
                     </View>
@@ -1072,7 +1105,9 @@ const TicketDetailsScreen = () => {
                                         : "text-primary-foreground"
                                 }`}
                             >
-                                Save Diagnosis
+                                {maintenanceRecordId
+                                    ? "Update Diagnosis"
+                                    : "Save Diagnosis"}
                             </Text>
                         )}
                     </Pressable>
