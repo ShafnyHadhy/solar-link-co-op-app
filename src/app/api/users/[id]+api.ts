@@ -1,6 +1,4 @@
-// Member Details and Update API Route
-// GET /api/users/:id — Retrieve specific member details with energy context
-// PATCH /api/users/:id — Update member role (manager, solar_owner, household, technician) and/or status
+import { requireManager } from "@/lib/server/auth/authorization";
 import {
     getMemberDetails,
     updateMemberRole,
@@ -10,6 +8,8 @@ import { errorResponse } from "@/lib/server/utils/response";
 
 export async function GET(request: Request, { id }: Record<string, string>) {
     try {
+        await requireManager(request);
+
         if (!id) {
             return Response.json(
                 { success: false, error: "Member ID is required" },
@@ -31,6 +31,9 @@ export async function GET(request: Request, { id }: Record<string, string>) {
 
 export async function PATCH(request: Request, { id }: Record<string, string>) {
     try {
+        const manager = await requireManager(request);
+        const managerId = manager.id;
+
         if (!id) {
             return Response.json(
                 { success: false, error: "Member ID is required" },
@@ -47,8 +50,6 @@ export async function PATCH(request: Request, { id }: Record<string, string>) {
                 { status: 400 }
             );
         }
-
-        const managerId = request.headers.get("x-user-id");
 
         let updatedUser;
 

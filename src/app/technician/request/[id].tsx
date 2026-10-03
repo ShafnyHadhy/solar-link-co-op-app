@@ -183,7 +183,10 @@ const TicketDetailsScreen = () => {
             const response = await fetch(
                 `/api/maintenance-records?ticketId=${encodeURIComponent(
                     id
-                )}`
+                )}`,
+                {
+                    headers: user?.id ? { "x-user-id": user.id } : {},
+                }
             );
 
             const result = await response.json();
@@ -252,6 +255,7 @@ const TicketDetailsScreen = () => {
                     headers: {
                         "Content-Type":
                             "application/json",
+                        ...(user?.id ? { "x-user-id": user.id } : {}),
                     },
                     body: JSON.stringify({
                         status: newStatus,
@@ -332,6 +336,7 @@ const TicketDetailsScreen = () => {
                     headers: {
                         "Content-Type":
                             "application/json",
+                        ...(user?.id ? { "x-user-id": user.id } : {}),
                     },
                     body: JSON.stringify({
                         technicianId:
@@ -417,6 +422,7 @@ const TicketDetailsScreen = () => {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
+                        ...(user?.id ? { "x-user-id": user.id } : {}),
                     },
                     body: JSON.stringify({
                         ticketId: ticket.id,
@@ -511,6 +517,7 @@ const TicketDetailsScreen = () => {
                     method: "PATCH",
                     headers: {
                         "Content-Type": "application/json",
+                        ...(user?.id ? { "x-user-id": user.id } : {}),
                     },
                     body: JSON.stringify({
                         recordId: maintenanceRecordId,
@@ -586,6 +593,7 @@ const TicketDetailsScreen = () => {
                     method: "PATCH",
                     headers: {
                         "Content-Type": "application/json",
+                        ...(user?.id ? { "x-user-id": user.id } : {}),
                     },
                     body: JSON.stringify({
                         recordId: maintenanceRecordId,

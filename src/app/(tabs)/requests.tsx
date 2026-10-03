@@ -1,4 +1,5 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
+import { useUser } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -46,6 +47,7 @@ const filters: TicketFilter[] = [
 ];
 
 const RequestsScreen = () => {
+    const { user } = useUser();
     const [search, setSearch] = useState('');
     const [selectedFilter, setSelectedFilter] =
         useState<TicketFilter>('All');
@@ -59,7 +61,12 @@ const RequestsScreen = () => {
             setLoading(true);
             setError(null);
 
-            const response = await fetch('/api/service-tickets');
+            const headers: Record<string, string> = {};
+            if (user?.id) {
+                headers['x-user-id'] = user.id;
+            }
+
+            const response = await fetch('/api/service-tickets', { headers });
             const result = await response.json();
 
             if (!response.ok || result.success === false) {

@@ -44,7 +44,7 @@ export interface ManagerDispatchRecord {
     };
 }
 
-export function useDispatches() {
+export function useDispatches(options?: { managerId?: string }) {
     const [dispatches, setDispatches] = useState<ManagerDispatchRecord[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -54,7 +54,12 @@ export function useDispatches() {
         setError(null);
 
         try {
-            const response = await fetch(getApiUrl("/api/manager/dispatches"));
+            const headers: Record<string, string> = {};
+            if (options?.managerId) {
+                headers["x-user-id"] = options.managerId;
+            }
+
+            const response = await fetch(getApiUrl("/api/manager/dispatches"), { headers });
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch dispatches (${response.status})`);

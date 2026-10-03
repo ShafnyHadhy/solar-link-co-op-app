@@ -99,7 +99,7 @@ export const ManagerEnergyRequests: React.FC<ManagerEnergyRequestsProps> = ({
 }) => {
     const router = useRouter();
     const { user } = useUser();
-    const { requests, loading, error, refetch, approveRequest, rejectRequest } = useEnergyRequests();
+    const { requests, loading, error, refetch, approveRequest, rejectRequest } = useEnergyRequests({ managerId: user?.id });
     const {
         offers,
         loading: offersLoading,
@@ -107,13 +107,13 @@ export const ManagerEnergyRequests: React.FC<ManagerEnergyRequestsProps> = ({
         refetch: refetchOffers,
         approveOffer: approveSolarOffer,
         rejectOffer: rejectSolarOffer,
-    } = useSolarOffers();
+    } = useSolarOffers({ managerId: user?.id });
     const {
         dispatches,
         loading: dispatchesLoading,
         error: dispatchesError,
         refetch: refetchDispatches,
-    } = useDispatches();
+    } = useDispatches({ managerId: user?.id });
 
     const [activeSection, setActiveSection] = useState<'requests' | 'offers' | 'dispatches'>('requests');
     const [searchQuery, setSearchQuery] = useState('');

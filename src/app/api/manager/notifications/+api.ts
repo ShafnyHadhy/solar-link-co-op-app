@@ -2,6 +2,7 @@
 // GET /api/manager/notifications — retrieve alerts/notifications for manager
 // PATCH /api/manager/notifications — mark an alert as read
 
+import { requireManager } from "@/lib/server/auth/authorization";
 import {
     getManagerNotifications,
     markNotificationAsRead,
@@ -11,6 +12,8 @@ import { errorResponse } from "@/lib/server/utils/response";
 
 export async function GET(request: Request) {
     try {
+        await requireManager(request);
+
         const url = new URL(request.url);
         const userId = url.searchParams.get("userId") || undefined;
         const unreadOnly = url.searchParams.get("unreadOnly") === "true";
@@ -34,6 +37,8 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
     try {
+        await requireManager(request);
+
         const body = await request.json();
         const { id } = body;
 
