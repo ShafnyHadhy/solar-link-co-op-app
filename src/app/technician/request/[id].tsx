@@ -558,6 +558,23 @@ const TicketDetailsScreen = () => {
         }
     };
 
+    // CESA-208 - Mark maintenance ticket as resolved
+    const resolveTicket = async () => {
+        if (!ticket || updatingStatus) {
+            return;
+        }
+
+        if (!maintenanceRecordId) {
+            Alert.alert(
+                "Maintenance Required",
+                "Save the maintenance diagnosis before resolving this ticket."
+            );
+            return;
+        }
+
+        await updateStatus("resolved");
+    };
+
     const getPriorityStyle = (
         priority: TicketPriority
     ) => {
@@ -1135,6 +1152,84 @@ const TicketDetailsScreen = () => {
                                 : "Save Maintenance Notes"}
                         </Text>
                     </Pressable>
+                </View>
+
+                {/* CESA-208 - Mark Ticket Resolved */}
+                <View className="mt-4 rounded-[24px] border border-border bg-card p-5">
+                    <View className="mb-4 flex-row items-center">
+                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-muted">
+                            <Feather
+                                name="check-circle"
+                                size={18}
+                                color="#6B7280"
+                            />
+                        </View>
+
+                        <View className="ml-3 flex-1">
+                            <Text className="text-sm font-bold text-foreground">
+                                Complete Maintenance
+                            </Text>
+
+                            <Text className="mt-1 text-xs text-muted-foreground">
+                                Mark this service ticket as resolved after completing maintenance.
+                            </Text>
+                        </View>
+                    </View>
+
+                    {ticket.status === "resolved" ? (
+                        <View className="flex-row items-center rounded-xl bg-muted p-3">
+                            <Feather
+                                name="check-circle"
+                                size={18}
+                                color="#6B7280"
+                            />
+
+                            <Text className="ml-2 text-sm font-bold text-foreground">
+                                Ticket Resolved
+                            </Text>
+                        </View>
+                    ) : (
+                        <Pressable
+                            disabled={
+                                updatingStatus ||
+                                !maintenanceRecordId
+                            }
+                            onPress={resolveTicket}
+                            className={`items-center rounded-xl px-4 py-3 ${
+                                updatingStatus ||
+                                !maintenanceRecordId
+                                    ? "bg-muted"
+                                    : "bg-primary"
+                            }`}
+                        >
+                            {updatingStatus ? (
+                                <View className="flex-row items-center">
+                                    <ActivityIndicator size="small" />
+
+                                    <Text className="ml-2 font-bold text-muted-foreground">
+                                        Resolving...
+                                    </Text>
+                                </View>
+                            ) : (
+                                <Text
+                                    className={`font-bold ${
+                                        !maintenanceRecordId
+                                            ? "text-muted-foreground"
+                                            : "text-primary-foreground"
+                                    }`}
+                                >
+                                    Mark Ticket Resolved
+                                </Text>
+                            )}
+                        </Pressable>
+                    )}
+
+                    {!maintenanceRecordId &&
+                        ticket.status !== "resolved" && (
+                            <Text className="mt-2 text-xs text-muted-foreground">
+                                Save the maintenance diagnosis before resolving this ticket.
+                            </Text>
+                        )}
                 </View>
 
                 {/* Status Update */}
