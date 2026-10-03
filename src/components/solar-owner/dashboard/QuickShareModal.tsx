@@ -13,10 +13,10 @@ export const QuickShareModal: React.FC<QuickShareModalProps> = ({ visible, onClo
     const [amountInput, setAmountInput] = useState<string>('3.5');
     const [selectedPool, setSelectedPool] = useState<string>('Co-Op Community Pool');
 
-    const handleShare = () => {
+    const handleShare = async () => {
         const amount = parseFloat(amountInput);
         if (isNaN(amount) || amount <= 0) return;
-        const success = shareEnergyWithCommunity(amount, selectedPool);
+        const success = await shareEnergyWithCommunity(amount, selectedPool);
         if (success) {
             onClose();
         }

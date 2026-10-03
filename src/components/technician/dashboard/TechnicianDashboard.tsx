@@ -4,6 +4,7 @@ import {
     technicianSummary,
     TechnicianFilter,
 } from '@/data/technicianData';
+import { useNotifications } from '@/hooks/useNotifications';
 import { Feather } from '@expo/vector-icons';
 import { useUser } from '@clerk/expo';
 import { router } from 'expo-router';
@@ -25,6 +26,7 @@ const filters: TechnicianFilter[] = [
 
 const TechnicianDashboard = () => {
     const { user } = useUser();
+    const { unreadCount } = useNotifications();
 
     const [search, setSearch] = useState('');
     const [selectedFilter, setSelectedFilter] =
@@ -104,10 +106,21 @@ const TechnicianDashboard = () => {
                         </Text>
                     </View>
 
-                    <View className="h-11 w-11 items-center justify-center rounded-2xl bg-primary">
-                        <Text className="text-lg font-extrabold text-primary-foreground">
-                            {(user?.firstName?.[0] || 'T').toUpperCase()}
-                        </Text>
+                    <View className="flex-row items-center gap-2.5">
+                        <Pressable
+                            onPress={() => router.push('/(tabs)/alerts')}
+                            className="h-11 w-11 items-center justify-center rounded-2xl bg-secondary border border-border/70 relative active:opacity-70"
+                        >
+                            <Feather name="bell" size={20} color="#F59E0B" />
+                            {unreadCount > 0 && (
+                                <View className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-500" />
+                            )}
+                        </Pressable>
+                        <View className="h-11 w-11 items-center justify-center rounded-2xl bg-primary">
+                            <Text className="text-lg font-extrabold text-primary-foreground">
+                                {(user?.firstName?.[0] || 'T').toUpperCase()}
+                            </Text>
+                        </View>
                     </View>
                 </View>
 

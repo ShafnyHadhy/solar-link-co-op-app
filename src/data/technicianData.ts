@@ -340,3 +340,38 @@ export const technicianSystems: TechnicianSystem[] = [
         lastUpdated: '5 min ago',
     },
 ];
+
+/**
+ * Dynamically register a new service request submitted by a Solar Panel Owner.
+ * Appends to serviceRequests and generates initial fault details so the technician can review it immediately.
+ */
+export function addServiceRequest(request: ServiceRequest, detail?: Partial<FaultDetail>) {
+    const exists = serviceRequests.some((r) => r.id === request.id);
+    if (!exists) {
+        serviceRequests.unshift(request);
+    }
+    const detailExists = faultDetails.some((f) => f.requestId === request.id);
+    if (!detailExists) {
+        faultDetails.unshift({
+            requestId: request.id,
+            faultType: request.issue,
+            errorCode: 'ERR-USER-REPORT',
+            detectedTime: 'Just now',
+            currentPerformance: request.severity === 'High' ? '0.0 kW (Offline)' : 'Degraded',
+            expectedPerformance: '6.0 kW',
+            equipmentModel: request.equipment,
+            equipmentSerial: `SN-${request.id}`,
+            installationDate: '12 Jan 2024',
+            previousFaults: [],
+            maintenanceHistory: [
+                {
+                    date: '14 days ago',
+                    action: 'Routine Telemetry Check',
+                    technician: 'Azmil Ahamed',
+                },
+            ],
+            recommendedAction: detail?.recommendedAction || 'Site inspection and diagnostics by technician Azmil Ahamed.',
+            ...detail,
+        });
+    }
+}

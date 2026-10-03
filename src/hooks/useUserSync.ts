@@ -1,4 +1,5 @@
 import { getApiUrl } from '@/lib/api';
+import { setCachedUserRole } from '@/lib/getUserRole';
 import type { User } from '@/lib/server/db/schema';
 import { useUser } from '@clerk/expo';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -56,11 +57,21 @@ export function useUserSync() {
                 throw new Error(data.error || 'Failed to synchronize user');
             }
 
-            setDbUser(data.data?.user ?? data.user);
+            const syncedUser = data.data?.user ?? data.user;
+            setDbUser(syncedUser);
+            if (syncedUser?.role) {
+                setCachedUserRole(syncedUser.role);
+            }
             lastSyncedUserIdRef.current = user.id;
-        } catch (err: any) {
-            console.error('[UserSync Error]:', err?.message || err);
-            setSyncError(err?.message || 'Failed to sync user with database');
+
+            // If Clerk metadata doesn't reflect the verified DB role, reload Clerk user session
+            if (syncedUser?.role && user.publicMetadata?.role !== syncedUser.role) {
+                try {
+                    await user.reload();
+                } catch (reloadErr) {
+                    console.warn('[UserSync] Clerk session reload skipped or pending:', reloadErr);
+                }
+            }
         } finally {
             setIsSyncing(false);
         }
@@ -69,6 +80,10 @@ export function useUserSync() {
     useEffect(() => {
         if (isLoaded && isSignedIn && user && lastSyncedUserIdRef.current !== user.id) {
             syncUser();
+        } else if (isLoaded && !isSignedIn) {
+            setDbUser(null);
+            setCachedUserRole(null);
+            lastSyncedUserIdRef.current = null;
         }
     }, [isLoaded, isSignedIn, user, syncUser]);
 

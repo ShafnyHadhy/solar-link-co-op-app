@@ -7,6 +7,7 @@ interface ViewHeaderProps {
     title: string;
     subtitle?: string;
     showBack?: boolean;
+    onBack?: () => void;
     rightAction?: {
         icon: keyof typeof Feather.glyphMap;
         onPress: () => void;
@@ -18,6 +19,7 @@ export const ViewHeader: React.FC<ViewHeaderProps> = ({
     title,
     subtitle,
     showBack = true,
+    onBack,
     rightAction,
 }) => {
     const { setActiveView } = useSolarOwnerStore();
@@ -27,7 +29,7 @@ export const ViewHeader: React.FC<ViewHeaderProps> = ({
             <View className="flex-row items-center flex-1 mr-1 min-w-0">
                 {showBack && (
                     <Pressable
-                        onPress={() => setActiveView('dashboard')}
+                        onPress={onBack || (() => setActiveView('dashboard'))}
                         className="h-10 w-10 items-center justify-center rounded-2xl bg-secondary/80 border border-border/70 mr-3 active:opacity-70 flex-shrink-0"
                     >
                         <Feather name="arrow-left" size={20} color="#F59E0B" />

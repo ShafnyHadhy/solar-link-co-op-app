@@ -14,7 +14,7 @@ export async function fetchSolarAssets(ownerId: string): Promise<SolarAsset[]> {
     }
 
     const data = await response.json();
-    return data.data.assets;
+    return data.assets;
 }
 
 /**
@@ -30,7 +30,7 @@ export async function fetchSolarAssetById(assetId: string): Promise<SolarAsset> 
     }
 
     const data = await response.json();
-    return data.data.asset;
+    return data.asset;
 }
 
 /**
@@ -50,7 +50,7 @@ export async function createSolarAsset(
     }
 
     const data = await response.json();
-    return data.data.asset;
+    return data.asset;
 }
 
 /**
@@ -74,5 +74,5 @@ export async function updateSolarAsset(
     }
 
     const data = await response.json();
-    return data.data.asset;
+    return data.asset;
 }

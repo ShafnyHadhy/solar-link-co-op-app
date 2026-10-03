@@ -3,34 +3,49 @@ import ManagerEnergyRequests from '@/components/manager/energy/ManagerEnergyRequ
 import WaitUntilRoleAssigned from '@/components/shared/WaitUntilRoleAssigned';
 import SolarOwnerEnergy from '@/components/solar-owner/energy/SolarOwnerEnergy';
 import TechnicianEnergyScreen from '@/components/technician/energy/TechnicianEnergyScreen';
+import { useUserSync } from '@/hooks/useUserSync';
 import { getUserRole } from '@/lib/getUserRole';
 import { useUser } from '@clerk/expo';
-
+import { useLocalSearchParams } from 'expo-router';
 import React from 'react';
 
 const EnergyScreen = () => {
     const { user, isLoaded } = useUser();
+    const { dbUser } = useUserSync();
+    const params = useLocalSearchParams<{ tab?: string }>();
 
     if (!isLoaded) {
         return null;
     }
 
     const role = getUserRole(
-        user?.publicMetadata?.role
+        user?.publicMetadata?.role,
+        dbUser?.role
     );
 
     switch (role) {
         case "manager":
-            return <ManagerEnergyRequests />
+            return <ManagerEnergyRequests />;
 
         case "solar_owner":
-            return <SolarOwnerEnergy />
+            return <SolarOwnerEnergy />;
 
         case "household":
-            return <HouseholdEnergy />
+            return (
+                <HouseholdEnergy
+                    initialTab={
+                        params.tab === "pending" || params.tab === "requests"
+                            ? "requests"
+                            : params.tab === "allocations"
+                            ? "allocations"
+                            : "create"
+                    }
+                    initialFilter={params.tab === "pending" ? "pending" : "all"}
+                />
+            );
 
         case "technician":
-            return <TechnicianEnergyScreen />
+            return <TechnicianEnergyScreen />;
 
         default:
             return <WaitUntilRoleAssigned />;

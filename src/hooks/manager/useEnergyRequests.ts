@@ -7,6 +7,8 @@ export interface ManagerEnergyRequest {
     householdName: string | null;
     householdEmail: string | null;
     requestedEnergyKwh: string;
+    totalDispatchedKwh?: number;
+    remainingEnergyKwh?: number;
     reason: string | null;
     status: "pending" | "approved" | "rejected" | "fulfilled" | "cancelled";
     requestedAt: string;
@@ -14,7 +16,7 @@ export interface ManagerEnergyRequest {
     reviewedBy: string | null;
 }
 
-export function useEnergyRequests() {
+export function useEnergyRequests(options?: { managerId?: string }) {
     const [requests, setRequests] = useState<ManagerEnergyRequest[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -24,7 +26,12 @@ export function useEnergyRequests() {
         setError(null);
 
         try {
-            const response = await fetch(getApiUrl("/api/manager/energy-requests"));
+            const headers: Record<string, string> = {};
+            if (options?.managerId) {
+                headers["x-user-id"] = options.managerId;
+            }
+
+            const response = await fetch(getApiUrl("/api/manager/energy-requests"), { headers });
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch energy requests (${response.status})`);

@@ -1,6 +1,6 @@
-// components/household/menu/HouseholdConsumerMenu.tsx
-
 import TabScreenBackground from "@/components/shared/TabScreenBackground";
+import { useHouseholdEnergyRequests } from "@/hooks/household/useHouseholdEnergyRequests";
+import { useUserSync } from "@/hooks/useUserSync";
 import { getUserRole } from "@/lib/getUserRole";
 import { useAuth, useUser } from "@clerk/expo";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -81,7 +81,11 @@ const HouseholdConsumerMenu = () => {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const role = getUserRole(user?.publicMetadata?.role as string | undefined);
+  const { requests } = useHouseholdEnergyRequests();
+  const pendingCount = requests.filter((r) => r.status === "pending").length;
+  const { dbUser } = useUserSync();
+
+  const role = getUserRole(user?.publicMetadata?.role as string | undefined, dbUser?.role);
 
   // Theme-based colors
   const theme = {
@@ -211,7 +215,7 @@ const HouseholdConsumerMenu = () => {
             icon={<Feather name="clock" size={18} color="#F59E0B" />}
             title="Pending Requests"
             subtitle="View submitted requests awaiting processing"
-            badge="3"
+            badge={pendingCount > 0 ? String(pendingCount) : undefined}
             onPress={handlePendingRequests}
           />
           <MenuItem
