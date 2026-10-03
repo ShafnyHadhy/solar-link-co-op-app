@@ -1,3 +1,4 @@
+import { useUser } from '@clerk/expo';
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -46,6 +47,8 @@ const filters: TicketFilter[] = [
 ];
 
 const RequestsScreen = () => {
+    const { user, isLoaded } = useUser();
+
     const [search, setSearch] = useState('');
     const [selectedFilter, setSelectedFilter] =
         useState<TicketFilter>('All');
@@ -54,38 +57,52 @@ const RequestsScreen = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // CESA-253 - Retrieve tickets assigned to logged-in technician
     const loadTickets = async () => {
+        if (!isLoaded) {
+            return;
+        }
+
+        if (!user?.id) {
+            setTickets([]);
+            setError('Unable to identify the logged-in technician.');
+            setLoading(false);
+            return;
+        }
+
         try {
             setLoading(true);
             setError(null);
 
-            const response = await fetch('/api/service-tickets');
+            const response = await fetch(
+                `/api/service-tickets?assignedTechnicianId=${encodeURIComponent(
+                    user.id
+                )}`
+            );
+
             const result = await response.json();
 
             if (!response.ok || result.success === false) {
                 throw new Error(
-                    result.error || 'Failed to load service tickets'
+                    result.error ||
+                        'Failed to load assigned service tickets'
                 );
             }
 
-            /*
-             * Supports the common API response structures:
-             *
-             * { success: true, data: { tickets: [...] } }
-             *
-             * or
-             *
-             * { success: true, tickets: [...] }
-             */
             const receivedTickets =
-                result.data?.tickets ?? result.tickets ?? [];
+                result.data?.tickets ??
+                result.tickets ??
+                [];
 
             setTickets(receivedTickets);
         } catch (err) {
-            console.error('Failed to load service tickets:', err);
+            console.error(
+                'Failed to load assigned service tickets:',
+                err
+            );
 
             setError(
-                'Unable to load service tickets. Please try again.'
+                'Unable to load your assigned service tickets. Please try again.'
             );
         } finally {
             setLoading(false);
@@ -93,8 +110,10 @@ const RequestsScreen = () => {
     };
 
     useEffect(() => {
-        loadTickets();
-    }, []);
+        if (isLoaded) {
+            loadTickets();
+        }
+    }, [isLoaded, user?.id]);
 
     const filteredTickets = useMemo(() => {
         const searchText = search.trim().toLowerCase();

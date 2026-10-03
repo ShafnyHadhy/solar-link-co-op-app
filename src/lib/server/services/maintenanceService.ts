@@ -265,6 +265,40 @@ export async function assignServiceTicketTechnician(
 
 
 // ============================================================
+// TECHNICIAN - US-31 COMPLETE MAINTENANCE WORKFLOW
+// ============================================================
+
+// CESA-253 - Retrieve tickets assigned to technician
+export async function getAssignedServiceTickets(
+    technicianId: string
+) {
+    try {
+        const tickets = await db
+            .select()
+            .from(serviceTickets)
+            .where(
+                eq(
+                    serviceTickets.assignedTechnicianId,
+                    technicianId
+                )
+            )
+            .orderBy(desc(serviceTickets.createdAt));
+
+        return tickets;
+    } catch (error) {
+        console.error(
+            "Failed to retrieve assigned service tickets:",
+            error
+        );
+
+        throw new Error(
+            "Failed to retrieve assigned service tickets"
+        );
+    }
+}
+
+
+// ============================================================
 // TECHNICIAN - US-25 MAINTENANCE RECORDS
 // ============================================================
 
