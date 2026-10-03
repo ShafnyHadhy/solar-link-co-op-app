@@ -13,6 +13,7 @@ import {
     NotFoundError,
     UnauthorizedError,
 } from "../utils/errors";
+import { createNotification } from "./notificationService";
 
 // ============================================================================
 // TypeScript Types
@@ -684,7 +685,30 @@ export async function createDispatch(input: CreateDispatchInput): Promise<Dispat
     }
 
     // -------------------------------------------------------------------------
-    // 6. Return Full Details
+    // 6. Generate Notification for Household User (US-18)
+    // -------------------------------------------------------------------------
+    try {
+        const targetHouseholdId = request.householdId;
+        if (targetHouseholdId) {
+            const kwh = dispatchAmount;
+            const kwhText =
+                !isNaN(kwh) && Number.isInteger(kwh)
+                    ? kwh.toString()
+                    : parseFloat(kwh.toFixed(3)).toString();
+
+            await createNotification({
+                userId: targetHouseholdId,
+                type: "energy",
+                title: "Energy Allocated",
+                message: `${kwhText} kWh of community solar energy has been allocated to your household.`,
+            });
+        }
+    } catch (notifError) {
+        console.error("[Dispatch] Failed to generate household allocation notification:", notifError);
+    }
+
+    // -------------------------------------------------------------------------
+    // 7. Return Full Details
     // -------------------------------------------------------------------------
     return getDispatchById(dispatchId);
 }
