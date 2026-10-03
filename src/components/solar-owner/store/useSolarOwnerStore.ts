@@ -597,6 +597,21 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
                     },
                 });
             }
+
+            // Also fetch real sharing history & credits summary from DB dispatches
+            try {
+                const historyRes = await fetch(
+                    `${getApiUrl('/api/solar-offers/history')}?ownerId=${ownerId}`
+                );
+                const historyData = await historyRes.json();
+                if (historyData.success && historyData.data?.history) {
+                    if (historyData.data.history.length > 0) {
+                        set({ sharingHistory: historyData.data.history });
+                    }
+                }
+            } catch (historyErr) {
+                console.warn('Could not fetch sharing history:', historyErr);
+            }
         } catch (error) {
             console.error('Failed to fetch offers:', error);
         }

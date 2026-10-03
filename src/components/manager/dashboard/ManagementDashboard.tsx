@@ -1,13 +1,157 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
+import { useCommunityAllocation } from '@/hooks/manager/useCommunityAllocation';
+import { useCommunityGeneration } from '@/hooks/manager/useCommunityGeneration';
+import { useCommunityReserve } from '@/hooks/manager/useCommunityReserve';
+import { useEnergyRequests } from '@/hooks/manager/useEnergyRequests';
+import { ManagerAlert, useManagerAlerts } from '@/hooks/manager/useManagerAlerts';
 import { useUser } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback } from 'react';
+import {
+    ActivityIndicator,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    Text,
+    View,
+} from 'react-native';
+
+const getAlertStyle = (type: string, title?: string) => {
+    const lowerTitle = (title || '').toLowerCase();
+    if (
+        lowerTitle.includes('outage') ||
+        lowerTitle.includes('critical') ||
+        lowerTitle.includes('insufficient') ||
+        lowerTitle.includes('low') ||
+        lowerTitle.includes('fault')
+    ) {
+        return {
+            iconName: 'alert-triangle' as const,
+            iconColor: '#EF4444',
+            containerBg: 'bg-red-500/15 border border-red-500',
+        };
+    }
+    switch (type) {
+        case 'energy':
+            return {
+                iconName: 'alert-triangle' as const,
+                iconColor: '#EF4444',
+                containerBg: 'bg-red-500/15 border border-red-500',
+            };
+        case 'maintenance':
+            return {
+                iconName: 'alert-triangle' as const,
+                iconColor: '#F59E0B',
+                containerBg: 'bg-yellow-500/15 border border-yellow-500',
+            };
+        case 'request':
+            return {
+                iconName: 'clock' as const,
+                iconColor: '#F59E0B',
+                containerBg: 'bg-yellow-500/15 border border-yellow-500',
+            };
+        case 'announcement':
+            return {
+                iconName: 'bell' as const,
+                iconColor: '#3B82F6',
+                containerBg: 'bg-blue-500/15 border border-blue-500',
+            };
+        case 'system':
+        default:
+            return {
+                iconName: 'alert-circle' as const,
+                iconColor: '#F59E0B',
+                containerBg: 'bg-yellow-500/15 border border-yellow-500',
+            };
+    }
+};
 
 const ManagementDashboard = () => {
     const { user } = useUser();
     const router = useRouter();
+    const {
+        data: generationData,
+        loading: generationLoading,
+        error: generationError,
+        refetch: refetchGeneration,
+    } = useCommunityGeneration();
+
+    const {
+        data: allocationData,
+        loading: allocationLoading,
+        error: allocationError,
+        refetch: refetchAllocation,
+    } = useCommunityAllocation();
+
+    const {
+        data: reserveData,
+        loading: reserveLoading,
+        error: reserveError,
+        refetch: refetchReserve,
+    } = useCommunityReserve();
+
+    const {
+        requests,
+        loading: requestsLoading,
+        error: requestsError,
+        refetch: refetchRequests,
+    } = useEnergyRequests();
+
+    const {
+        alerts,
+        loading: alertsLoading,
+        error: alertsError,
+        refetch: refetchAlerts,
+        markAsRead: markAlertAsRead,
+    } = useManagerAlerts({ userId: user?.id, unreadOnly: true });
+
+    // Automatically synchronize live data when screen regains focus
+    useFocusEffect(
+        useCallback(() => {
+            refetchRequests();
+            refetchAlerts();
+        }, [refetchRequests, refetchAlerts])
+    );
+
+    const pendingRequestsCount = requests.filter((r) => r.status === 'pending').length;
+
+    const isRefreshing =
+        generationLoading ||
+        allocationLoading ||
+        reserveLoading ||
+        requestsLoading ||
+        alertsLoading;
+
+    const handleRefresh = useCallback(async () => {
+        await Promise.all([
+            refetchGeneration(),
+            refetchAllocation(),
+            refetchReserve(),
+            refetchRequests(),
+            refetchAlerts(),
+        ]);
+    }, [
+        refetchGeneration,
+        refetchAllocation,
+        refetchReserve,
+        refetchRequests,
+        refetchAlerts,
+    ]);
+
+    const handleAlertPress = useCallback(
+        async (alert: ManagerAlert) => {
+            if (alert.type === 'request' || alert.title.toLowerCase().includes('request')) {
+                router.push('/energy');
+            }
+            try {
+                await markAlertAsRead(alert.id);
+            } catch (err) {
+                console.error('Failed to mark alert as read:', err);
+            }
+        },
+        [markAlertAsRead, router]
+    );
 
     return (
         <View className='flex-1'>
@@ -16,6 +160,13 @@ const ManagementDashboard = () => {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ flexGrow: 1, padding: 20, paddingTop: 60 }}
                 className='flex-1'
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefreshing}
+                        onRefresh={handleRefresh}
+                        tintColor="#10B981"
+                    />
+                }
             >
                 <View className='flex-row items-center justify-between mb-6'>
                     <View>
@@ -27,8 +178,11 @@ const ManagementDashboard = () => {
                         </Text>
                     </View>
 
-                    <View className='h-10 w-10 items-center justify-center rounded-2xl bg-secondary border border-border/60'>
+                    <View className='h-10 w-10 items-center justify-center rounded-2xl bg-secondary border border-border/60 relative'>
                         <Feather name="bell" size={20} color="#F59E0B" />
+                        {alerts.length > 0 && (
+                            <View className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-500 border border-secondary" />
+                        )}
                     </View>
                 </View>
 
@@ -36,18 +190,42 @@ const ManagementDashboard = () => {
                     <Text className='text-sm font-semibold text-muted-foreground'>
                         Available Community Energy
                     </Text>
-                    <Text className='text-3xl font-extrabold text-foreground'>
-                        45 kWh
-                    </Text>
-                    <View className='w-full flex-row items-center justify-between mb-1'>
-                        <Text className='text-xs font-semibold text-muted-foreground'>
-                            12% available for sharing
+                    {reserveLoading && !reserveData ? (
+                        <View className='h-9 justify-center'>
+                            <ActivityIndicator size="small" color="#10B981" />
+                        </View>
+                    ) : (
+                        <Text className='text-3xl font-extrabold text-foreground'>
+                            {reserveError ? '-- kWh' : `${reserveData?.availableReserveKwh ?? 0} kWh`}
                         </Text>
+                    )}
+                    <View className='w-full flex-row items-center justify-between mb-1'>
+                        {reserveLoading && !reserveData ? (
+                            <Text className='text-xs font-semibold text-muted-foreground'>
+                                Calculating community reserve...
+                            </Text>
+                        ) : reserveError ? (
+                            <Pressable onPress={() => refetchReserve()} className='flex-row items-center gap-1 active:opacity-70'>
+                                <Feather name="alert-circle" size={12} color="#EF4444" />
+                                <Text className='text-xs font-semibold text-[#EF4444]'>
+                                    Sync error • Tap to retry
+                                </Text>
+                            </Pressable>
+                        ) : (
+                            <Text className='text-xs font-semibold text-muted-foreground'>
+                                {reserveData?.percentageAvailable ?? 0}% available for sharing
+                            </Text>
+                        )}
                     </View>
                     {/* Progress Bar Container */}
                     <View className='w-full h-2 rounded-full bg-secondary overflow-hidden border border-border/40'>
                         {/* Progress Bar Fill */}
-                        <View className='h-full w-[12%] bg-primary rounded-full' />
+                        <View
+                            className='h-full bg-primary rounded-full'
+                            style={{
+                                width: `${Math.min(100, Math.max(0, reserveData?.percentageAvailable ?? 0))}%`,
+                            }}
+                        />
                     </View>
                 </View>
 
@@ -61,45 +239,140 @@ const ManagementDashboard = () => {
                                 </Text>
                             </View>
                         </View>
-                        <Text className='text-xl font-extrabold text-foreground mt-1'>
-                            120 kWh
-                        </Text>
-                        <View className='flex-row items-center gap-1'>
-                            <Feather name="trending-up" size={12} color="#10B981" />
-                            <Text className='text-xs font-semibold text-[#10B981]'>
-                                +5.2% vs yesterday
+                        {generationLoading && !generationData ? (
+                            <View className='h-7 justify-center mt-1'>
+                                <ActivityIndicator size="small" color="#10B981" />
+                            </View>
+                        ) : (
+                            <Text className='text-xl font-extrabold text-foreground mt-1'>
+                                {generationError ? '-- kWh' : `${generationData?.generatedTodayKwh ?? 0} kWh`}
                             </Text>
-                        </View>
+                        )}
+                        {generationLoading && !generationData ? (
+                            <View className='flex-row items-center gap-1'>
+                                <Text className='text-xs font-semibold text-muted-foreground'>
+                                    Syncing...
+                                </Text>
+                            </View>
+                        ) : generationError ? (
+                            <Pressable onPress={() => refetchGeneration()} className='flex-row items-center gap-1 active:opacity-70'>
+                                <Feather name="alert-circle" size={12} color="#EF4444" />
+                                <Text className='text-xs font-semibold text-[#EF4444]'>
+                                    Sync error • Retry
+                                </Text>
+                            </Pressable>
+                        ) : generationData?.trend === 'up' ? (
+                            <View className='flex-row items-center gap-1'>
+                                <Feather name="trending-up" size={12} color="#10B981" />
+                                <Text className='text-xs font-semibold text-[#10B981]'>
+                                    +{generationData.changePercentage}% vs yesterday
+                                </Text>
+                            </View>
+                        ) : generationData?.trend === 'down' ? (
+                            <View className='flex-row items-center gap-1'>
+                                <Feather name="trending-down" size={12} color="#EF4444" />
+                                <Text className='text-xs font-semibold text-[#EF4444]'>
+                                    {generationData.changePercentage}% vs yesterday
+                                </Text>
+                            </View>
+                        ) : (
+                            <View className='flex-row items-center gap-1'>
+                                <Feather name="minus" size={12} color="#9CA3AF" />
+                                <Text className='text-xs font-semibold text-muted-foreground'>
+                                    0.0% vs yesterday
+                                </Text>
+                            </View>
+                        )}
                     </View>
                     <View className='flex-1 flex-col gap-2 rounded-lg border border-border/30 bg-secondary/60 p-4 shadow-sm'>
                         <View className='flex-row items-center justify-between'>
                             <View className='flex-row items-center gap-1.5'>
-                                <Feather name="zap" size={14} color="#EF4444" />
+                                <Feather name="send" size={14} color="#3B82F6" />
                                 <Text className='text-sm font-semibold text-muted-foreground'>
-                                    Consumed Today
+                                    Allocated Today
                                 </Text>
                             </View>
                         </View>
-                        <Text className='text-xl font-extrabold text-foreground mt-1'>
-                            75 kWh
-                        </Text>
-                        <View className='flex-row items-center gap-1'>
-                            <Feather name="trending-down" size={12} color="#EF4444" />
-                            <Text className='text-xs font-semibold text-[#EF4444]'>
-                                -2.1% vs yesterday
+                        {allocationLoading && !allocationData ? (
+                            <View className='h-7 justify-center mt-1'>
+                                <ActivityIndicator size="small" color="#3B82F6" />
+                            </View>
+                        ) : (
+                            <Text className='text-xl font-extrabold text-foreground mt-1'>
+                                {allocationError ? '-- kWh' : `${allocationData?.allocatedTodayKwh ?? 0} kWh`}
                             </Text>
-                        </View>
+                        )}
+                        {allocationLoading && !allocationData ? (
+                            <View className='flex-row items-center gap-1'>
+                                <Text className='text-xs font-semibold text-muted-foreground'>
+                                    Syncing...
+                                </Text>
+                            </View>
+                        ) : allocationError ? (
+                            <Pressable onPress={() => refetchAllocation()} className='flex-row items-center gap-1 active:opacity-70'>
+                                <Feather name="alert-circle" size={12} color="#EF4444" />
+                                <Text className='text-xs font-semibold text-[#EF4444]'>
+                                    Sync error • Retry
+                                </Text>
+                            </Pressable>
+                        ) : allocationData?.trend === 'up' ? (
+                            <View className='flex-row items-center gap-1'>
+                                <Feather name="trending-up" size={12} color="#10B981" />
+                                <Text className='text-xs font-semibold text-[#10B981]'>
+                                    +{allocationData.changePercentage}% vs yesterday
+                                </Text>
+                            </View>
+                        ) : allocationData?.trend === 'down' ? (
+                            <View className='flex-row items-center gap-1'>
+                                <Feather name="trending-down" size={12} color="#EF4444" />
+                                <Text className='text-xs font-semibold text-[#EF4444]'>
+                                    {allocationData.changePercentage}% vs yesterday
+                                </Text>
+                            </View>
+                        ) : (
+                            <View className='flex-row items-center gap-1'>
+                                <Feather name="minus" size={12} color="#9CA3AF" />
+                                <Text className='text-xs font-semibold text-muted-foreground'>
+                                    0.0% vs yesterday
+                                </Text>
+                            </View>
+                        )}
                     </View>
                 </View>
 
                 <View className='flex-row items-center justify-between gap-4 p-4 bg-secondary/60 rounded-xl shadow-sm'>
                     <View className='flex-col gap-1'>
-                        <Text className='text-lg font-semibold text-foreground'>
-                            3 requests
-                        </Text>
-                        <Text className='text-xs font-semibold text-muted-foreground'>
-                            pending household requests
-                        </Text>
+                        {requestsLoading && requests.length === 0 ? (
+                            <>
+                                <View className='h-7 justify-center'>
+                                    <ActivityIndicator size="small" color="#F59E0B" />
+                                </View>
+                                <Text className='text-xs font-semibold text-muted-foreground'>
+                                    pending household requests
+                                </Text>
+                            </>
+                        ) : requestsError ? (
+                            <Pressable onPress={() => refetchRequests()} className='active:opacity-70'>
+                                <Text className='text-lg font-semibold text-foreground'>
+                                    -- requests
+                                </Text>
+                                <View className='flex-row items-center gap-1'>
+                                    <Feather name="alert-circle" size={12} color="#EF4444" />
+                                    <Text className='text-xs font-semibold text-[#EF4444]'>
+                                        Sync error • Tap to retry
+                                    </Text>
+                                </View>
+                            </Pressable>
+                        ) : (
+                            <>
+                                <Text className='text-lg font-semibold text-foreground'>
+                                    {pendingRequestsCount} {pendingRequestsCount === 1 ? 'request' : 'requests'}
+                                </Text>
+                                <Text className='text-xs font-semibold text-muted-foreground'>
+                                    pending household requests
+                                </Text>
+                            </>
+                        )}
                     </View>
                     <View className='items-center justify-center'>
                         <Pressable
@@ -117,54 +390,73 @@ const ManagementDashboard = () => {
                     <Text className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
                         Needs Attention
                     </Text>
+                    {alerts.length > 0 && (
+                        <View className="bg-red-500/15 border border-red-500/30 px-2.5 py-0.5 rounded-full">
+                            <Text className="text-[11px] font-bold text-red-500">
+                                {alerts.length} {alerts.length === 1 ? 'alert' : 'alerts'}
+                            </Text>
+                        </View>
+                    )}
                 </View>
 
                 <View className="flex-col gap-4 mt-4 p-4 border border-border rounded-2xl shadow-sm">
-                    <Pressable className="flex-row items-center gap-4 p-4 bg-secondary/60 rounded-xl border border-border active:opacity-70 shadow-sm">
-                        <View className="h-12 w-12 items-center justify-center rounded-full bg-red-500/15 border border-red-500">
-                            <Feather name="alert-triangle" size={20} color="#EF4444" />
-                        </View>
-                        <View className="flex-1 flex-col">
-                            <Text className="text-lg font-semibold text-foreground" numberOfLines={1}>
-                                Low Stock Alert
-                            </Text>
-                            <Text className="text-xs font-semibold text-muted-foreground" numberOfLines={1}>
-                                Community storage is running low
+                    {alertsLoading && alerts.length === 0 ? (
+                        <View className="py-6 items-center justify-center">
+                            <ActivityIndicator size="small" color="#F59E0B" />
+                            <Text className="text-xs font-semibold text-muted-foreground mt-2">
+                                Checking community alerts...
                             </Text>
                         </View>
-                        <Feather name="chevron-right" size={20} color="#9CA3AF" />
-                    </Pressable>
-
-                    <Pressable className="flex-row items-center gap-4 p-4 bg-secondary/60 rounded-xl border border-border active:opacity-70 shadow-sm">
-                        <View className="h-12 w-12 items-center justify-center rounded-full bg-red-500/15 border border-red-500">
-                            <Feather name="alert-triangle" size={20} color="#EF4444" />
-                        </View>
-                        <View className="flex-1 flex-col">
-                            <Text className="text-lg font-semibold text-foreground" numberOfLines={1}>
-                                Insufficient Power
+                    ) : alertsError ? (
+                        <Pressable
+                            onPress={() => refetchAlerts()}
+                            className="py-4 items-center justify-center active:opacity-70"
+                        >
+                            <Feather name="alert-circle" size={20} color="#EF4444" />
+                            <Text className="text-sm font-semibold text-foreground mt-1.5">
+                                Failed to load alerts
                             </Text>
-                            <Text className="text-xs font-semibold text-muted-foreground" numberOfLines={1}>
-                                3 households are experiencing power outages
+                            <Text className="text-xs font-semibold text-[#EF4444] mt-0.5">
+                                Sync error • Tap to retry
                             </Text>
-                        </View>
-                        <Feather name="chevron-right" size={20} color="#9CA3AF" />
-                    </Pressable>
-
-                    <Pressable className="flex-row items-center gap-4 p-4 bg-secondary/60 rounded-xl border border-border active:opacity-70 shadow-sm">
-                        <View className="h-12 w-12 items-center justify-center rounded-full bg-yellow-500/15 border border-yellow-500">
-                            <Feather name="alert-triangle" size={20} color="#F59E0B" />
-                        </View>
-                        <View className="flex-1 flex-col">
-                            <Text className="text-lg font-semibold text-foreground" numberOfLines={1}>
-                                Grid Maintenance
+                        </Pressable>
+                    ) : alerts.length === 0 ? (
+                        <View className="py-6 items-center justify-center">
+                            <View className="h-10 w-10 rounded-full bg-emerald-500/15 border border-emerald-500/40 items-center justify-center mb-2">
+                                <Feather name="check" size={20} color="#10B981" />
+                            </View>
+                            <Text className="text-sm font-semibold text-foreground">
+                                All Systems Normal
                             </Text>
-                            <Text className="text-xs font-semibold text-muted-foreground" numberOfLines={1}>
-                                Scheduled maintenance on 2024-12-31
+                            <Text className="text-xs font-semibold text-muted-foreground mt-0.5 text-center">
+                                No urgent community alerts requiring attention
                             </Text>
                         </View>
-                        <Feather name="chevron-right" size={20} color="#9CA3AF" />
-                    </Pressable>
-
+                    ) : (
+                        alerts.map((alert) => {
+                            const style = getAlertStyle(alert.type, alert.title);
+                            return (
+                                <Pressable
+                                    key={alert.id}
+                                    onPress={() => handleAlertPress(alert)}
+                                    className="flex-row items-center gap-4 p-4 bg-secondary/60 rounded-xl border border-border active:opacity-70 shadow-sm"
+                                >
+                                    <View className={`h-12 w-12 items-center justify-center rounded-full ${style.containerBg}`}>
+                                        <Feather name={style.iconName} size={20} color={style.iconColor} />
+                                    </View>
+                                    <View className="flex-1 flex-col">
+                                        <Text className="text-lg font-semibold text-foreground" numberOfLines={1}>
+                                            {alert.title}
+                                        </Text>
+                                        <Text className="text-xs font-semibold text-muted-foreground" numberOfLines={1}>
+                                            {alert.message}
+                                        </Text>
+                                    </View>
+                                    <Feather name="chevron-right" size={20} color="#9CA3AF" />
+                                </Pressable>
+                            );
+                        })
+                    )}
                 </View>
 
                 <View className="flex-row items-center justify-between mt-6">
