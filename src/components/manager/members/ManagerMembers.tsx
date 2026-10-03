@@ -1,5 +1,11 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
-import { fetchMemberDetails, updateMemberStatusApi, useMembers } from '@/hooks/manager/useMembers';
+import {
+    fetchMemberDetails,
+    updateMemberApi,
+    updateMemberRoleApi,
+    updateMemberStatusApi,
+    useMembers,
+} from '@/hooks/manager/useMembers';
 import { calculateMemberAnalytics } from '@/lib/memberService';
 import { CommunityMember, MemberDetailedProfile, MemberStatus } from '@/types/member';
 import { UserRole } from '@/types/role';
@@ -107,38 +113,82 @@ const ManagerMembers = () => {
     const handleSaveStatus = async () => {
         if (!selectedMember) return;
 
-        // If status hasn't changed, just close
-        if (newStatus === selectedMember.status) {
+        const roleChanged = newRole !== selectedMember.role;
+        const statusChanged = newStatus !== selectedMember.status;
+
+        // If neither role nor status has changed, just close
+        if (!roleChanged && !statusChanged) {
             setModalVisible(false);
             return;
         }
 
         setIsSavingStatus(true);
         try {
-            await updateMemberStatusApi(selectedMember.id, newStatus, user?.id);
+            if (roleChanged && statusChanged) {
+                await updateMemberApi(
+                    selectedMember.id,
+                    { role: newRole, status: newStatus },
+                    user?.id
+                );
+            } else if (roleChanged) {
+                await updateMemberRoleApi(selectedMember.id, newRole, user?.id);
+            } else if (statusChanged) {
+                await updateMemberStatusApi(selectedMember.id, newStatus, user?.id);
+            }
 
             // Update UI state immediately
             setMembers((prev) =>
                 prev.map((m) =>
-                    m.id === selectedMember.id ? { ...m, status: newStatus } : m
+                    m.id === selectedMember.id
+                        ? { ...m, role: newRole, status: newStatus }
+                        : m
                 )
             );
 
             if (detailedProfile && detailedProfile.id === selectedMember.id) {
-                setDetailedProfile((prev) => (prev ? { ...prev, status: newStatus } : null));
+                setDetailedProfile((prev) =>
+                    prev ? { ...prev, role: newRole, status: newStatus } : null
+                );
             }
-            if (selectedMemberForDetails && selectedMemberForDetails.id === selectedMember.id) {
-                setSelectedMemberForDetails((prev) => (prev ? { ...prev, status: newStatus } : null));
+            if (
+                selectedMemberForDetails &&
+                selectedMemberForDetails.id === selectedMember.id
+            ) {
+                setSelectedMemberForDetails((prev) =>
+                    prev ? { ...prev, role: newRole, status: newStatus } : null
+                );
+            }
+
+            // If the manager updated their own role, refresh Clerk session so navigation updates
+            if (user?.id === selectedMember.id) {
+                try {
+                    await user?.reload();
+                } catch (reloadErr) {
+                    console.warn('[Clerk Reload]', reloadErr);
+                }
             }
 
             setModalVisible(false);
-            Alert.alert(
-                'Status Updated',
-                `${selectedMember.name}'s membership status has been updated to "${newStatus.toUpperCase()}".`
-            );
+
+            if (roleChanged && statusChanged) {
+                Alert.alert(
+                    'Member Updated',
+                    `${selectedMember.name}'s role is now "${ROLE_LABELS[newRole].label}" and status is "${newStatus.toUpperCase()}".`
+                );
+            } else if (roleChanged) {
+                Alert.alert(
+                    'Role Assigned',
+                    `${selectedMember.name}'s role has been updated to "${ROLE_LABELS[newRole].label}".`
+                );
+            } else {
+                Alert.alert(
+                    'Status Updated',
+                    `${selectedMember.name}'s membership status has been updated to "${newStatus.toUpperCase()}".`
+                );
+            }
         } catch (err: any) {
-            console.error('[Save Status Error]', err);
-            Alert.alert('Update Failed', err?.message || 'Failed to update member status.');
+            console.error('[Save Member Error]', err);
+            Alert.alert('Update Failed', err?.message || 'Failed to update member.');
         } finally {
             setIsSavingStatus(false);
         }

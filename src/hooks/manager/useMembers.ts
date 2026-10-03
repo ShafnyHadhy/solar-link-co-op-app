@@ -1,5 +1,6 @@
 import { getApiUrl } from "@/lib/api";
 import { CommunityMember, MemberStatus } from "@/types/member";
+import { UserRole } from "@/types/role";
 import { useCallback, useEffect, useState } from "react";
 
 export function useMembers() {
@@ -85,6 +86,60 @@ export async function updateMemberStatusApi(
 
     if (!response.ok || !data.success) {
         throw new Error(data.error || `Failed to update member status (${response.status})`);
+    }
+
+    return data.user || data.member || data.data?.user;
+}
+
+export async function updateMemberRoleApi(
+    memberId: string,
+    role: UserRole,
+    managerId?: string
+): Promise<any> {
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+    };
+    if (managerId) {
+        headers["x-user-id"] = managerId;
+    }
+
+    const response = await fetch(getApiUrl(`/api/users/${encodeURIComponent(memberId)}`), {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ role }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+        throw new Error(data.error || `Failed to update member role (${response.status})`);
+    }
+
+    return data.user || data.member || data.data?.user;
+}
+
+export async function updateMemberApi(
+    memberId: string,
+    params: { role?: UserRole; status?: MemberStatus },
+    managerId?: string
+): Promise<any> {
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+    };
+    if (managerId) {
+        headers["x-user-id"] = managerId;
+    }
+
+    const response = await fetch(getApiUrl(`/api/users/${encodeURIComponent(memberId)}`), {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify(params),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+        throw new Error(data.error || `Failed to update member (${response.status})`);
     }
 
     return data.user || data.member || data.data?.user;

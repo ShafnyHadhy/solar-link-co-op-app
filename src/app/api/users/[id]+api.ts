@@ -1,7 +1,11 @@
 // Member Details and Update API Route
 // GET /api/users/:id — Retrieve specific member details with energy context
-// PATCH /api/users/:id — Update member status (active, pending, inactive)
-import { getMemberDetails, updateMemberStatus } from "@/lib/server/services/userService";
+// PATCH /api/users/:id — Update member role (manager, solar_owner, household, technician) and/or status
+import {
+    getMemberDetails,
+    updateMemberRole,
+    updateMemberStatus,
+} from "@/lib/server/services/userService";
 import { errorResponse } from "@/lib/server/utils/response";
 
 export async function GET(request: Request, { id }: Record<string, string>) {
@@ -35,11 +39,28 @@ export async function PATCH(request: Request, { id }: Record<string, string>) {
         }
 
         const body = await request.json();
-        const { status } = body;
+        const { role, status } = body;
+
+        if (role === undefined && status === undefined) {
+            return Response.json(
+                { success: false, error: "At least one of 'role' or 'status' is required" },
+                { status: 400 }
+            );
+        }
 
         const managerId = request.headers.get("x-user-id");
 
-        const updatedUser = await updateMemberStatus(id, status, managerId);
+        let updatedUser;
+
+        // Role assignment: Enforces manager authentication & authorization in userService
+        if (role !== undefined) {
+            updatedUser = await updateMemberRole(id, role, managerId);
+        }
+
+        // Status update
+        if (status !== undefined) {
+            updatedUser = await updateMemberStatus(id, status, managerId);
+        }
 
         return Response.json({
             success: true,

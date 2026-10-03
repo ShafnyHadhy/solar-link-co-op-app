@@ -1,15 +1,27 @@
 import type { UserRole } from "@/types/role";
 
+let cachedUserRole: UserRole | null = null;
+
+export function setCachedUserRole(role: UserRole | null) {
+    cachedUserRole = role;
+}
+
+export function getCachedUserRole(): UserRole | null {
+    return cachedUserRole;
+}
+
 export function getUserRole(
-    metadataRole: unknown
+    metadataRole?: unknown,
+    fallbackRole?: unknown
 ): UserRole | null {
+    const candidate = metadataRole || fallbackRole || cachedUserRole;
     if (
-        metadataRole === "manager" ||
-        metadataRole === "solar_owner" ||
-        metadataRole === "household" ||
-        metadataRole === "technician"
+        candidate === "manager" ||
+        candidate === "solar_owner" ||
+        candidate === "household" ||
+        candidate === "technician"
     ) {
-        return metadataRole;
+        return candidate;
     }
 
     return null;

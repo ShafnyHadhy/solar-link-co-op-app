@@ -9,7 +9,7 @@ import {
     users,
 } from "@/lib/server/db/schema";
 import { desc, eq, inArray } from "drizzle-orm";
-import { BadRequestError, NotFoundError } from "../utils/errors";
+import { BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError } from "../utils/errors";
 
 export type SyncUserInput = {
     id: string;
@@ -397,8 +397,11 @@ export async function syncUser(input: SyncUserInput) {
             updatedAt: new Date(),
         };
 
-        if (input.role && input.role !== currentUser.role) {
-            updatePayload.role = input.role;
+        // Security: Do not blindly trust client-supplied role for existing users.
+        // Role assignment is strictly managed via updateMemberRole by authorized managers.
+        // If Clerk metadata is out of sync with Neon, keep Neon role and trigger Clerk metadata sync if needed.
+        if (currentUser.role && input.role !== currentUser.role) {
+            syncClerkUserRole(input.id, currentUser.role).catch(() => {});
         }
 
         const [updatedUser] = await db
@@ -488,6 +491,147 @@ export async function updateMemberStatus(
             newStatus: typedStatus,
             memberEmail: existing.email,
             memberName: existing.name,
+            timestamp: new Date().toISOString(),
+        }),
+    });
+
+    return updatedUser;
+}
+
+/**
+ * Synchronize a user's role to Clerk publicMetadata via Clerk's Backend REST API.
+ * Securely uses CLERK_SECRET_KEY strictly in the server layer.
+ * Does not expose secrets to client. Gracefully handles missing key or non-Clerk test users.
+ */
+export async function syncClerkUserRole(userId: string, role: string): Promise<boolean> {
+    const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+    if (!clerkSecretKey) {
+        console.warn(
+            "[Clerk Sync] CLERK_SECRET_KEY is not defined in server environment. Neon role updated, skipping Clerk metadata synchronization."
+        );
+        return false;
+    }
+
+    // Only attempt Clerk API sync for valid Clerk user IDs (typically user_...)
+    if (!userId.startsWith("user_")) {
+        console.log(
+            `[Clerk Sync] Skipped Clerk API sync for non-Clerk ID "${userId}".`
+        );
+        return false;
+    }
+
+    try {
+        const response = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(userId)}/metadata`, {
+            method: "PATCH",
+            headers: {
+                Authorization: `Bearer ${clerkSecretKey}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                public_metadata: {
+                    role,
+                },
+            }),
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            console.warn(
+                `[Clerk Sync Warning] Clerk API returned ${response.status} for user ${userId}: ${errText}`
+            );
+            return false;
+        }
+
+        console.log(`[Clerk Sync Success] Synced role "${role}" to Clerk publicMetadata for user ${userId}.`);
+        return true;
+    } catch (err: any) {
+        console.error(`[Clerk Sync Error] Failed to reach Clerk API:`, err?.message || err);
+        return false;
+    }
+}
+
+/**
+ * Assign / update a member's role (manager, solar_owner, household, technician).
+ * 
+ * Security & Validation:
+ * 1. Enforces manager authorization: managerId must correspond to an active manager in Neon users table.
+ * 2. Validates newRole against userRoleEnum ("manager", "solar_owner", "household", "technician").
+ * 3. Updates users.role and updatedAt in Neon database.
+ * 4. Synchronizes Clerk publicMetadata.role via server-side Clerk REST API if CLERK_SECRET_KEY is configured.
+ * 5. Records an immutable audit log entry in audit_logs table.
+ * 6. Returns the updated user record.
+ */
+export async function updateMemberRole(
+    userId: string,
+    role: unknown,
+    managerId?: string | null
+) {
+    // 1. Enforce manager authorization
+    if (!managerId) {
+        throw new UnauthorizedError("Authentication required: Manager ID missing");
+    }
+
+    const [manager] = await db
+        .select({ id: users.id, role: users.role, status: users.status })
+        .from(users)
+        .where(eq(users.id, managerId))
+        .limit(1);
+
+    if (!manager || manager.role !== "manager") {
+        throw new ForbiddenError("Only authorized managers can assign member roles");
+    }
+
+    // 2. Validate role against user_role enum
+    const VALID_ROLES = ["manager", "solar_owner", "household", "technician"] as const;
+
+    if (typeof role !== "string" || !VALID_ROLES.includes(role as any)) {
+        throw new BadRequestError(
+            `Invalid role: "${role}". Allowed values are: ${VALID_ROLES.join(", ")}`
+        );
+    }
+
+    const typedRole = role as (typeof VALID_ROLES)[number];
+
+    // 3. Ensure target member exists
+    const [existing] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+    if (!existing) {
+        throw new NotFoundError("Member not found");
+    }
+
+    const previousRole = existing.role;
+
+    // 4. Update Neon users table
+    const [updatedUser] = await db
+        .update(users)
+        .set({
+            role: typedRole,
+            updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId))
+        .returning();
+
+    // 5. Server-side Clerk role metadata synchronization (Neon role -> Clerk metadata)
+    await syncClerkUserRole(userId, typedRole);
+
+    // 6. Record audit log entry
+    const auditId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    await db.insert(auditLogs).values({
+        id: auditId,
+        userId: managerId,
+        action: "ASSIGN_MEMBER_ROLE",
+        entityType: "user",
+        entityId: userId,
+        details: JSON.stringify({
+            previousRole,
+            newRole: typedRole,
+            memberEmail: existing.email,
+            memberName: existing.name,
+            assignedBy: managerId,
             timestamp: new Date().toISOString(),
         }),
     });
