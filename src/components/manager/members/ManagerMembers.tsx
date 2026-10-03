@@ -1,6 +1,6 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
-import { calculateMemberAnalytics } from '@/lib/memberService';
 import { useMembers } from '@/hooks/manager/useMembers';
+import { calculateMemberAnalytics } from '@/lib/memberService';
 import { CommunityMember, MemberStatus } from '@/types/member';
 import { UserRole } from '@/types/role';
 import { Feather } from '@expo/vector-icons';
@@ -94,8 +94,8 @@ const ManagerMembers = () => {
 
     const filteredMembers = members.filter((m) => {
         const matchesSearch =
-            m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            m.email.toLowerCase().includes(searchQuery.toLowerCase());
+            (m.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (m.email || '').toLowerCase().includes(searchQuery.toLowerCase());
 
         if (selectedFilter === 'all') return matchesSearch;
         if (selectedFilter === 'pending') return matchesSearch && m.status === 'pending';
@@ -209,97 +209,44 @@ const ManagerMembers = () => {
                 </View>
 
                 {/* Filter Tabs */}
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ gap: 8 }}
-                    className='mb-5'
-                >
-                    <Pressable
-                        onPress={() => setSelectedFilter('all')}
-                        className={`px-4 py-2 rounded-full border ${selectedFilter === 'all'
-                                ? 'bg-primary border-primary shadow-sm'
-                                : 'bg-secondary/60 border-border/60 active:bg-secondary'
-                            }`}
+                <View className='mb-5'>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ gap: 8, alignItems: 'center' }}
+                        style={{ flexGrow: 0 }}
                     >
-                        <Text
-                            className={`text-xs font-bold ${selectedFilter === 'all'
-                                    ? 'text-primary-foreground'
-                                    : 'text-muted-foreground'
-                                }`}
-                        >
-                            All ({members.length})
-                        </Text>
-                    </Pressable>
-
-                    <Pressable
-                        onPress={() => setSelectedFilter('solar_owner')}
-                        className={`px-4 py-2 rounded-full border ${selectedFilter === 'solar_owner'
-                                ? 'bg-primary border-primary shadow-sm'
-                                : 'bg-secondary/60 border-border/60 active:bg-secondary'
-                            }`}
-                    >
-                        <Text
-                            className={`text-xs font-bold ${selectedFilter === 'solar_owner'
-                                    ? 'text-primary-foreground'
-                                    : 'text-muted-foreground'
-                                }`}
-                        >
-                            Solar Owners ({analytics.solarOwnerCount})
-                        </Text>
-                    </Pressable>
-
-                    <Pressable
-                        onPress={() => setSelectedFilter('household')}
-                        className={`px-4 py-2 rounded-full border ${selectedFilter === 'household'
-                                ? 'bg-primary border-primary shadow-sm'
-                                : 'bg-secondary/60 border-border/60 active:bg-secondary'
-                            }`}
-                    >
-                        <Text
-                            className={`text-xs font-bold ${selectedFilter === 'household'
-                                    ? 'text-primary-foreground'
-                                    : 'text-muted-foreground'
-                                }`}
-                        >
-                            Households ({analytics.householdCount})
-                        </Text>
-                    </Pressable>
-
-                    <Pressable
-                        onPress={() => setSelectedFilter('technician')}
-                        className={`px-4 py-2 rounded-full border ${selectedFilter === 'technician'
-                                ? 'bg-primary border-primary shadow-sm'
-                                : 'bg-secondary/60 border-border/60 active:bg-secondary'
-                            }`}
-                    >
-                        <Text
-                            className={`text-xs font-bold ${selectedFilter === 'technician'
-                                    ? 'text-primary-foreground'
-                                    : 'text-muted-foreground'
-                                }`}
-                        >
-                            Technicians ({analytics.technicianCount})
-                        </Text>
-                    </Pressable>
-
-                    <Pressable
-                        onPress={() => setSelectedFilter('pending')}
-                        className={`px-4 py-2 rounded-full border ${selectedFilter === 'pending'
-                                ? 'bg-primary border-primary shadow-sm'
-                                : 'bg-secondary/60 border-border/60 active:bg-secondary'
-                            }`}
-                    >
-                        <Text
-                            className={`text-xs font-bold ${selectedFilter === 'pending'
-                                    ? 'text-primary-foreground'
-                                    : 'text-muted-foreground'
-                                }`}
-                        >
-                            Pending ({analytics.pendingMembers})
-                        </Text>
-                    </Pressable>
-                </ScrollView>
+                        {[
+                            { id: 'all', label: 'All', count: members.length },
+                            { id: 'pending', label: 'Pending', count: analytics.pendingMembers },
+                            { id: 'manager', label: 'Managers', count: analytics.managerCount },
+                            { id: 'solar_owner', label: 'Solar Owners', count: analytics.solarOwnerCount },
+                            { id: 'household', label: 'Households', count: analytics.householdCount },
+                            { id: 'technician', label: 'Technicians', count: analytics.technicianCount },
+                        ].map((tab) => {
+                            const isSelected = selectedFilter === tab.id;
+                            return (
+                                <Pressable
+                                    key={tab.id}
+                                    onPress={() => setSelectedFilter(tab.id as 'all' | UserRole | 'pending')}
+                                    className={`px-4 py-2 rounded-full border items-center justify-center ${isSelected
+                                        ? 'bg-primary border-primary shadow-sm'
+                                        : 'bg-secondary/60 border-border/60 active:bg-secondary'
+                                        }`}
+                                >
+                                    <Text
+                                        className={`text-xs font-bold ${isSelected
+                                            ? 'text-primary-foreground'
+                                            : 'text-muted-foreground'
+                                            }`}
+                                    >
+                                        {tab.label} ({tab.count})
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </ScrollView>
+                </View>
 
                 {/* Member Cards List */}
                 <View className='flex-col gap-4'>
@@ -385,18 +332,18 @@ const ManagerMembers = () => {
                                         {/* Status Badge */}
                                         <View
                                             className={`px-2.5 py-0.5 rounded-full border ${isActive
-                                                    ? 'bg-emerald-500/15 border-emerald-500/40'
-                                                    : isPending
-                                                        ? 'bg-yellow-500/15 border-yellow-500/40'
-                                                        : 'bg-zinc-500/15 border-zinc-500/40'
+                                                ? 'bg-emerald-500/15 border-emerald-500/40'
+                                                : isPending
+                                                    ? 'bg-yellow-500/15 border-yellow-500/40'
+                                                    : 'bg-zinc-500/15 border-zinc-500/40'
                                                 }`}
                                         >
                                             <Text
                                                 className={`text-[10px] font-bold uppercase ${isActive
-                                                        ? 'text-[#10B981]'
-                                                        : isPending
-                                                            ? 'text-[#F59E0B]'
-                                                            : 'text-[#6B7280]'
+                                                    ? 'text-[#10B981]'
+                                                    : isPending
+                                                        ? 'text-[#F59E0B]'
+                                                        : 'text-[#6B7280]'
                                                     }`}
                                             >
                                                 {member.status}
@@ -575,8 +522,8 @@ const ManagerMembers = () => {
                                         key={roleKey}
                                         onPress={() => setNewRole(roleKey)}
                                         className={`flex-row items-center justify-between p-3 rounded-xl border ${isSelected
-                                                ? 'bg-primary/15 border-primary shadow-sm'
-                                                : 'bg-secondary/40 border-border/40 active:bg-secondary'
+                                            ? 'bg-primary/15 border-primary shadow-sm'
+                                            : 'bg-secondary/40 border-border/40 active:bg-secondary'
                                             }`}
                                     >
                                         <View className='flex-1'>
@@ -614,14 +561,14 @@ const ManagerMembers = () => {
                                             key={st}
                                             onPress={() => setNewStatus(st)}
                                             className={`flex-1 py-2 items-center justify-center rounded-xl border ${isSel
-                                                    ? 'bg-primary border-primary shadow-sm'
-                                                    : 'bg-secondary/40 border-border/40 active:bg-secondary'
+                                                ? 'bg-primary border-primary shadow-sm'
+                                                : 'bg-secondary/40 border-border/40 active:bg-secondary'
                                                 }`}
                                         >
                                             <Text
                                                 className={`text-xs font-bold capitalize ${isSel
-                                                        ? 'text-primary-foreground'
-                                                        : 'text-muted-foreground'
+                                                    ? 'text-primary-foreground'
+                                                    : 'text-muted-foreground'
                                                     }`}
                                             >
                                                 {st}
