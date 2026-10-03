@@ -9,11 +9,11 @@ import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabsLayout() {
-  useUserSync();
+  const { dbUser } = useUserSync();
   const { user, isSignedIn, isLoaded } = useUser();
   const insets = useSafeAreaInsets();
 
-  const role = getUserRole(user?.publicMetadata?.role);
+  const role = getUserRole(user?.publicMetadata?.role, dbUser?.role);
 
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
