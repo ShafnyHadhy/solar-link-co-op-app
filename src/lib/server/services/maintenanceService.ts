@@ -170,19 +170,31 @@ export async function getServiceTicketById(ticketId: string) {
 }
 
 
-// CESA-201 - Update service ticket status
+// CESA-201 / CESA-260 - Update service ticket status
 export async function updateServiceTicketStatus(
     ticketId: string,
     status: "open" | "assigned" | "in_progress" | "resolved" | "closed"
 ) {
     try {
+        // CESA-260 - Update ticket status
+        const updateData: {
+            status: "open" | "assigned" | "in_progress" | "resolved" | "closed";
+            updatedAt: Date;
+            resolvedAt?: Date;
+        } = {
+            status,
+            updatedAt: new Date(),
+        };
+
+        // Set resolution time when maintenance is completed.
+        // Do not erase it when the resolved ticket is later closed.
+        if (status === "resolved") {
+            updateData.resolvedAt = new Date();
+        }
+
         const [updatedTicket] = await db
             .update(serviceTickets)
-            .set({
-                status,
-                updatedAt: new Date(),
-                resolvedAt: status === "resolved" ? new Date() : null,
-            })
+            .set(updateData)
             .where(eq(serviceTickets.id, ticketId))
             .returning();
 
@@ -265,6 +277,40 @@ export async function assignServiceTicketTechnician(
 
 
 // ============================================================
+// TECHNICIAN - US-31 COMPLETE MAINTENANCE WORKFLOW
+// ============================================================
+
+// CESA-253 - Retrieve tickets assigned to technician
+export async function getAssignedServiceTickets(
+    technicianId: string
+) {
+    try {
+        const tickets = await db
+            .select()
+            .from(serviceTickets)
+            .where(
+                eq(
+                    serviceTickets.assignedTechnicianId,
+                    technicianId
+                )
+            )
+            .orderBy(desc(serviceTickets.createdAt));
+
+        return tickets;
+    } catch (error) {
+        console.error(
+            "Failed to retrieve assigned service tickets:",
+            error
+        );
+
+        throw new Error(
+            "Failed to retrieve assigned service tickets"
+        );
+    }
+}
+
+
+// ============================================================
 // TECHNICIAN - US-25 MAINTENANCE RECORDS
 // ============================================================
 
@@ -295,6 +341,34 @@ export async function createMaintenanceDiagnosis(data: {
 
         throw new Error(
             "Failed to record maintenance diagnosis"
+        );
+    }
+}
+
+
+// CESA-255 - Update maintenance diagnosis
+export async function updateMaintenanceDiagnosis(
+    recordId: string,
+    diagnosis: string
+) {
+    try {
+        const [updatedRecord] = await db
+            .update(maintenanceRecords)
+            .set({
+                description: diagnosis,
+            })
+            .where(eq(maintenanceRecords.id, recordId))
+            .returning();
+
+        return updatedRecord ?? null;
+    } catch (error) {
+        console.error(
+            "Failed to update maintenance diagnosis:",
+            error
+        );
+
+        throw new Error(
+            "Failed to update maintenance diagnosis"
         );
     }
 }
@@ -352,6 +426,7 @@ export async function updateMaintenanceNotes(
         );
     }
 }
+
 
 // CESA-209 - Retrieve maintenance history for a service ticket
 export async function getMaintenanceHistory(
