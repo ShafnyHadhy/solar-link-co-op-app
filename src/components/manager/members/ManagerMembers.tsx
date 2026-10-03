@@ -58,7 +58,7 @@ const ROLE_LABELS: Record<
 const ManagerMembers = () => {
     const { user } = useUser();
     const router = useRouter();
-    const { members, setMembers, loading, error, refetch } = useMembers();
+    const { members, setMembers, loading, error, refetch } = useMembers({ managerId: user?.id });
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedFilter, setSelectedFilter] = useState<'all' | UserRole | 'pending'>('all');
 
@@ -84,7 +84,7 @@ const ManagerMembers = () => {
         setDetailsModalVisible(true);
 
         try {
-            const details = await fetchMemberDetails(member.id);
+            const details = await fetchMemberDetails(member.id, user?.id);
             setDetailedProfile(details);
         } catch (err: any) {
             console.error('[Member Details Error]', err);

@@ -1,11 +1,11 @@
-// Users API Route
-// GET /api/users — Retrieve community members for management (or single member if ?id= is passed)
-// PATCH /api/users — Update member status (supports ?id= or body.id/userId)
+import { requireManager } from "@/lib/server/auth/authorization";
 import { getAllUsers, getMemberDetails, updateMemberStatus } from "@/lib/server/services/userService";
 import { errorResponse } from "@/lib/server/utils/response";
 
 export async function GET(request: Request) {
     try {
+        await requireManager(request);
+
         const url = new URL(request.url);
         const memberId = url.searchParams.get("id");
 
@@ -33,6 +33,9 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
     try {
+        const manager = await requireManager(request);
+        const managerId = manager.id;
+
         const url = new URL(request.url);
         const queryId = url.searchParams.get("id");
 
@@ -47,7 +50,6 @@ export async function PATCH(request: Request) {
         }
 
         const { status } = body;
-        const managerId = request.headers.get("x-user-id");
 
         const updatedUser = await updateMemberStatus(memberId, status, managerId);
 

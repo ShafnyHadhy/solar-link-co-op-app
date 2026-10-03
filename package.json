@@ -55,7 +55,16 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "test": "node ./tests/run-all.mjs",
+    "test:regression": "node ./tests/run-all.mjs",
+    "test:auth": "node ./tests/01-auth-and-roles.mjs",
+    "test:manager": "node ./tests/02-manager-workflows.mjs",
+    "test:solar-owner": "node ./tests/03-solar-owner-workflows.mjs",
+    "test:household": "node ./tests/04-household-workflows.mjs",
+    "test:technician": "node ./tests/05-technician-workflows.mjs",
+    "test:validation": "node ./tests/06-validations-and-errors.mjs",
+    "test:db": "node ./tests/07-database-integrity.mjs"
   },
   "private": true
 }

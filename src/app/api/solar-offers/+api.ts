@@ -1,7 +1,4 @@
-// Solar Offers API Routes
-// GET  /api/solar-offers?ownerId=... — list owner's offers
-// POST /api/solar-offers             — create a new sharing offer
-
+import { requireSolarOwner } from "@/lib/server/auth/authorization";
 import {
     createSolarOffer,
     getOffersByOwner,
@@ -16,11 +13,8 @@ import {
 export async function GET(request: Request) {
     try {
         const url = new URL(request.url);
-        const ownerId = url.searchParams.get("ownerId");
-
-        if (!ownerId) {
-            throw new BadRequestError("ownerId is required");
-        }
+        const authUser = await requireSolarOwner(request, url.searchParams.get("ownerId") || undefined);
+        const ownerId = authUser.id;
 
         const offers = await getOffersByOwner(ownerId);
 
@@ -32,13 +26,15 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
     try {
-        const body = await request.json();
+        const body = await request.json().catch(() => ({}));
+        const authUser = await requireSolarOwner(request, body?.ownerId);
+        const ownerId = authUser.id;
 
-        const { id, ownerId, assetId, energyAmountKwh, minimumBatteryPercent, expiresAt } = body;
+        const { id, assetId, energyAmountKwh, minimumBatteryPercent, expiresAt } = body;
 
-        if (!id || !ownerId || !assetId || energyAmountKwh === undefined) {
+        if (!id || !assetId || energyAmountKwh === undefined) {
             throw new BadRequestError(
-                "id, ownerId, assetId and energyAmountKwh are required"
+                "id, assetId and energyAmountKwh are required"
             );
         }
 

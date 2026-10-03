@@ -23,7 +23,7 @@ export interface CommunityGenerationData {
     breakdownByAsset?: CommunityAssetBreakdown[];
 }
 
-export function useCommunityGeneration(options?: { date?: string }) {
+export function useCommunityGeneration(options?: { date?: string; managerId?: string }) {
     const [data, setData] = useState<CommunityGenerationData | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -34,7 +34,12 @@ export function useCommunityGeneration(options?: { date?: string }) {
 
         try {
             const query = options?.date ? `?date=${encodeURIComponent(options.date)}` : "";
-            const response = await fetch(getApiUrl(`/api/manager/energy-generation${query}`));
+            const headers: Record<string, string> = {};
+            if (options?.managerId) {
+                headers["x-user-id"] = options.managerId;
+            }
+
+            const response = await fetch(getApiUrl(`/api/manager/energy-generation${query}`), { headers });
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch generation data (${response.status})`);

@@ -1,6 +1,4 @@
-// Maintenance Records API Routes
-// POST /api/maintenance-records - record technician diagnosis
-
+import { requireTechnician } from "@/lib/server/auth/authorization";
 import {
     createMaintenanceDiagnosis,
     getMaintenanceHistory,
@@ -17,6 +15,8 @@ import {
 // CESA-209 - Get maintenance history for a service ticket
 export async function GET(request: Request) {
     try {
+        await requireTechnician(request);
+
         const url = new URL(request.url);
         const ticketId =
             url.searchParams.get("ticketId");
@@ -38,18 +38,20 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
     try {
-        const body = await request.json();
+        const body = await request.json().catch(() => ({}));
+
+        const technician = await requireTechnician(request, body?.technicianId);
+        const technicianId = technician.id;
 
         const {
             id,
             ticketId,
-            technicianId,
             diagnosis,
         } = body;
 
-        if (!ticketId || !technicianId || !diagnosis) {
+        if (!ticketId || !diagnosis) {
             throw new BadRequestError(
-                "ticketId, technicianId and diagnosis are required"
+                "ticketId and diagnosis are required"
             );
         }
 
@@ -72,10 +74,11 @@ export async function POST(request: Request) {
     }
 }
 
-
 // CESA-255, CESA-206 & CESA-207 - Update maintenance record
 export async function PATCH(request: Request) {
     try {
+        await requireTechnician(request);
+
         const body = await request.json();
 
         const {

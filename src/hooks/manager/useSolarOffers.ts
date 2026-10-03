@@ -30,8 +30,8 @@ export interface ManagerSolarOfferDetail extends ManagerSolarOffer {
     };
 }
 
-export function useSolarOffers(options: { enabled?: boolean } = {}) {
-    const { enabled = true } = options;
+export function useSolarOffers(options: { enabled?: boolean; managerId?: string } = {}) {
+    const { enabled = true, managerId } = options;
     const [offers, setOffers] = useState<ManagerSolarOffer[]>([]);
     const [loading, setLoading] = useState<boolean>(enabled);
     const [error, setError] = useState<string | null>(null);
@@ -41,7 +41,12 @@ export function useSolarOffers(options: { enabled?: boolean } = {}) {
         setError(null);
 
         try {
-            const response = await fetch(getApiUrl("/api/manager/solar-offers"));
+            const headers: Record<string, string> = {};
+            if (managerId) {
+                headers["x-user-id"] = managerId;
+            }
+
+            const response = await fetch(getApiUrl("/api/manager/solar-offers"), { headers });
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch solar offers (${response.status})`);

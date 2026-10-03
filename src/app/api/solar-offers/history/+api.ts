@@ -1,11 +1,8 @@
-// Solar Owner Sharing History API Route
-// GET /api/solar-offers/history?ownerId=... — retrieve completed dispatches & earned credits summary
-
+import { requireSolarOwner } from "@/lib/server/auth/authorization";
 import {
     getOwnerSharingHistory,
     getOwnerOfferSummary,
 } from "@/lib/server/services/solarOfferService";
-import { BadRequestError } from "@/lib/server/utils/errors";
 import {
     errorResponse,
     successResponse,
@@ -14,11 +11,8 @@ import {
 export async function GET(request: Request) {
     try {
         const url = new URL(request.url);
-        const ownerId = url.searchParams.get("ownerId");
-
-        if (!ownerId) {
-            throw new BadRequestError("ownerId is required");
-        }
+        const authUser = await requireSolarOwner(request, url.searchParams.get("ownerId") || undefined);
+        const ownerId = authUser.id;
 
         const history = await getOwnerSharingHistory(ownerId);
         const summary = await getOwnerOfferSummary(ownerId);
