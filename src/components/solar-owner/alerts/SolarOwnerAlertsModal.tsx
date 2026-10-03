@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useNotifications } from '@/hooks/useNotifications';
 import React, { useState } from 'react';
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSolarOwnerStore } from '../store/useSolarOwnerStore';
 
 type ModalCategory = 'all' | 'requests' | 'energy' | 'maintenance' | 'system';
@@ -17,9 +17,33 @@ export const SolarOwnerAlertsModal: React.FC<SolarOwnerAlertsModalProps> = ({
     onClose,
     onNavigateToShare,
 }) => {
-    const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
-    const { notificationsEnabled } = useSolarOwnerStore();
+    const {
+        notifications,
+        unreadCount,
+        markingReadId,
+        isMarkingAllRead,
+        markAsRead,
+        markAllAsRead,
+    } = useNotifications();
+    const { notificationsEnabled, showToast } = useSolarOwnerStore();
     const [selectedCategory, setSelectedCategory] = useState<ModalCategory>('all');
+
+    const handleMarkAsRead = async (id: string) => {
+        try {
+            await markAsRead(id);
+        } catch (err: any) {
+            showToast(err?.message || 'Failed to mark notification as read', 'warning');
+        }
+    };
+
+    const handleMarkAllAsRead = async () => {
+        try {
+            await markAllAsRead();
+            showToast('All notifications marked as read', 'info');
+        } catch (err: any) {
+            showToast(err?.message || 'Failed to mark all as read', 'warning');
+        }
+    };
 
     // Filter notifications respecting user's active notification toggles
     const activeNotifications = notifications.filter((item) => {
@@ -113,10 +137,23 @@ export const SolarOwnerAlertsModal: React.FC<SolarOwnerAlertsModalProps> = ({
                     {/* Mark all as read action */}
                     {unreadCount > 0 && (
                         <View className="flex-row justify-end mb-3">
-                            <Pressable onPress={markAllAsRead} className="px-2 py-1">
-                                <Text className="text-xs font-bold text-primary">
-                                    Mark all as read
-                                </Text>
+                            <Pressable
+                                onPress={handleMarkAllAsRead}
+                                disabled={isMarkingAllRead}
+                                className="px-2.5 py-1 rounded-lg bg-secondary border border-border/60 flex-row items-center active:opacity-80"
+                            >
+                                {isMarkingAllRead ? (
+                                    <View className="flex-row items-center gap-1">
+                                        <ActivityIndicator size="small" color="#F59E0B" />
+                                        <Text className="text-xs font-bold text-primary">
+                                            Marking...
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <Text className="text-xs font-bold text-primary">
+                                        Mark all as read
+                                    </Text>
+                                )}
                             </Pressable>
                         </View>
                     )}
@@ -182,8 +219,8 @@ export const SolarOwnerAlertsModal: React.FC<SolarOwnerAlertsModalProps> = ({
                                     <Pressable
                                         key={item.id}
                                         onPress={() => {
-                                            if (!item.isRead) {
-                                                markAsRead(item.id);
+                                            if (!item.isRead && markingReadId !== item.id) {
+                                                handleMarkAsRead(item.id);
                                             }
                                         }}
                                         style={{ padding: 16 }}
@@ -219,12 +256,22 @@ export const SolarOwnerAlertsModal: React.FC<SolarOwnerAlertsModalProps> = ({
                                         {!item.isRead && (
                                             <View className="flex-row items-center justify-end pt-2 border-t border-border/30">
                                                 <Pressable
-                                                    onPress={() => markAsRead(item.id)}
-                                                    className="px-3 py-1 rounded-lg bg-primary/20 border border-primary/30 active:opacity-80"
+                                                    onPress={() => handleMarkAsRead(item.id)}
+                                                    disabled={markingReadId === item.id}
+                                                    className="px-3 py-1 rounded-lg bg-primary/20 border border-primary/30 active:opacity-80 flex-row items-center"
                                                 >
-                                                    <Text className="text-[11px] font-bold text-primary">
-                                                        Mark as read
-                                                    </Text>
+                                                    {markingReadId === item.id ? (
+                                                        <View className="flex-row items-center gap-1">
+                                                            <ActivityIndicator size="small" color="#F59E0B" />
+                                                            <Text className="text-[11px] font-bold text-primary">
+                                                                Saving...
+                                                            </Text>
+                                                        </View>
+                                                    ) : (
+                                                        <Text className="text-[11px] font-bold text-primary">
+                                                            Mark as read
+                                                        </Text>
+                                                    )}
                                                 </Pressable>
                                             </View>
                                         )}

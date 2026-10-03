@@ -21,13 +21,15 @@ type NotificationCategory = 'all' | 'requests' | 'energy' | 'maintenance' | 'sys
 export const SolarOwnerAlerts = () => {
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const { setActiveView } = useSolarOwnerStore();
+    const { setActiveView, showToast } = useSolarOwnerStore();
 
     const {
         notifications,
         unreadCount,
         loading,
         error,
+        markingReadId,
+        isMarkingAllRead,
         refetch,
         markAsRead,
         markAllAsRead,
@@ -42,6 +44,23 @@ export const SolarOwnerAlerts = () => {
         setRefreshing(true);
         await refetch();
         setRefreshing(false);
+    };
+
+    const handleMarkAsRead = async (id: string) => {
+        try {
+            await markAsRead(id);
+        } catch (err: any) {
+            showToast(err?.message || 'Failed to mark notification as read', 'warning');
+        }
+    };
+
+    const handleMarkAllAsRead = async () => {
+        try {
+            await markAllAsRead();
+            showToast('All notifications marked as read', 'info');
+        } catch (err: any) {
+            showToast(err?.message || 'Failed to mark all as read', 'warning');
+        }
     };
 
     // Filter notifications by selected category tab
@@ -165,12 +184,22 @@ export const SolarOwnerAlerts = () => {
 
                     {unreadCount > 0 && (
                         <Pressable
-                            onPress={markAllAsRead}
-                            className="px-3 py-1.5 rounded-xl bg-secondary border border-border/70 active:opacity-80"
+                            onPress={handleMarkAllAsRead}
+                            disabled={isMarkingAllRead}
+                            className="px-3 py-1.5 rounded-xl bg-secondary border border-border/70 active:opacity-80 flex-row items-center"
                         >
-                            <Text className="text-[11px] font-bold text-primary">
-                                Mark all as read
-                            </Text>
+                            {isMarkingAllRead ? (
+                                <View className="flex-row items-center gap-1">
+                                    <ActivityIndicator size="small" color="#F59E0B" />
+                                    <Text className="text-[11px] font-bold text-primary">
+                                        Marking...
+                                    </Text>
+                                </View>
+                            ) : (
+                                <Text className="text-[11px] font-bold text-primary">
+                                    Mark all as read
+                                </Text>
+                            )}
                         </Pressable>
                     )}
                 </View>
@@ -275,8 +304,8 @@ export const SolarOwnerAlerts = () => {
                                 <Pressable
                                     key={item.id}
                                     onPress={() => {
-                                        if (!item.isRead) {
-                                            markAsRead(item.id);
+                                        if (!item.isRead && markingReadId !== item.id) {
+                                            handleMarkAsRead(item.id);
                                         }
                                     }}
                                     style={{ padding: 18 }}
@@ -316,12 +345,22 @@ export const SolarOwnerAlerts = () => {
                                     {!item.isRead && (
                                         <View className="flex-row items-center justify-end pt-2 border-t border-border/40">
                                             <Pressable
-                                                onPress={() => markAsRead(item.id)}
-                                                className="px-3.5 py-1.5 rounded-xl bg-primary/20 border border-primary/30 active:opacity-80"
+                                                onPress={() => handleMarkAsRead(item.id)}
+                                                disabled={markingReadId === item.id}
+                                                className="px-3.5 py-1.5 rounded-xl bg-primary/20 border border-primary/30 active:opacity-80 flex-row items-center"
                                             >
-                                                <Text className="text-xs font-bold text-primary">
-                                                    Mark as read
-                                                </Text>
+                                                {markingReadId === item.id ? (
+                                                    <View className="flex-row items-center gap-1.5">
+                                                        <ActivityIndicator size="small" color="#F59E0B" />
+                                                        <Text className="text-xs font-bold text-primary">
+                                                            Saving...
+                                                        </Text>
+                                                    </View>
+                                                ) : (
+                                                    <Text className="text-xs font-bold text-primary">
+                                                        Mark as read
+                                                    </Text>
+                                                )}
                                             </Pressable>
                                         </View>
                                     )}

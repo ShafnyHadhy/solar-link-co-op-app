@@ -59,15 +59,18 @@ export async function PATCH(request: Request) {
         const headerUserId = request.headers.get("x-user-id");
         const body = await request.json().catch(() => ({}));
 
-        const userId = body.userId || headerUserId || url.searchParams.get("userId");
+        const userId = headerUserId || body.userId || url.searchParams.get("userId");
+
+        if (!userId) {
+            throw new UnauthorizedError(
+                "Authentication required: user ID is missing"
+            );
+        }
+
         const notificationId = body.id || body.notificationId;
         const markAll = body.markAll === true;
 
         if (markAll) {
-            if (!userId) {
-                throw new BadRequestError("userId is required to mark all notifications as read");
-            }
-
             const updated = await markAllNotificationsAsRead(userId);
             return successResponse({
                 message: "All notifications marked as read",
@@ -79,7 +82,7 @@ export async function PATCH(request: Request) {
             throw new BadRequestError("notificationId or id is required");
         }
 
-        const updated = await markNotificationAsRead(notificationId, userId || undefined);
+        const updated = await markNotificationAsRead(notificationId, userId);
 
         return successResponse({
             notification: updated,

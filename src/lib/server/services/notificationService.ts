@@ -6,7 +6,7 @@ import {
     notificationTypeEnum,
     users,
 } from "../db/schema";
-import { BadRequestError, NotFoundError } from "../utils/errors";
+import { BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError } from "../utils/errors";
 
 export type NotificationType = (typeof notificationTypeEnum.enumValues)[number];
 
@@ -111,8 +111,10 @@ export async function getUnreadNotificationsForUser(
 
 /**
  * 4. Mark a notification as read
- * - Updates isRead to true for the specified notification ID.
- * - Optionally checks ownership if userId is supplied.
+ * - Verifies that the notification exists.
+ * - Verifies that the notification belongs to the authenticated user.
+ * - Strictly disallows one user from marking another user's notification as read (throws 403 Forbidden).
+ * - Updates isRead to true in the existing notifications table.
  */
 export async function markNotificationAsRead(
     notificationId: string,
@@ -122,34 +124,50 @@ export async function markNotificationAsRead(
         throw new BadRequestError("Notification ID is required");
     }
 
-    const conditions = [eq(notifications.id, notificationId)];
-    if (userId) {
-        conditions.push(eq(notifications.userId, userId));
+    // 1. Fetch notification first to verify existence and ownership
+    const [existing] = await db
+        .select()
+        .from(notifications)
+        .where(eq(notifications.id, notificationId))
+        .limit(1);
+
+    if (!existing) {
+        throw new NotFoundError("Notification not found");
     }
 
+    // 2. If userId is provided, strictly enforce ownership
+    if (userId && existing.userId !== userId) {
+        throw new ForbiddenError(
+            "Forbidden: You cannot modify another user's notification"
+        );
+    }
+
+    // 3. If already marked as read, return immediately
+    if (existing.isRead) {
+        return existing;
+    }
+
+    // 4. Update isRead = true in the notifications table
     const [updated] = await db
         .update(notifications)
         .set({ isRead: true })
-        .where(and(...conditions))
+        .where(eq(notifications.id, notificationId))
         .returning();
-
-    if (!updated) {
-        throw new NotFoundError("Notification not found");
-    }
 
     return updated;
 }
 
 /**
  * 5. Mark all notifications as read for a user
+ * - Strictly verifies userId authentication.
  * - Marks all unread notifications belonging to the requested user as read.
- * - Fits the existing UI pattern (e.g. "Mark all as read").
+ * - Prevents modifying any other user's notifications.
  */
 export async function markAllNotificationsAsRead(
     userId: string
 ): Promise<Notification[]> {
     if (!userId) {
-        throw new BadRequestError("User ID is required");
+        throw new UnauthorizedError("Authentication required: user ID is missing");
     }
 
     const updated = await db

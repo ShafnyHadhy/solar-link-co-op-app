@@ -101,50 +101,70 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
         return () => clearInterval(interval);
     }, [pollIntervalMs, enabled, userId, fetchNotifications]);
 
+    const [markingReadId, setMarkingReadId] = useState<string | null>(null);
+    const [isMarkingAllRead, setIsMarkingAllRead] = useState<boolean>(false);
+
     // Mark single notification as read
     const markAsRead = useCallback(
-        async (notificationId: string) => {
-            if (!notificationId) return;
+        async (notificationId: string): Promise<boolean> => {
+            if (!notificationId) return false;
+            if (!userId) {
+                throw new Error("You must be signed in to perform this action");
+            }
 
-            // Optimistic update
-            setNotifications((prev) =>
-                prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
-            );
-            setUnreadCount((prev) => Math.max(0, prev - 1));
-
+            setMarkingReadId(notificationId);
             try {
                 const url = getApiUrl("/api/notifications");
-                await fetch(url, {
+                const response = await fetch(url, {
                     method: "PATCH",
                     headers: {
                         "Content-Type": "application/json",
-                        "x-user-id": userId || "",
+                        "x-user-id": userId,
                     },
                     body: JSON.stringify({
                         id: notificationId,
                         userId,
                     }),
                 });
-            } catch (err) {
+
+                const data = await response.json().catch(() => ({}));
+
+                if (!response.ok || data.success === false) {
+                    const message =
+                        data.error ||
+                        data.message ||
+                        `Failed to mark notification as read (${response.status})`;
+                    throw new Error(message);
+                }
+
+                // Update the UI immediately after success
+                setNotifications((prev) =>
+                    prev.map((n) =>
+                        n.id === notificationId ? { ...n, isRead: true } : n
+                    )
+                );
+                setUnreadCount((prev) => Math.max(0, prev - 1));
+                return true;
+            } catch (err: any) {
                 console.error("[useNotifications markAsRead Error]", err);
-                // Refetch on error to restore correct state
-                fetchNotifications();
+                throw err;
+            } finally {
+                setMarkingReadId(null);
             }
         },
-        [userId, fetchNotifications]
+        [userId]
     );
 
     // Mark all notifications as read
-    const markAllAsRead = useCallback(async () => {
-        if (!userId) return;
+    const markAllAsRead = useCallback(async (): Promise<boolean> => {
+        if (!userId) {
+            throw new Error("You must be signed in to perform this action");
+        }
 
-        // Optimistic update
-        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-        setUnreadCount(0);
-
+        setIsMarkingAllRead(true);
         try {
             const url = getApiUrl("/api/notifications");
-            await fetch(url, {
+            const response = await fetch(url, {
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",
@@ -155,17 +175,36 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
                     userId,
                 }),
             });
-        } catch (err) {
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok || data.success === false) {
+                const message =
+                    data.error ||
+                    data.message ||
+                    `Failed to mark all notifications as read (${response.status})`;
+                throw new Error(message);
+            }
+
+            // Update the UI immediately after success
+            setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+            setUnreadCount(0);
+            return true;
+        } catch (err: any) {
             console.error("[useNotifications markAllAsRead Error]", err);
-            fetchNotifications();
+            throw err;
+        } finally {
+            setIsMarkingAllRead(false);
         }
-    }, [userId, fetchNotifications]);
+    }, [userId]);
 
     return {
         notifications,
         unreadCount,
         loading,
         error,
+        markingReadId,
+        isMarkingAllRead,
         refetch: fetchNotifications,
         markAsRead,
         markAllAsRead,
