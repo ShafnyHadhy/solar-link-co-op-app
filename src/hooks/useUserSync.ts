@@ -80,6 +80,10 @@ export function useUserSync() {
     useEffect(() => {
         if (isLoaded && isSignedIn && user && lastSyncedUserIdRef.current !== user.id) {
             syncUser();
+        } else if (isLoaded && !isSignedIn) {
+            setDbUser(null);
+            setCachedUserRole(null);
+            lastSyncedUserIdRef.current = null;
         }
     }, [isLoaded, isSignedIn, user, syncUser]);
 
