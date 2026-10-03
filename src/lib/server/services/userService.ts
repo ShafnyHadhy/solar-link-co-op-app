@@ -1,5 +1,6 @@
 import { db } from "@/lib/server/db/client";
 import {
+    auditLogs,
     dispatches,
     energyRequests,
     serviceTickets,
@@ -8,7 +9,7 @@ import {
     users,
 } from "@/lib/server/db/schema";
 import { desc, eq, inArray } from "drizzle-orm";
-import { NotFoundError } from "../utils/errors";
+import { BadRequestError, NotFoundError } from "../utils/errors";
 
 export type SyncUserInput = {
     id: string;
@@ -429,4 +430,67 @@ export async function syncUser(input: SyncUserInput) {
         action: "created" as const,
         user: newUser,
     };
+}
+
+/**
+ * Update a member's status (active, pending, inactive).
+ * Validates against allowed statuses, updates Neon users table,
+ * and creates an audit_logs entry.
+ * Note: Does NOT modify user role (strictly enforced for US-14 status update subtask).
+ */
+export async function updateMemberStatus(
+    userId: string,
+    status: unknown,
+    managerId?: string | null
+) {
+    const VALID_STATUSES = ["active", "pending", "inactive"] as const;
+
+    if (typeof status !== "string" || !VALID_STATUSES.includes(status as any)) {
+        throw new BadRequestError(
+            `Invalid status: "${status}". Allowed values are: ${VALID_STATUSES.join(", ")}`
+        );
+    }
+
+    const typedStatus = status as (typeof VALID_STATUSES)[number];
+
+    const [existing] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+    if (!existing) {
+        throw new NotFoundError("Member not found");
+    }
+
+    const previousStatus = existing.status;
+
+    // Update users table in Neon
+    const [updatedUser] = await db
+        .update(users)
+        .set({
+            status: typedStatus,
+            updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId))
+        .returning();
+
+    // Record audit log entry
+    const auditId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    await db.insert(auditLogs).values({
+        id: auditId,
+        userId: managerId || null,
+        action: "UPDATE_MEMBER_STATUS",
+        entityType: "user",
+        entityId: userId,
+        details: JSON.stringify({
+            previousStatus,
+            newStatus: typedStatus,
+            memberEmail: existing.email,
+            memberName: existing.name,
+            timestamp: new Date().toISOString(),
+        }),
+    });
+
+    return updatedUser;
 }

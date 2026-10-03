@@ -1,5 +1,5 @@
 import { getApiUrl } from "@/lib/api";
-import { CommunityMember } from "@/types/member";
+import { CommunityMember, MemberStatus } from "@/types/member";
 import { useCallback, useEffect, useState } from "react";
 
 export function useMembers() {
@@ -62,4 +62,32 @@ export async function fetchMemberDetails(memberId: string): Promise<any> {
 
     return data.member || data.data?.member;
 }
+
+export async function updateMemberStatusApi(
+    memberId: string,
+    status: MemberStatus,
+    managerId?: string
+): Promise<any> {
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+    };
+    if (managerId) {
+        headers["x-user-id"] = managerId;
+    }
+
+    const response = await fetch(getApiUrl(`/api/users/${encodeURIComponent(memberId)}`), {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ status }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+        throw new Error(data.error || `Failed to update member status (${response.status})`);
+    }
+
+    return data.user || data.member || data.data?.user;
+}
+
 

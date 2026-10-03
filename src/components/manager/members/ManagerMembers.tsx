@@ -1,8 +1,9 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
-import { fetchMemberDetails, useMembers } from '@/hooks/manager/useMembers';
+import { fetchMemberDetails, updateMemberStatusApi, useMembers } from '@/hooks/manager/useMembers';
 import { calculateMemberAnalytics } from '@/lib/memberService';
 import { CommunityMember, MemberDetailedProfile, MemberStatus } from '@/types/member';
 import { UserRole } from '@/types/role';
+import { useUser } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
@@ -49,6 +50,7 @@ const ROLE_LABELS: Record<
 };
 
 const ManagerMembers = () => {
+    const { user } = useUser();
     const router = useRouter();
     const { members, setMembers, loading, error, refetch } = useMembers();
     const [searchQuery, setSearchQuery] = useState('');
@@ -86,11 +88,12 @@ const ManagerMembers = () => {
         }
     };
 
-    // Role Edit Modal State
+    // Role / Status Edit Modal State
     const [selectedMember, setSelectedMember] = useState<CommunityMember | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
     const [newRole, setNewRole] = useState<UserRole>('household');
     const [newStatus, setNewStatus] = useState<MemberStatus>('active');
+    const [isSavingStatus, setIsSavingStatus] = useState(false);
 
     const analytics = calculateMemberAnalytics(members);
 
@@ -101,20 +104,69 @@ const ManagerMembers = () => {
         setModalVisible(true);
     };
 
-    const handleSaveRole = () => {
+    const handleSaveStatus = async () => {
         if (!selectedMember) return;
 
-        setMembers((prev) =>
-            prev.map((m) =>
-                m.id === selectedMember.id ? { ...m, role: newRole, status: newStatus } : m
-            )
-        );
+        // If status hasn't changed, just close
+        if (newStatus === selectedMember.status) {
+            setModalVisible(false);
+            return;
+        }
 
-        setModalVisible(false);
-        Alert.alert(
-            'Role Updated',
-            `${selectedMember.name} is now assigned as "${ROLE_LABELS[newRole].label}".`
-        );
+        setIsSavingStatus(true);
+        try {
+            await updateMemberStatusApi(selectedMember.id, newStatus, user?.id);
+
+            // Update UI state immediately
+            setMembers((prev) =>
+                prev.map((m) =>
+                    m.id === selectedMember.id ? { ...m, status: newStatus } : m
+                )
+            );
+
+            if (detailedProfile && detailedProfile.id === selectedMember.id) {
+                setDetailedProfile((prev) => (prev ? { ...prev, status: newStatus } : null));
+            }
+            if (selectedMemberForDetails && selectedMemberForDetails.id === selectedMember.id) {
+                setSelectedMemberForDetails((prev) => (prev ? { ...prev, status: newStatus } : null));
+            }
+
+            setModalVisible(false);
+            Alert.alert(
+                'Status Updated',
+                `${selectedMember.name}'s membership status has been updated to "${newStatus.toUpperCase()}".`
+            );
+        } catch (err: any) {
+            console.error('[Save Status Error]', err);
+            Alert.alert('Update Failed', err?.message || 'Failed to update member status.');
+        } finally {
+            setIsSavingStatus(false);
+        }
+    };
+
+    const handleQuickStatusChange = async (memberId: string, status: MemberStatus) => {
+        setIsSavingStatus(true);
+        try {
+            await updateMemberStatusApi(memberId, status, user?.id);
+
+            // Update UI state immediately
+            setMembers((prev) =>
+                prev.map((m) => (m.id === memberId ? { ...m, status } : m))
+            );
+
+            setDetailedProfile((prev) => (prev ? { ...prev, status } : null));
+            setSelectedMemberForDetails((prev) => (prev ? { ...prev, status } : null));
+
+            Alert.alert(
+                'Status Updated',
+                `Membership status has been changed to "${status.toUpperCase()}".`
+            );
+        } catch (err: any) {
+            console.error('[Quick Status Error]', err);
+            Alert.alert('Update Failed', err?.message || 'Could not update status.');
+        } finally {
+            setIsSavingStatus(false);
+        }
     };
 
     const filteredMembers = members.filter((m) => {
@@ -627,6 +679,44 @@ const ManagerMembers = () => {
                                             <Text className='text-xs text-muted-foreground'>Member Since</Text>
                                             <Text className='text-xs font-semibold text-foreground'>{detailedProfile.createdDate || detailedProfile.joinedAt}</Text>
                                         </View>
+                                        <View className='flex-row justify-between items-center pt-2 border-t border-border/20'>
+                                            <Text className='text-xs text-muted-foreground font-semibold'>Quick Status</Text>
+                                            <View className='flex-row gap-1.5'>
+                                                {(['active', 'pending', 'inactive'] as MemberStatus[]).map((st) => {
+                                                    const isCurrent = detailedProfile.status === st;
+                                                    return (
+                                                        <Pressable
+                                                            key={st}
+                                                            disabled={isSavingStatus || isCurrent}
+                                                            onPress={() => handleQuickStatusChange(detailedProfile.id, st)}
+                                                            className={`px-2 py-0.5 rounded-md border ${
+                                                                isCurrent
+                                                                    ? st === 'active'
+                                                                        ? 'bg-emerald-500/20 border-emerald-500/50'
+                                                                        : st === 'pending'
+                                                                        ? 'bg-yellow-500/20 border-yellow-500/50'
+                                                                        : 'bg-zinc-500/20 border-zinc-500/50'
+                                                                    : 'bg-secondary/40 border-border/40 active:bg-secondary'
+                                                            }`}
+                                                        >
+                                                            <Text
+                                                                className={`text-[10px] font-bold capitalize ${
+                                                                    isCurrent
+                                                                        ? st === 'active'
+                                                                            ? 'text-[#10B981]'
+                                                                            : st === 'pending'
+                                                                            ? 'text-[#F59E0B]'
+                                                                            : 'text-foreground'
+                                                                        : 'text-muted-foreground'
+                                                                }`}
+                                                            >
+                                                                {st}
+                                                            </Text>
+                                                        </Pressable>
+                                                    );
+                                                })}
+                                            </View>
+                                        </View>
                                         {detailedProfile.solarCapacityKw !== undefined && (
                                             <View className='flex-row justify-between items-center'>
                                                 <Text className='text-xs text-muted-foreground'>Solar Capacity</Text>
@@ -1004,6 +1094,7 @@ const ManagerMembers = () => {
                         {/* Modal Action Buttons */}
                         <View className='flex-row gap-3'>
                             <Pressable
+                                disabled={isSavingStatus}
                                 onPress={() => setModalVisible(false)}
                                 className='flex-1 py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
                             >
@@ -1013,12 +1104,22 @@ const ManagerMembers = () => {
                             </Pressable>
 
                             <Pressable
-                                onPress={handleSaveRole}
-                                className='flex-1 py-2.5 items-center justify-center rounded-xl bg-primary border border-primary/40 active:opacity-80 shadow-sm'
+                                disabled={isSavingStatus}
+                                onPress={handleSaveStatus}
+                                className='flex-1 py-2.5 items-center justify-center rounded-xl bg-primary border border-primary/40 active:opacity-80 shadow-sm flex-row gap-2'
                             >
-                                <Text className='text-sm font-bold text-primary-foreground'>
-                                    Save Changes
-                                </Text>
+                                {isSavingStatus ? (
+                                    <>
+                                        <ActivityIndicator size="small" color="#1F1B18" />
+                                        <Text className='text-sm font-bold text-primary-foreground'>
+                                            Saving...
+                                        </Text>
+                                    </>
+                                ) : (
+                                    <Text className='text-sm font-bold text-primary-foreground'>
+                                        Save Changes
+                                    </Text>
+                                )}
                             </Pressable>
                         </View>
                     </View>

@@ -16,13 +16,13 @@ export function successResponse<T>(
 export function errorResponse(
     error: unknown
 ) {
-    if (error instanceof AppError) {
+    if (error instanceof AppError || (error && typeof (error as any).statusCode === 'number')) {
         return Response.json(
             {
                 success: false,
-                error: error.message,
+                error: (error as any).message,
             },
-            { status: error.statusCode }
+            { status: (error as any).statusCode }
         );
     }
 
