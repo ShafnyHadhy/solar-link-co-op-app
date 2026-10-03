@@ -14,6 +14,7 @@ import {
     Pressable,
     ScrollView,
     Text,
+    TextInput,
     View,
 } from "react-native";
 
@@ -45,6 +46,16 @@ interface ServiceTicket {
     resolvedAt: string | null;
 }
 
+interface MaintenanceRecord {
+    id: string;
+    ticketId: string;
+    technicianId: string;
+    description: string | null;
+    partsUsed: string | null;
+    maintenanceDate: string;
+    notes: string | null;
+}
+
 const TicketDetailsScreen = () => {
     const { id } =
         useLocalSearchParams<{ id: string }>();
@@ -61,6 +72,37 @@ const TicketDetailsScreen = () => {
         useState<string | null>(null);
 
     const [updatingStatus, setUpdatingStatus] =
+        useState(false);
+
+    // CESA-205 - Maintenance diagnosis
+    const [diagnosis, setDiagnosis] =
+        useState("");
+
+    const [savingDiagnosis, setSavingDiagnosis] =
+        useState(false);
+
+    // CESA-206 - Replaced parts
+    const [maintenanceRecordId, setMaintenanceRecordId] =
+        useState<string | null>(null);
+
+    const [partsUsed, setPartsUsed] =
+        useState("");
+
+    const [savingParts, setSavingParts] =
+        useState(false);
+
+    // CESA-207 - Maintenance notes
+    const [maintenanceNotes, setMaintenanceNotes] =
+        useState("");
+
+    const [savingNotes, setSavingNotes] =
+        useState(false);
+
+    // CESA-209 - Maintenance history
+    const [maintenanceHistory, setMaintenanceHistory] =
+        useState<MaintenanceRecord[]>([]);
+
+    const [loadingHistory, setLoadingHistory] =
         useState(false);
 
     useEffect(() => {
@@ -121,6 +163,53 @@ const TicketDetailsScreen = () => {
 
         fetchTicket();
     }, [id]);
+
+    // CESA-209 - Load history when the ticket opens
+    useEffect(() => {
+        if (id) {
+            fetchMaintenanceHistory();
+        }
+    }, [id]);
+
+    // CESA-209 - Load maintenance history
+    const fetchMaintenanceHistory = async () => {
+        if (!id) {
+            return;
+        }
+
+        try {
+            setLoadingHistory(true);
+
+            const response = await fetch(
+                `/api/maintenance-records?ticketId=${encodeURIComponent(
+                    id
+                )}`
+            );
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    result.message ??
+                        "Failed to load maintenance history"
+                );
+            }
+
+            const records =
+                result.data?.records ??
+                result.records ??
+                [];
+
+            setMaintenanceHistory(records);
+        } catch (err) {
+            console.error(
+                "Failed to load maintenance history:",
+                err
+            );
+        } finally {
+            setLoadingHistory(false);
+        }
+    };
 
     const formatStatus = (
         status: TicketStatus
@@ -293,6 +382,267 @@ const TicketDetailsScreen = () => {
         } finally {
             setUpdatingStatus(false);
         }
+    };
+
+    // CESA-205 - Save technician diagnosis
+    const saveDiagnosis = async () => {
+        if (!ticket || savingDiagnosis) {
+            return;
+        }
+
+        if (!user?.id) {
+            Alert.alert(
+                "Save Failed",
+                "Unable to identify the logged-in technician."
+            );
+            return;
+        }
+
+        const cleanedDiagnosis = diagnosis.trim();
+
+        if (!cleanedDiagnosis) {
+            Alert.alert(
+                "Diagnosis Required",
+                "Please enter the diagnosis before saving."
+            );
+            return;
+        }
+
+        try {
+            setSavingDiagnosis(true);
+
+            const response = await fetch(
+                "/api/maintenance-records",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        ticketId: ticket.id,
+                        technicianId: user.id,
+                        diagnosis: cleanedDiagnosis,
+                    }),
+                }
+            );
+
+            const result = await response.json();
+            console.log("CESA-205 STATUS:", response.status);
+            console.log("CESA-205 RESPONSE:", result);
+
+            if (!response.ok) {
+                throw new Error(
+                    result.message ??
+                        "Failed to save diagnosis"
+                );
+            }
+
+            const createdRecord =
+                result.data?.record ??
+                result.record ??
+                null;
+
+            if (!createdRecord?.id) {
+                throw new Error(
+                    "Maintenance record ID was not returned"
+                );
+            }
+
+            setMaintenanceRecordId(createdRecord.id);
+            console.log(
+                "MAINTENANCE RECORD ID:",
+                createdRecord.id
+            );
+            setDiagnosis("");
+
+            await fetchMaintenanceHistory();
+
+            Alert.alert(
+                "Diagnosis Saved",
+                "The maintenance diagnosis has been recorded successfully."
+            );
+        } catch (err) {
+            console.error(
+                "Failed to save diagnosis:",
+                err
+            );
+
+            Alert.alert(
+                "Save Failed",
+                err instanceof Error
+                    ? err.message
+                    : "Failed to save diagnosis"
+            );
+        } finally {
+            setSavingDiagnosis(false);
+        }
+    };
+
+    // CESA-206 - Save replaced parts
+    const saveReplacedParts = async () => {
+        if (savingParts) {
+            return;
+        }
+
+        if (!maintenanceRecordId) {
+            Alert.alert(
+                "Diagnosis Required",
+                "Save the diagnosis first before recording replaced parts."
+            );
+            return;
+        }
+
+        const cleanedParts = partsUsed.trim();
+
+        if (!cleanedParts) {
+            Alert.alert(
+                "Parts Required",
+                "Please enter the replaced parts."
+            );
+            return;
+        }
+
+        try {
+            setSavingParts(true);
+
+            const response = await fetch(
+                "/api/maintenance-records",
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        recordId: maintenanceRecordId,
+                        partsUsed: cleanedParts,
+                    }),
+                }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    result.message ??
+                        "Failed to save replaced parts"
+                );
+            }
+
+            setPartsUsed("");
+
+            await fetchMaintenanceHistory();
+
+            Alert.alert(
+                "Parts Saved",
+                "The replaced parts have been recorded successfully."
+            );
+        } catch (err) {
+            console.error(
+                "Failed to save replaced parts:",
+                err
+            );
+
+            Alert.alert(
+                "Save Failed",
+                err instanceof Error
+                    ? err.message
+                    : "Failed to save replaced parts"
+            );
+        } finally {
+            setSavingParts(false);
+        }
+    };
+
+    // CESA-207 - Save maintenance notes
+    const saveMaintenanceNotes = async () => {
+        if (savingNotes) {
+            return;
+        }
+
+        if (!maintenanceRecordId) {
+            Alert.alert(
+                "Diagnosis Required",
+                "Save the diagnosis first before recording maintenance notes."
+            );
+            return;
+        }
+
+        const cleanedNotes = maintenanceNotes.trim();
+
+        if (!cleanedNotes) {
+            Alert.alert(
+                "Notes Required",
+                "Please enter maintenance notes."
+            );
+            return;
+        }
+
+        try {
+            setSavingNotes(true);
+
+            const response = await fetch(
+                "/api/maintenance-records",
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        recordId: maintenanceRecordId,
+                        notes: cleanedNotes,
+                    }),
+                }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    result.message ??
+                        "Failed to save maintenance notes"
+                );
+            }
+
+            setMaintenanceNotes("");
+
+            await fetchMaintenanceHistory();
+
+            Alert.alert(
+                "Notes Saved",
+                "The maintenance notes have been recorded successfully."
+            );
+        } catch (err) {
+            console.error(
+                "Failed to save maintenance notes:",
+                err
+            );
+
+            Alert.alert(
+                "Save Failed",
+                err instanceof Error
+                    ? err.message
+                    : "Failed to save maintenance notes"
+            );
+        } finally {
+            setSavingNotes(false);
+        }
+    };
+
+    // CESA-208 - Mark maintenance ticket as resolved
+    const resolveTicket = async () => {
+        if (!ticket || updatingStatus) {
+            return;
+        }
+
+        if (!maintenanceRecordId) {
+            Alert.alert(
+                "Maintenance Required",
+                "Save the maintenance diagnosis before resolving this ticket."
+            );
+            return;
+        }
+
+        await updateStatus("resolved");
     };
 
     const getPriorityStyle = (
@@ -643,6 +993,428 @@ const TicketDetailsScreen = () => {
                             </Text>
                         </View>
                     )}
+                </View>
+
+                {/* CESA-205 - Record Diagnosis */}
+                <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
+                    Maintenance Diagnosis
+                </Text>
+
+                <View className="rounded-[24px] border border-border bg-card p-5">
+                    <View className="mb-4 flex-row items-center">
+                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-muted">
+                            <Feather
+                                name="clipboard"
+                                size={18}
+                                color="#6B7280"
+                            />
+                        </View>
+
+                        <View className="ml-3 flex-1">
+                            <Text className="text-sm font-bold text-foreground">
+                                Record Diagnosis
+                            </Text>
+
+                            <Text className="mt-1 text-xs text-muted-foreground">
+                                Record your diagnosis for this service ticket.
+                            </Text>
+                        </View>
+                    </View>
+
+                    <TextInput
+                        value={diagnosis}
+                        onChangeText={setDiagnosis}
+                        placeholder="Enter diagnosis..."
+                        placeholderTextColor="#9CA3AF"
+                        multiline
+                        textAlignVertical="top"
+                        editable={!savingDiagnosis}
+                        className="min-h-[120px] rounded-xl border border-border bg-background p-4 text-sm text-foreground"
+                    />
+
+                    <Pressable
+                        disabled={
+                            savingDiagnosis ||
+                            !diagnosis.trim() ||
+                            !user?.id
+                        }
+                        onPress={saveDiagnosis}
+                        className={`mt-4 items-center rounded-xl px-4 py-3 ${
+                            savingDiagnosis ||
+                            !diagnosis.trim() ||
+                            !user?.id
+                                ? "bg-muted"
+                                : "bg-primary"
+                        }`}
+                    >
+                        {savingDiagnosis ? (
+                            <View className="flex-row items-center">
+                                <ActivityIndicator size="small" />
+
+                                <Text className="ml-2 font-bold text-muted-foreground">
+                                    Saving...
+                                </Text>
+                            </View>
+                        ) : (
+                            <Text
+                                className={`font-bold ${
+                                    !diagnosis.trim() ||
+                                    !user?.id
+                                        ? "text-muted-foreground"
+                                        : "text-primary-foreground"
+                                }`}
+                            >
+                                Save Diagnosis
+                            </Text>
+                        )}
+                    </Pressable>
+                </View>
+
+                {/* CESA-206 - Record Replaced Parts */}
+                <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
+                    Replaced Parts
+                </Text>
+
+                <View className="rounded-[24px] border border-border bg-card p-5">
+                    <View className="mb-4 flex-row items-center">
+                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-muted">
+                            <Feather
+                                name="tool"
+                                size={18}
+                                color="#6B7280"
+                            />
+                        </View>
+
+                        <View className="ml-3 flex-1">
+                            <Text className="text-sm font-bold text-foreground">
+                                Record Replaced Parts
+                            </Text>
+
+                            <Text className="mt-1 text-xs text-muted-foreground">
+                                Record any components replaced during maintenance.
+                            </Text>
+                        </View>
+                    </View>
+
+                    <TextInput
+                        value={partsUsed}
+                        onChangeText={setPartsUsed}
+                        placeholder="Example: Inverter fuse, DC cable..."
+                        placeholderTextColor="#9CA3AF"
+                        multiline
+                        textAlignVertical="top"
+                        editable={
+                            !savingParts &&
+                            !!maintenanceRecordId
+                        }
+                        className="min-h-[100px] rounded-xl border border-border bg-background p-4 text-sm text-foreground"
+                    />
+
+                    {!maintenanceRecordId && (
+                        <Text className="mt-2 text-xs text-muted-foreground">
+                            Save the diagnosis first to enable replaced parts.
+                        </Text>
+                    )}
+
+                    <Pressable
+                        disabled={
+                            savingParts ||
+                            !partsUsed.trim() ||
+                            !maintenanceRecordId
+                        }
+                        onPress={saveReplacedParts}
+                        className={`mt-4 items-center rounded-xl px-4 py-3 ${
+                            savingParts ||
+                            !partsUsed.trim() ||
+                            !maintenanceRecordId
+                                ? "bg-muted"
+                                : "bg-primary"
+                        }`}
+                    >
+                        <Text
+                            className={`font-bold ${
+                                savingParts ||
+                                !partsUsed.trim() ||
+                                !maintenanceRecordId
+                                    ? "text-muted-foreground"
+                                    : "text-primary-foreground"
+                            }`}
+                        >
+                            {savingParts
+                                ? "Saving..."
+                                : "Save Replaced Parts"}
+                        </Text>
+                    </Pressable>
+                </View>
+
+                {/* CESA-207 - Maintenance Notes */}
+                <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
+                    Maintenance Notes
+                </Text>
+
+                <View className="rounded-[24px] border border-border bg-card p-5">
+                    <View className="mb-4 flex-row items-center">
+                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-muted">
+                            <Feather
+                                name="file-text"
+                                size={18}
+                                color="#6B7280"
+                            />
+                        </View>
+
+                        <View className="ml-3 flex-1">
+                            <Text className="text-sm font-bold text-foreground">
+                                Record Maintenance Notes
+                            </Text>
+
+                            <Text className="mt-1 text-xs text-muted-foreground">
+                                Add notes about the maintenance work performed.
+                            </Text>
+                        </View>
+                    </View>
+
+                    <TextInput
+                        value={maintenanceNotes}
+                        onChangeText={setMaintenanceNotes}
+                        placeholder="Example: Inspected inverter and replaced damaged fuse..."
+                        placeholderTextColor="#9CA3AF"
+                        multiline
+                        textAlignVertical="top"
+                        editable={
+                            !savingNotes &&
+                            !!maintenanceRecordId
+                        }
+                        className="min-h-[120px] rounded-xl border border-border bg-background p-4 text-sm text-foreground"
+                    />
+
+                    {!maintenanceRecordId && (
+                        <Text className="mt-2 text-xs text-muted-foreground">
+                            Save the diagnosis first to enable maintenance notes.
+                        </Text>
+                    )}
+
+                    <Pressable
+                        disabled={
+                            savingNotes ||
+                            !maintenanceNotes.trim() ||
+                            !maintenanceRecordId
+                        }
+                        onPress={saveMaintenanceNotes}
+                        className={`mt-4 items-center rounded-xl px-4 py-3 ${
+                            savingNotes ||
+                            !maintenanceNotes.trim() ||
+                            !maintenanceRecordId
+                                ? "bg-muted"
+                                : "bg-primary"
+                        }`}
+                    >
+                        <Text
+                            className={`font-bold ${
+                                savingNotes ||
+                                !maintenanceNotes.trim() ||
+                                !maintenanceRecordId
+                                    ? "text-muted-foreground"
+                                    : "text-primary-foreground"
+                            }`}
+                        >
+                            {savingNotes
+                                ? "Saving..."
+                                : "Save Maintenance Notes"}
+                        </Text>
+                    </Pressable>
+                </View>
+
+                {/* CESA-209 - Maintenance History */}
+                <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
+                    Maintenance History
+                </Text>
+
+                <View className="rounded-[24px] border border-border bg-card p-5">
+                    <View className="mb-4 flex-row items-center">
+                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-muted">
+                            <Feather
+                                name="clock"
+                                size={18}
+                                color="#6B7280"
+                            />
+                        </View>
+
+                        <View className="ml-3 flex-1">
+                            <Text className="text-sm font-bold text-foreground">
+                                Previous Maintenance Records
+                            </Text>
+
+                            <Text className="mt-1 text-xs text-muted-foreground">
+                                Maintenance activity recorded for this service ticket.
+                            </Text>
+                        </View>
+                    </View>
+
+                    {loadingHistory ? (
+                        <View className="items-center py-5">
+                            <ActivityIndicator size="small" />
+
+                            <Text className="mt-2 text-xs text-muted-foreground">
+                                Loading maintenance history...
+                            </Text>
+                        </View>
+                    ) : maintenanceHistory.length === 0 ? (
+                        <View className="items-center py-5">
+                            <Feather
+                                name="inbox"
+                                size={24}
+                                color="#9CA3AF"
+                            />
+
+                            <Text className="mt-2 text-sm text-muted-foreground">
+                                No maintenance records found.
+                            </Text>
+                        </View>
+                    ) : (
+                        maintenanceHistory.map(
+                            (record, index) => (
+                                <View
+                                    key={record.id}
+                                    className={`${
+                                        index > 0
+                                            ? "mt-4 border-t border-border pt-4"
+                                            : ""
+                                    }`}
+                                >
+                                    <View className="mb-3 flex-row items-center justify-between">
+                                        <Text className="text-sm font-extrabold text-foreground">
+                                            Maintenance Record
+                                        </Text>
+
+                                        <Text className="text-xs text-muted-foreground">
+                                            {formatDate(
+                                                record.maintenanceDate
+                                            )}
+                                        </Text>
+                                    </View>
+
+                                    <Text className="text-xs font-bold text-muted-foreground">
+                                        Diagnosis
+                                    </Text>
+
+                                    <Text className="mt-1 text-sm text-foreground">
+                                        {record.description ??
+                                            "No diagnosis recorded"}
+                                    </Text>
+
+                                    <View className="my-3 h-px bg-border" />
+
+                                    <Text className="text-xs font-bold text-muted-foreground">
+                                        Replaced Parts
+                                    </Text>
+
+                                    <Text className="mt-1 text-sm text-foreground">
+                                        {record.partsUsed ??
+                                            "No replaced parts recorded"}
+                                    </Text>
+
+                                    <View className="my-3 h-px bg-border" />
+
+                                    <Text className="text-xs font-bold text-muted-foreground">
+                                        Maintenance Notes
+                                    </Text>
+
+                                    <Text className="mt-1 text-sm text-foreground">
+                                        {record.notes ??
+                                            "No maintenance notes recorded"}
+                                    </Text>
+
+                                    <View className="my-3 h-px bg-border" />
+
+                                    <Text className="text-xs font-bold text-muted-foreground">
+                                        Technician
+                                    </Text>
+
+                                    <Text className="mt-1 text-sm text-foreground">
+                                        {record.technicianId}
+                                    </Text>
+                                </View>
+                            )
+                        )
+                    )}
+                </View>
+
+                {/* CESA-208 - Mark Ticket Resolved */}
+                <View className="mt-4 rounded-[24px] border border-border bg-card p-5">
+                    <View className="mb-4 flex-row items-center">
+                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-muted">
+                            <Feather
+                                name="check-circle"
+                                size={18}
+                                color="#6B7280"
+                            />
+                        </View>
+
+                        <View className="ml-3 flex-1">
+                            <Text className="text-sm font-bold text-foreground">
+                                Complete Maintenance
+                            </Text>
+
+                            <Text className="mt-1 text-xs text-muted-foreground">
+                                Mark this service ticket as resolved after completing maintenance.
+                            </Text>
+                        </View>
+                    </View>
+
+                    {ticket.status === "resolved" ? (
+                        <View className="flex-row items-center rounded-xl bg-muted p-3">
+                            <Feather
+                                name="check-circle"
+                                size={18}
+                                color="#6B7280"
+                            />
+
+                            <Text className="ml-2 text-sm font-bold text-foreground">
+                                Ticket Resolved
+                            </Text>
+                        </View>
+                    ) : (
+                        <Pressable
+                            disabled={
+                                updatingStatus ||
+                                !maintenanceRecordId
+                            }
+                            onPress={resolveTicket}
+                            className={`items-center rounded-xl px-4 py-3 ${
+                                updatingStatus ||
+                                !maintenanceRecordId
+                                    ? "bg-muted"
+                                    : "bg-primary"
+                            }`}
+                        >
+                            {updatingStatus ? (
+                                <View className="flex-row items-center">
+                                    <ActivityIndicator size="small" />
+
+                                    <Text className="ml-2 font-bold text-muted-foreground">
+                                        Resolving...
+                                    </Text>
+                                </View>
+                            ) : (
+                                <Text
+                                    className={`font-bold ${
+                                        !maintenanceRecordId
+                                            ? "text-muted-foreground"
+                                            : "text-primary-foreground"
+                                    }`}
+                                >
+                                    Mark Ticket Resolved
+                                </Text>
+                            )}
+                        </Pressable>
+                    )}
+
+                    {!maintenanceRecordId &&
+                        ticket.status !== "resolved" && (
+                            <Text className="mt-2 text-xs text-muted-foreground">
+                                Save the maintenance diagnosis before resolving this ticket.
+                            </Text>
+                        )}
                 </View>
 
                 {/* Status Update */}

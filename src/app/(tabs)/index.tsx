@@ -3,13 +3,14 @@ import ManagementDashboard from '@/components/manager/dashboard/ManagementDashbo
 import WaitUntilRoleAssigned from '@/components/shared/WaitUntilRoleAssigned';
 import SolarOwnerDashboard from '@/components/solar-owner/dashboard/SolarOwnerDashboard';
 import TechnicianDashboard from '@/components/technician/dashboard/TechnicianDashboard';
+import { useUserSync } from '@/hooks/useUserSync';
 import { getUserRole } from '@/lib/getUserRole';
 import { useUser } from '@clerk/expo';
 import { Redirect } from 'expo-router';
 
 export default function HomeScreen() {
-
     const { user, isLoaded, isSignedIn } = useUser();
+    const { dbUser } = useUserSync();
 
     if (!isLoaded) {
         return null;
@@ -19,7 +20,7 @@ export default function HomeScreen() {
         return <Redirect href="/(auth)/sign-in" />;
     }
 
-    const role = getUserRole(user?.publicMetadata?.role);
+    const role = getUserRole(user?.publicMetadata?.role, dbUser?.role);
 
     switch (role) {
         case "manager":

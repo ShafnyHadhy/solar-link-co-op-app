@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { db } from "../db/client";
 import {
     auditLogs,
@@ -13,6 +13,7 @@ import {
     NotFoundError,
     UnauthorizedError,
 } from "../utils/errors";
+import { createNotification } from "./notificationService";
 
 // ============================================================================
 // TypeScript Types
@@ -684,7 +685,200 @@ export async function createDispatch(input: CreateDispatchInput): Promise<Dispat
     }
 
     // -------------------------------------------------------------------------
-    // 6. Return Full Details
+    // 6. Generate Notification for Household User (US-18)
+    // -------------------------------------------------------------------------
+    try {
+        const targetHouseholdId = request.householdId;
+        if (targetHouseholdId) {
+            const kwh = dispatchAmount;
+            const kwhText =
+                !isNaN(kwh) && Number.isInteger(kwh)
+                    ? kwh.toString()
+                    : parseFloat(kwh.toFixed(3)).toString();
+
+            await createNotification({
+                userId: targetHouseholdId,
+                type: "energy",
+                title: "Energy Allocated",
+                message: `${kwhText} kWh of community solar energy has been allocated to your household.`,
+            });
+        }
+    } catch (notifError) {
+        console.error("[Dispatch] Failed to generate household allocation notification:", notifError);
+    }
+
+    // -------------------------------------------------------------------------
+    // 7. Return Full Details
     // -------------------------------------------------------------------------
     return getDispatchById(dispatchId);
 }
+
+// ============================================================================
+// Community Energy Allocation (US-13 Manager Dashboard)
+// ============================================================================
+
+export interface CommunityAllocationBreakdownItem {
+    id: string;
+    dispatchedEnergyKwh: number;
+    dispatchedAt: string;
+    householdName: string | null;
+    solarOwnerName: string | null;
+}
+
+export interface CommunityAllocationResult {
+    period: "today";
+    date: string; // YYYY-MM-DD
+    allocatedTodayKwh: number;
+    allocatedYesterdayKwh: number;
+    changePercentage: number | null;
+    trend: "up" | "down" | "neutral";
+    dispatchesTodayCount: number;
+    dispatchesYesterdayCount: number;
+    totalDispatchesCount: number;
+    breakdownByDispatch?: CommunityAllocationBreakdownItem[];
+}
+
+export interface GetCommunityAllocationOptions {
+    date?: string; // Optional target date: YYYY-MM-DD or ISO string
+}
+
+function parseTargetDate(input?: string): Date {
+    if (!input) return new Date();
+    const parts = input.split("-").map(Number);
+    if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+        // Construct date at midday to avoid edge issues with daylight/timezones
+        return new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
+    }
+    return new Date(input);
+}
+
+function isSameCalendarDay(d1: Date, d2: Date): boolean {
+    return (
+        (d1.getFullYear() === d2.getFullYear() &&
+            d1.getMonth() === d2.getMonth() &&
+            d1.getDate() === d2.getDate()) ||
+        (d1.getUTCFullYear() === d2.getUTCFullYear() &&
+            d1.getUTCMonth() === d2.getUTCMonth() &&
+            d1.getUTCDate() === d2.getUTCDate())
+    );
+}
+
+/**
+ * Calculates real community solar energy allocation from dispatches for Today
+ * (or selected date) compared against Yesterday.
+ */
+export async function getCommunityEnergyAllocation(
+    options?: GetCommunityAllocationOptions
+): Promise<CommunityAllocationResult> {
+    const targetDate = parseTargetDate(options?.date);
+    const year = targetDate.getFullYear();
+    const month = targetDate.getMonth();
+    const day = targetDate.getDate();
+
+    const startOfToday = new Date(year, month, day, 0, 0, 0, 0);
+    const endOfToday = new Date(year, month, day, 23, 59, 59, 999);
+
+    const startOfYesterday = new Date(year, month, day - 1, 0, 0, 0, 0);
+    const endOfYesterday = new Date(year, month, day - 1, 23, 59, 59, 999);
+    const yesterdayDate = new Date(year, month, day - 1, 12, 0, 0);
+
+    const formattedDate = [
+        year,
+        String(month + 1).padStart(2, "0"),
+        String(day).padStart(2, "0"),
+    ].join("-");
+
+    // 1. Query dispatches within the window (yesterday + today with safety buffer)
+    const windowStart = new Date(startOfYesterday.getTime() - 24 * 3600 * 1000);
+    const windowEnd = new Date(endOfToday.getTime() + 24 * 3600 * 1000);
+
+    const rows = await db
+        .select({
+            id: dispatches.id,
+            dispatchedEnergyKwh: dispatches.dispatchedEnergyKwh,
+            dispatchedAt: dispatches.dispatchedAt,
+            householdName: users.name,
+        })
+        .from(dispatches)
+        .leftJoin(energyRequests, eq(dispatches.requestId, energyRequests.id))
+        .leftJoin(users, eq(energyRequests.householdId, users.id))
+        .where(
+            and(
+                gte(dispatches.dispatchedAt, windowStart),
+                lte(dispatches.dispatchedAt, windowEnd)
+            )
+        )
+        .orderBy(desc(dispatches.dispatchedAt));
+
+    // Also get overall total dispatches count
+    const totalCountRes = await db
+        .select({ id: dispatches.id })
+        .from(dispatches);
+    const totalDispatchesCount = totalCountRes.length;
+
+    // 2. Filter dispatches into Today and Yesterday
+    let allocatedTodayKwh = 0;
+    let dispatchesTodayCount = 0;
+    const breakdownByDispatch: CommunityAllocationBreakdownItem[] = [];
+
+    let allocatedYesterdayKwh = 0;
+    let dispatchesYesterdayCount = 0;
+
+    for (const row of rows) {
+        const dTime = new Date(row.dispatchedAt);
+        const amount = Number(row.dispatchedEnergyKwh || 0);
+
+        if (isSameCalendarDay(dTime, targetDate)) {
+            allocatedTodayKwh += amount;
+            dispatchesTodayCount++;
+            breakdownByDispatch.push({
+                id: row.id,
+                dispatchedEnergyKwh: +amount.toFixed(3),
+                dispatchedAt: dTime.toISOString(),
+                householdName: row.householdName ?? null,
+                solarOwnerName: null,
+            });
+        } else if (isSameCalendarDay(dTime, yesterdayDate)) {
+            allocatedYesterdayKwh += amount;
+            dispatchesYesterdayCount++;
+        }
+    }
+
+    allocatedTodayKwh = +allocatedTodayKwh.toFixed(1);
+    allocatedYesterdayKwh = +allocatedYesterdayKwh.toFixed(1);
+
+    // 3. Calculate trend and change percentage
+    let changePercentage: number | null = null;
+    let trend: "up" | "down" | "neutral" = "neutral";
+
+    if (allocatedYesterdayKwh > 0) {
+        const diff = allocatedTodayKwh - allocatedYesterdayKwh;
+        changePercentage = +((diff / allocatedYesterdayKwh) * 100).toFixed(1);
+        if (changePercentage > 0) {
+            trend = "up";
+        } else if (changePercentage < 0) {
+            trend = "down";
+        } else {
+            trend = "neutral";
+        }
+    } else if (allocatedTodayKwh > 0) {
+        changePercentage = 100.0;
+        trend = "up";
+    } else {
+        changePercentage = 0.0;
+        trend = "neutral";
+    }
+
+    return {
+        period: "today",
+        date: formattedDate,
+        allocatedTodayKwh,
+        allocatedYesterdayKwh,
+        changePercentage,
+        trend,
+        dispatchesTodayCount,
+        dispatchesYesterdayCount,
+        totalDispatchesCount,
+        breakdownByDispatch,
+    };
+}

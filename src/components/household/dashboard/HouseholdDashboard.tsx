@@ -1,6 +1,7 @@
 import TabScreenBackground from "@/components/shared/TabScreenBackground";
 import { useHouseholdAllocations } from "@/hooks/household/useHouseholdAllocations";
 import { useHouseholdEnergyRequests } from "@/hooks/household/useHouseholdEnergyRequests";
+import { useNotifications } from "@/hooks/useNotifications";
 import { useUser } from "@clerk/expo";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -19,6 +20,7 @@ const HouseholdDashboard = () => {
   const router = useRouter();
   const isDark = colorScheme === "dark";
   const { user } = useUser();
+  const { unreadCount } = useNotifications();
 
   const {
     stats,
@@ -80,7 +82,8 @@ const HouseholdDashboard = () => {
 
         <View className="mr-16">
           <Pressable
-            className={`h-12 w-12 rounded-full items-center justify-center ${
+            onPress={() => router.push("/(tabs)/alerts")}
+            className={`h-12 w-12 rounded-full items-center justify-center relative active:opacity-70 ${
               isDark
                 ? "bg-black/30 border border-white/10"
                 : "bg-gray-200 border border-gray-300"
@@ -91,6 +94,9 @@ const HouseholdDashboard = () => {
               size={22}
               color={isDark ? "white" : "#374151"}
             />
+            {unreadCount > 0 && (
+              <View className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-amber-500" />
+            )}
           </Pressable>
         </View>
       </View>

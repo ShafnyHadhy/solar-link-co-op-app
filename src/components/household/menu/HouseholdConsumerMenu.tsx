@@ -1,5 +1,6 @@
 import TabScreenBackground from "@/components/shared/TabScreenBackground";
 import { useHouseholdEnergyRequests } from "@/hooks/household/useHouseholdEnergyRequests";
+import { useUserSync } from "@/hooks/useUserSync";
 import { getUserRole } from "@/lib/getUserRole";
 import { useAuth, useUser } from "@clerk/expo";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -82,8 +83,9 @@ const HouseholdConsumerMenu = () => {
 
   const { requests } = useHouseholdEnergyRequests();
   const pendingCount = requests.filter((r) => r.status === "pending").length;
+  const { dbUser } = useUserSync();
 
-  const role = getUserRole(user?.publicMetadata?.role as string | undefined);
+  const role = getUserRole(user?.publicMetadata?.role as string | undefined, dbUser?.role);
 
   // Theme-based colors
   const theme = {
