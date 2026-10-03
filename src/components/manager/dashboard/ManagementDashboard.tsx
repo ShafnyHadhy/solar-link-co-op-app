@@ -4,6 +4,7 @@ import { useCommunityGeneration } from '@/hooks/manager/useCommunityGeneration';
 import { useCommunityReserve } from '@/hooks/manager/useCommunityReserve';
 import { useEnergyRequests } from '@/hooks/manager/useEnergyRequests';
 import { ManagerAlert, useManagerAlerts } from '@/hooks/manager/useManagerAlerts';
+import { useNotifications } from '@/hooks/useNotifications';
 import { useUser } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -70,6 +71,7 @@ const getAlertStyle = (type: string, title?: string) => {
 const ManagementDashboard = () => {
     const { user } = useUser();
     const router = useRouter();
+    const { unreadCount: notifUnreadCount } = useNotifications();
     const {
         data: generationData,
         loading: generationLoading,
@@ -178,12 +180,15 @@ const ManagementDashboard = () => {
                         </Text>
                     </View>
 
-                    <View className='h-10 w-10 items-center justify-center rounded-2xl bg-secondary border border-border/60 relative'>
+                    <Pressable
+                        onPress={() => router.push('/(tabs)/alerts')}
+                        className='h-10 w-10 items-center justify-center rounded-2xl bg-secondary border border-border/60 relative active:opacity-70'
+                    >
                         <Feather name="bell" size={20} color="#F59E0B" />
-                        {alerts.length > 0 && (
+                        {(notifUnreadCount > 0 || alerts.length > 0) && (
                             <View className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-500 border border-secondary" />
                         )}
-                    </View>
+                    </Pressable>
                 </View>
 
                 <View className='flex-col items-start gap-2 rounded-xl border border-border/30 bg-secondary/60 p-4 shadow-sm'>

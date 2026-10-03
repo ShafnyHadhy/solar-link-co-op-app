@@ -12,12 +12,14 @@ import { BatteryCard } from './BatteryCard';
 import { ExcessEnergyCard } from './ExcessEnergyCard';
 import { PowerFlowDiagram } from './PowerFlowDiagram';
 import { QuickShareModal } from './QuickShareModal';
+import { useNotifications } from '@/hooks/useNotifications';
 
 export const SolarOwnerDashboard = () => {
     const insets = useSafeAreaInsets();
     const { user } = useUser();
     const router = useRouter();
     const { metrics, battery, alerts, weather, fetchSolarData, lastFetchedAt, notificationsEnabled } = useSolarOwnerStore();
+    const { unreadCount: realUnreadCount, notifications: realNotifications } = useNotifications();
 
     const [alertsModalOpen, setAlertsModalOpen] = useState(false);
     const [quickShareOpen, setQuickShareOpen] = useState(false);
@@ -83,14 +85,14 @@ export const SolarOwnerDashboard = () => {
 
                     {/* Notification Bell Icon */}
                     <Pressable
-                        onPress={() => setAlertsModalOpen(true)}
+                        onPress={() => router.push('/(tabs)/alerts')}
                         className="h-11 w-11 items-center justify-center rounded-2xl bg-secondary/80 border border-border/70 relative active:opacity-70 shadow-sm flex-shrink-0"
                     >
                         <Feather name="bell" size={20} color="#F59E0B" />
-                        {unreadAlerts.length > 0 && (
+                        {realUnreadCount > 0 && (
                             <View className="absolute -top-1 -right-1 h-5 min-w-[20px] px-1 rounded-full bg-destructive items-center justify-center border-2 border-background">
                                 <Text className="text-[10px] font-black text-white">
-                                    {unreadAlerts.length}
+                                    {realUnreadCount}
                                 </Text>
                             </View>
                         )}
