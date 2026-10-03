@@ -1,6 +1,10 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "../db/client";
-import { serviceTickets, users } from "../db/schema";
+import {
+    maintenanceRecords,
+    serviceTickets,
+    users,
+} from "../db/schema";
 
 export async function createServiceTicket(data: {
     id: string;
@@ -171,5 +175,127 @@ export async function assignServiceTicketTechnician(
     } catch (error) {
         console.error("Failed to assign technician to service ticket:", error);
         throw new Error("Failed to assign technician to service ticket");
+    }
+}
+
+
+// ============================================================
+// TECHNICIAN - US-25 MAINTENANCE RECORDS
+// ============================================================
+
+// CESA-205 - Record diagnosis for a service ticket
+export async function createMaintenanceDiagnosis(data: {
+    id: string;
+    ticketId: string;
+    technicianId: string;
+    diagnosis: string;
+}) {
+    try {
+        const [record] = await db
+            .insert(maintenanceRecords)
+            .values({
+                id: data.id,
+                ticketId: data.ticketId,
+                technicianId: data.technicianId,
+                description: data.diagnosis,
+            })
+            .returning();
+
+        return record;
+    } catch (error) {
+        console.error(
+            "Failed to record maintenance diagnosis:",
+            error
+        );
+
+        throw new Error(
+            "Failed to record maintenance diagnosis"
+        );
+    }
+}
+
+
+// CESA-206 - Record replaced parts
+export async function updateMaintenanceParts(
+    recordId: string,
+    partsUsed: string
+) {
+    try {
+        const [record] = await db
+            .update(maintenanceRecords)
+            .set({
+                partsUsed,
+            })
+            .where(eq(maintenanceRecords.id, recordId))
+            .returning();
+
+        return record ?? null;
+    } catch (error) {
+        console.error(
+            "Failed to record replaced parts:",
+            error
+        );
+        throw new Error(
+            "Failed to record replaced parts"
+        );
+    }
+}
+
+
+// CESA-207 - Record maintenance notes
+export async function updateMaintenanceNotes(
+    recordId: string,
+    notes: string
+) {
+    try {
+        const [record] = await db
+            .update(maintenanceRecords)
+            .set({
+                notes,
+            })
+            .where(eq(maintenanceRecords.id, recordId))
+            .returning();
+
+        return record ?? null;
+    } catch (error) {
+        console.error(
+            "Failed to record maintenance notes:",
+            error
+        );
+        throw new Error(
+            "Failed to record maintenance notes"
+        );
+    }
+}
+
+// CESA-209 - Retrieve maintenance history for a service ticket
+export async function getMaintenanceHistory(
+    ticketId: string
+) {
+    try {
+        const records = await db
+            .select()
+            .from(maintenanceRecords)
+            .where(
+                eq(
+                    maintenanceRecords.ticketId,
+                    ticketId
+                )
+            )
+            .orderBy(
+                desc(
+                    maintenanceRecords.maintenanceDate
+                )
+            );
+
+        return records;
+    } catch (error) {
+        console.error(
+            "Failed to retrieve maintenance history:",
+            error
+        );
+        throw new Error(
+            "Failed to retrieve maintenance history"
+        );
     }
 }
