@@ -267,7 +267,21 @@ export async function approveEnergyRequest(requestId: string, managerId: string)
         createdAt: now,
     });
 
-    // 6. Return the updated request with full household details
+    // 6. Notify household user that request was approved (isolated in try/catch to avoid corrupting request)
+    try {
+        const kwh = Number(existingRequest.requestedEnergyKwh);
+        const kwhText = !isNaN(kwh) && Number.isInteger(kwh) ? kwh.toString() : existingRequest.requestedEnergyKwh;
+        await createNotification({
+            userId: existingRequest.householdId,
+            type: "request",
+            title: "Energy Request Approved",
+            message: `Your energy request for ${kwhText} kWh has been approved by the co-op manager.`,
+        });
+    } catch (notifError) {
+        console.error("[EnergyRequest] Failed to generate approval notification:", notifError);
+    }
+
+    // 7. Return the updated request with full household details
     return getEnergyRequestById(requestId);
 }
 
@@ -355,7 +369,21 @@ export async function rejectEnergyRequest(requestId: string, managerId: string) 
         createdAt: now,
     });
 
-    // 6. Return the updated request with full household details
+    // 6. Notify household user that request was rejected (isolated in try/catch to avoid corrupting request)
+    try {
+        const kwh = Number(existingRequest.requestedEnergyKwh);
+        const kwhText = !isNaN(kwh) && Number.isInteger(kwh) ? kwh.toString() : existingRequest.requestedEnergyKwh;
+        await createNotification({
+            userId: existingRequest.householdId,
+            type: "request",
+            title: "Energy Request Rejected",
+            message: `Your energy request for ${kwhText} kWh was rejected by the co-op manager.`,
+        });
+    } catch (notifError) {
+        console.error("[EnergyRequest] Failed to generate rejection notification:", notifError);
+    }
+
+    // 7. Return the updated request with full household details
     return getEnergyRequestById(requestId);
 }
 
