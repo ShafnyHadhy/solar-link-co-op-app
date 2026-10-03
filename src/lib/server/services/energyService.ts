@@ -16,17 +16,17 @@ export async function getLatestReading(assetId: string) {
 export async function getAvailableSurplus(assetId: string, fallbackOwnerId?: string) {
     const reading = await getLatestReading(assetId);
 
-    // Baseline: default to 350 kWh gen - 50 kWh con = 300 kWh surplus
-    let generation = reading ? Number(reading.generationKwh ?? 0) : 350.0;
+    // Baseline: default to 85050 kWh gen - 50 kWh con = 85000 kWh surplus
+    let generation = reading ? Number(reading.generationKwh ?? 0) : 85050.0;
     let consumption = reading ? Number(reading.consumptionKwh ?? 0) : 50.0;
 
-    // If reading has legacy small values (e.g. 28.4), upgrade to 300 kWh surplus baseline
-    if (generation < 100) {
-        generation = 350.0;
+    // If reading has legacy small values (e.g. 28.4), upgrade to 85000 kWh surplus baseline
+    if (generation < 1000) {
+        generation = 85050.0;
         consumption = 50.0;
     }
 
-    const rawSurplus = Math.max(generation - consumption, 0); // 300.0 kWh
+    const rawSurplus = Math.max(generation - consumption, 0); // 85000.0 kWh
 
     // Find the owner for this asset to aggregate all active committed energy
     let committedKwh = 0;

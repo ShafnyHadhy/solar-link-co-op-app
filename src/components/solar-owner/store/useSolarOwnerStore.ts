@@ -152,9 +152,9 @@ const INITIAL_METRICS: SolarMetrics = {
     batteryPowerKW: 2.4, // charging
     gridExportKW: 6.9,
 
-    dailyGenerationKWh: 350.0,
+    dailyGenerationKWh: 85050.0,
     dailyConsumptionKWh: 50.0,
-    dailyExcessKWh: 300.0,
+    dailyExcessKWh: 85000.0,
     dailySharedKWh: 18.5,
     dailyGridFeedKWh: 12.3,
     dailySelfSufficiencyPercent: 100,
@@ -584,11 +584,11 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
                     .reduce((sum, o) => sum + Number(o.energyAmountKwh || 0), 0);
 
                 const currentMetrics = get().metrics;
-                const newExcess = Math.max(0, +(300.0 - committed).toFixed(1));
+                const newExcess = Math.max(0, +(85000.0 - committed).toFixed(1));
                 set({
                     metrics: {
                         ...currentMetrics,
-                        dailyGenerationKWh: 350.0,
+                        dailyGenerationKWh: 85050.0,
                         dailyConsumptionKWh: 50.0,
                         dailyExcessKWh: newExcess,
                         generationKW: 12.5,
