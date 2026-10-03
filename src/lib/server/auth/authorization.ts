@@ -32,12 +32,14 @@ export interface AuthenticatedUser {
  * - Authorization: Bearer <token> (direct Clerk ID or Clerk session JWT)
  */
 export function extractClerkUserId(request: Request): string | null {
-    // 1. Check x-user-id / x-clerk-user-id / x-manager-id / x-technician-id headers
+    // 1. Check x-user-id / x-clerk-user-id / x-manager-id / x-technician-id / x-household-id / x-solar-owner-id headers
     const directHeader =
         request.headers.get("x-user-id") ||
         request.headers.get("x-clerk-user-id") ||
         request.headers.get("x-manager-id") ||
-        request.headers.get("x-technician-id");
+        request.headers.get("x-technician-id") ||
+        request.headers.get("x-household-id") ||
+        request.headers.get("x-solar-owner-id");
 
     if (directHeader && directHeader.trim()) {
         return directHeader.trim();
@@ -125,7 +127,7 @@ export function extractClerkUserId(request: Request): string | null {
         }
     }
 
-    // 4. Check URL query parameters for userId / clerkUserId
+    // 4. Check URL query parameters for userId / clerkUserId / householdId / ownerId
     try {
         if (request.url) {
             const urlObj = new URL(request.url);
@@ -133,7 +135,9 @@ export function extractClerkUserId(request: Request): string | null {
                 urlObj.searchParams.get("userId") ||
                 urlObj.searchParams.get("clerkUserId") ||
                 urlObj.searchParams.get("managerId") ||
-                urlObj.searchParams.get("technicianId");
+                urlObj.searchParams.get("technicianId") ||
+                urlObj.searchParams.get("householdId") ||
+                urlObj.searchParams.get("ownerId");
 
             if (queryUser && queryUser.trim() && queryUser.startsWith("user_")) {
                 return queryUser.trim();
@@ -251,3 +255,24 @@ export async function requireTechnician(
 ): Promise<AuthenticatedUser> {
     return requireRole(request, "technician", fallbackUserId);
 }
+
+/**
+ * Convenience helper to require household role for consumer energy requests & allocations.
+ */
+export async function requireHousehold(
+    request: Request,
+    fallbackUserId?: string
+): Promise<AuthenticatedUser> {
+    return requireRole(request, "household", fallbackUserId);
+}
+
+/**
+ * Convenience helper to require solar_owner role for solar asset & offer management.
+ */
+export async function requireSolarOwner(
+    request: Request,
+    fallbackUserId?: string
+): Promise<AuthenticatedUser> {
+    return requireRole(request, "solar_owner", fallbackUserId);
+}
+

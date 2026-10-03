@@ -1,11 +1,12 @@
-// Solar Asset Detail API Routes
-// GET /api/solar-assets/:id  — get a single asset
-// PUT /api/solar-assets/:id  — update an asset
-
+import { requireSolarOwner } from "@/lib/server/auth/authorization";
 import { getAssetById, updateAsset } from "@/lib/server/services/solarService";
+import { errorResponse } from "@/lib/server/utils/response";
 
 export async function GET(request: Request, { id }: Record<string, string>) {
   try {
+    const url = new URL(request.url);
+    await requireSolarOwner(request, url.searchParams.get("ownerId") || undefined);
+
     const asset = await getAssetById(id);
 
     if (!asset) {
@@ -17,15 +18,15 @@ export async function GET(request: Request, { id }: Record<string, string>) {
       asset,
     });
   } catch (error) {
-    console.error("Failed to get asset:", error);
-
-    return Response.json({ error: "Failed to get asset" }, { status: 500 });
+    return errorResponse(error);
   }
 }
 
 export async function PUT(request: Request, { id }: Record<string, string>) {
   try {
-    const body = await request.json();
+    const url = new URL(request.url);
+    const body = await request.json().catch(() => ({}));
+    await requireSolarOwner(request, body?.ownerId || url.searchParams.get("ownerId") || undefined);
 
     const asset = await updateAsset(id, {
       name: body.name,
@@ -45,8 +46,6 @@ export async function PUT(request: Request, { id }: Record<string, string>) {
       asset,
     });
   } catch (error) {
-    console.error("Failed to update asset:", error);
-
-    return Response.json({ error: "Failed to update asset" }, { status: 500 });
+    return errorResponse(error);
   }
 }

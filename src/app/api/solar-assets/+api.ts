@@ -1,20 +1,15 @@
-// Solar Assets API Routes
-// GET  /api/solar-assets?ownerId=...  — list owner's solar assets
-// POST /api/solar-assets              — register a new solar asset
-
+import { requireSolarOwner } from "@/lib/server/auth/authorization";
 import {
     createAsset,
     getAssetsByOwner,
 } from "@/lib/server/services/solarService";
+import { errorResponse } from "@/lib/server/utils/response";
 
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const ownerId = url.searchParams.get("ownerId");
-
-    if (!ownerId) {
-      return Response.json({ error: "ownerId is required" }, { status: 400 });
-    }
+    const authUser = await requireSolarOwner(request, url.searchParams.get("ownerId") || undefined);
+    const ownerId = authUser.id;
 
     const assets = await getAssetsByOwner(ownerId);
 
@@ -23,23 +18,20 @@ export async function GET(request: Request) {
       assets,
     });
   } catch (error) {
-    console.error("Failed to get solar assets:", error);
-
-    return Response.json(
-      { error: "Failed to get solar assets" },
-      { status: 500 },
-    );
+    return errorResponse(error);
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
+    const authUser = await requireSolarOwner(request, body?.ownerId);
+    const ownerId = authUser.id;
 
-    if (!body.id || !body.ownerId || !body.name || !body.assetType) {
+    if (!body.id || !body.name || !body.assetType) {
       return Response.json(
         {
-          error: "id, ownerId, name and assetType are required",
+          error: "id, name and assetType are required",
         },
         { status: 400 },
       );
@@ -47,7 +39,7 @@ export async function POST(request: Request) {
 
     const asset = await createAsset({
       id: body.id,
-      ownerId: body.ownerId,
+      ownerId,
       assetType: body.assetType,
       name: body.name,
       capacityKw: body.capacityKw,
@@ -64,11 +56,6 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
-    console.error("Failed to create solar asset:", error);
-
-    return Response.json(
-      { error: "Failed to create solar asset" },
-      { status: 500 },
-    );
+    return errorResponse(error);
   }
 }
