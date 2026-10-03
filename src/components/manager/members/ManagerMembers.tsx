@@ -1,7 +1,7 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
-import { useMembers } from '@/hooks/manager/useMembers';
+import { fetchMemberDetails, useMembers } from '@/hooks/manager/useMembers';
 import { calculateMemberAnalytics } from '@/lib/memberService';
-import { CommunityMember, MemberStatus } from '@/types/member';
+import { CommunityMember, MemberDetailedProfile, MemberStatus } from '@/types/member';
 import { UserRole } from '@/types/role';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -60,6 +60,31 @@ const ManagerMembers = () => {
             refetch();
         }, [refetch])
     );
+
+    // Member Details Modal State
+    const [selectedMemberForDetails, setSelectedMemberForDetails] = useState<CommunityMember | null>(null);
+    const [detailedProfile, setDetailedProfile] = useState<MemberDetailedProfile | null>(null);
+    const [detailsLoading, setDetailsLoading] = useState(false);
+    const [detailsError, setDetailsError] = useState<string | null>(null);
+    const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+
+    const handleOpenMemberDetails = async (member: CommunityMember) => {
+        setSelectedMemberForDetails(member);
+        setDetailedProfile(null);
+        setDetailsLoading(true);
+        setDetailsError(null);
+        setDetailsModalVisible(true);
+
+        try {
+            const details = await fetchMemberDetails(member.id);
+            setDetailedProfile(details);
+        } catch (err: any) {
+            console.error('[Member Details Error]', err);
+            setDetailsError(err?.message || 'Failed to load member details');
+        } finally {
+            setDetailsLoading(false);
+        }
+    };
 
     // Role Edit Modal State
     const [selectedMember, setSelectedMember] = useState<CommunityMember | null>(null);
@@ -297,8 +322,11 @@ const ManagerMembers = () => {
                                     key={member.id}
                                     className='rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'
                                 >
-                                    {/* Member Header */}
-                                    <View className='flex-row items-center justify-between mb-3'>
+                                    {/* Member Header (Clickable for Details) */}
+                                    <Pressable
+                                        onPress={() => handleOpenMemberDetails(member)}
+                                        className='flex-row items-center justify-between mb-3 active:opacity-75'
+                                    >
                                         <View className='flex-row items-center gap-3 flex-1 mr-2'>
                                             {/* Avatar Initials */}
                                             <View className='h-10 w-10 items-center justify-center rounded-xl bg-card border border-border/60'>
@@ -349,7 +377,7 @@ const ManagerMembers = () => {
                                                 {member.status}
                                             </Text>
                                         </View>
-                                    </View>
+                                    </Pressable>
 
                                     {/* Co-op Details Block */}
                                     <View className='flex-row items-center justify-between rounded-xl bg-card/70 border border-border/30 p-3 mb-3'>
@@ -456,15 +484,27 @@ const ManagerMembers = () => {
                                             </Text>
                                         </View>
 
-                                        {/* Change Role Button */}
-                                        <Pressable
-                                            onPress={() => openRoleModal(member)}
-                                            className='px-3.5 py-1.5 rounded-lg bg-primary border border-primary/40 active:opacity-80 shadow-sm'
-                                        >
-                                            <Text className='text-xs font-bold text-primary-foreground'>
-                                                Change Role
-                                            </Text>
-                                        </Pressable>
+                                        <View className='flex-row items-center gap-2'>
+                                            {/* View Details Button */}
+                                            <Pressable
+                                                onPress={() => handleOpenMemberDetails(member)}
+                                                className='px-3 py-1.5 rounded-lg bg-card border border-border/80 active:bg-secondary shadow-sm'
+                                            >
+                                                <Text className='text-xs font-bold text-foreground'>
+                                                    Details
+                                                </Text>
+                                            </Pressable>
+
+                                            {/* Change Role Button */}
+                                            <Pressable
+                                                onPress={() => openRoleModal(member)}
+                                                className='px-3.5 py-1.5 rounded-lg bg-primary border border-primary/40 active:opacity-80 shadow-sm'
+                                            >
+                                                <Text className='text-xs font-bold text-primary-foreground'>
+                                                    Change Role
+                                                </Text>
+                                            </Pressable>
+                                        </View>
                                     </View>
                                 </View>
                             );
@@ -472,6 +512,388 @@ const ManagerMembers = () => {
                     )}
                 </View>
             </ScrollView>
+
+            {/* Member Details Modal */}
+            <Modal
+                visible={detailsModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setDetailsModalVisible(false)}
+            >
+                <View className='flex-1 bg-black/70 items-center justify-center p-4'>
+                    <View className='w-full max-w-md max-h-[85%] rounded-3xl border border-border/60 bg-card p-5 shadow-2xl flex-col'>
+                        {/* Header */}
+                        <View className='flex-row items-center justify-between pb-3 border-b border-border/40 mb-3'>
+                            <View className='flex-row items-center gap-3 flex-1 mr-2'>
+                                <View className='h-12 w-12 items-center justify-center rounded-2xl bg-secondary border border-border/60'>
+                                    <Text className='text-base font-extrabold text-foreground'>
+                                        {(selectedMemberForDetails?.name || 'User')
+                                            .split(' ')
+                                            .map((n) => n[0])
+                                            .filter(Boolean)
+                                            .join('')
+                                            .substring(0, 2)
+                                            .toUpperCase() || 'U'}
+                                    </Text>
+                                </View>
+                                <View className='flex-1'>
+                                    <Text className='text-lg font-bold text-foreground' numberOfLines={1}>
+                                        {selectedMemberForDetails?.name}
+                                    </Text>
+                                    <Text className='text-xs text-muted-foreground' numberOfLines={1}>
+                                        {selectedMemberForDetails?.email}
+                                    </Text>
+                                </View>
+                            </View>
+                            <Pressable
+                                onPress={() => setDetailsModalVisible(false)}
+                                className='h-8 w-8 items-center justify-center rounded-full bg-secondary active:opacity-70'
+                            >
+                                <Feather name="x" size={18} color="#9CA3AF" />
+                            </Pressable>
+                        </View>
+
+                        {/* Content */}
+                        {detailsLoading ? (
+                            <View className='items-center justify-center py-12'>
+                                <ActivityIndicator size="large" color="#F59E0B" />
+                                <Text className='text-xs font-semibold text-muted-foreground mt-3'>
+                                    Loading member details & energy context...
+                                </Text>
+                            </View>
+                        ) : detailsError ? (
+                            <View className='items-center justify-center py-8'>
+                                <Feather name="alert-circle" size={28} color="#EF4444" />
+                                <Text className='text-sm font-bold text-foreground mt-2'>
+                                    Failed to load details
+                                </Text>
+                                <Text className='text-xs text-muted-foreground text-center mt-1 mb-3'>
+                                    {detailsError}
+                                </Text>
+                                <Pressable
+                                    onPress={() => selectedMemberForDetails && handleOpenMemberDetails(selectedMemberForDetails)}
+                                    className='px-3.5 py-1.5 rounded-lg bg-secondary border border-border/60'
+                                >
+                                    <Text className='text-xs font-semibold text-[#F59E0B]'>Retry</Text>
+                                </Pressable>
+                            </View>
+                        ) : detailedProfile ? (
+                            <ScrollView showsVerticalScrollIndicator={false} className='flex-1'>
+                                {/* Badges Row */}
+                                <View className='flex-row items-center gap-2 mb-4'>
+                                    <View className={`px-2.5 py-1 rounded-lg border ${ROLE_LABELS[detailedProfile.role]?.badgeBg || 'bg-secondary'}`}>
+                                        <Text className={`text-xs font-bold ${ROLE_LABELS[detailedProfile.role]?.textColor || 'text-foreground'}`}>
+                                            {ROLE_LABELS[detailedProfile.role]?.label || detailedProfile.role}
+                                        </Text>
+                                    </View>
+                                    <View className={`px-2.5 py-1 rounded-lg border ${
+                                        detailedProfile.status === 'active'
+                                            ? 'bg-emerald-500/15 border-emerald-500/40'
+                                            : detailedProfile.status === 'pending'
+                                            ? 'bg-yellow-500/15 border-yellow-500/40'
+                                            : 'bg-zinc-500/15 border-zinc-500/40'
+                                    }`}>
+                                        <Text className={`text-xs font-bold uppercase ${
+                                            detailedProfile.status === 'active'
+                                                ? 'text-[#10B981]'
+                                                : detailedProfile.status === 'pending'
+                                                ? 'text-[#F59E0B]'
+                                                : 'text-muted-foreground'
+                                        }`}>
+                                            {detailedProfile.status}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Member Information Card */}
+                                <View className='rounded-xl bg-secondary/50 border border-border/40 p-3.5 mb-4'>
+                                    <Text className='text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2.5'>
+                                        Account & Profile
+                                    </Text>
+                                    <View className='gap-2'>
+                                        <View className='flex-row justify-between items-center'>
+                                            <Text className='text-xs text-muted-foreground'>Email</Text>
+                                            <Text className='text-xs font-semibold text-foreground'>{detailedProfile.email}</Text>
+                                        </View>
+                                        <View className='flex-row justify-between items-center'>
+                                            <Text className='text-xs text-muted-foreground'>Phone</Text>
+                                            <Text className='text-xs font-semibold text-foreground'>{detailedProfile.phone || 'Not provided'}</Text>
+                                        </View>
+                                        <View className='flex-row justify-between items-center'>
+                                            <Text className='text-xs text-muted-foreground'>Assigned Grid</Text>
+                                            <Text className='text-xs font-semibold text-foreground'>{detailedProfile.assignedGrid || 'Unassigned'}</Text>
+                                        </View>
+                                        <View className='flex-row justify-between items-center'>
+                                            <Text className='text-xs text-muted-foreground'>Member Since</Text>
+                                            <Text className='text-xs font-semibold text-foreground'>{detailedProfile.createdDate || detailedProfile.joinedAt}</Text>
+                                        </View>
+                                        {detailedProfile.solarCapacityKw !== undefined && (
+                                            <View className='flex-row justify-between items-center'>
+                                                <Text className='text-xs text-muted-foreground'>Solar Capacity</Text>
+                                                <Text className='text-xs font-bold text-[#F59E0B]'>{detailedProfile.solarCapacityKw} kW</Text>
+                                            </View>
+                                        )}
+                                        {detailedProfile.monthlyAllocationKwh !== undefined && (
+                                            <View className='flex-row justify-between items-center'>
+                                                <Text className='text-xs text-muted-foreground'>Monthly Allocation</Text>
+                                                <Text className='text-xs font-bold text-sky-500'>{detailedProfile.monthlyAllocationKwh} kWh / mo</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                </View>
+
+                                {/* Energy Context Section based on role */}
+                                {detailedProfile.role === 'solar_owner' && (
+                                    <>
+                                        <Text className='text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2'>
+                                            Solar Assets & Offers
+                                        </Text>
+
+                                        {/* Metrics Row */}
+                                        <View className='flex-row gap-2 mb-3'>
+                                            <View className='flex-1 rounded-xl bg-secondary/50 border border-border/40 p-2.5 items-center'>
+                                                <Text className='text-[10px] text-muted-foreground font-semibold'>Total Capacity</Text>
+                                                <Text className='text-sm font-extrabold text-foreground mt-0.5'>
+                                                    {detailedProfile.energyDetails?.metrics?.totalCapacityKw ?? detailedProfile.solarCapacityKw ?? 0} kW
+                                                </Text>
+                                            </View>
+                                            <View className='flex-1 rounded-xl bg-secondary/50 border border-border/40 p-2.5 items-center'>
+                                                <Text className='text-[10px] text-muted-foreground font-semibold'>Energy Offered</Text>
+                                                <Text className='text-sm font-extrabold text-[#F59E0B] mt-0.5'>
+                                                    {detailedProfile.energyDetails?.metrics?.totalOfferedKwh ?? 0} kWh
+                                                </Text>
+                                            </View>
+                                            <View className='flex-1 rounded-xl bg-secondary/50 border border-border/40 p-2.5 items-center'>
+                                                <Text className='text-[10px] text-muted-foreground font-semibold'>Active Offers</Text>
+                                                <Text className='text-sm font-extrabold text-foreground mt-0.5'>
+                                                    {detailedProfile.energyDetails?.metrics?.activeOffersCount ?? 0}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {/* Assets List */}
+                                        <View className='rounded-xl bg-secondary/50 border border-border/40 p-3 mb-3'>
+                                            <Text className='text-[11px] font-bold text-foreground mb-2'>
+                                                Registered Hardware ({detailedProfile.energyDetails?.solarAssets?.length ?? 0})
+                                            </Text>
+                                            {detailedProfile.energyDetails?.solarAssets && detailedProfile.energyDetails.solarAssets.length > 0 ? (
+                                                detailedProfile.energyDetails.solarAssets.map((asset) => (
+                                                    <View key={asset.id} className='flex-row items-center justify-between py-1.5 border-b border-border/20 last:border-b-0'>
+                                                        <View>
+                                                            <Text className='text-xs font-semibold text-foreground'>{asset.name}</Text>
+                                                            <Text className='text-[10px] text-muted-foreground uppercase'>{asset.assetType} {asset.location ? `• ${asset.location}` : ''}</Text>
+                                                        </View>
+                                                        <Text className='text-xs font-bold text-[#F59E0B]'>{asset.capacityKw} kW</Text>
+                                                    </View>
+                                                ))
+                                            ) : (
+                                                <Text className='text-xs text-muted-foreground italic py-1'>No hardware assets registered.</Text>
+                                            )}
+                                        </View>
+
+                                        {/* Offers List */}
+                                        <View className='rounded-xl bg-secondary/50 border border-border/40 p-3 mb-3'>
+                                            <Text className='text-[11px] font-bold text-foreground mb-2'>
+                                                Recent Solar Offers ({detailedProfile.energyDetails?.solarOffers?.length ?? 0})
+                                            </Text>
+                                            {detailedProfile.energyDetails?.solarOffers && detailedProfile.energyDetails.solarOffers.length > 0 ? (
+                                                detailedProfile.energyDetails.solarOffers.map((offer) => (
+                                                    <View key={offer.id} className='flex-row items-center justify-between py-1.5 border-b border-border/20 last:border-b-0'>
+                                                        <View>
+                                                            <Text className='text-xs font-semibold text-foreground'>{offer.energyAmountKwh} kWh</Text>
+                                                            <Text className='text-[10px] text-muted-foreground'>
+                                                                {new Date(offer.offeredAt).toLocaleDateString()}
+                                                            </Text>
+                                                        </View>
+                                                        <View className={`px-2 py-0.5 rounded-full border ${
+                                                            offer.status === 'approved' ? 'bg-emerald-500/15 border-emerald-500/30' :
+                                                            offer.status === 'pending' ? 'bg-yellow-500/15 border-yellow-500/30' :
+                                                            'bg-zinc-500/15 border-zinc-500/30'
+                                                        }`}>
+                                                            <Text className={`text-[10px] font-bold uppercase ${
+                                                                offer.status === 'approved' ? 'text-[#10B981]' :
+                                                                offer.status === 'pending' ? 'text-[#F59E0B]' :
+                                                                'text-muted-foreground'
+                                                            }`}>
+                                                                {offer.status}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                ))
+                                            ) : (
+                                                <Text className='text-xs text-muted-foreground italic py-1'>No solar offers submitted yet.</Text>
+                                            )}
+                                        </View>
+                                    </>
+                                )}
+
+                                {detailedProfile.role === 'household' && (
+                                    <>
+                                        <Text className='text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2'>
+                                            Energy Consumption & Requests
+                                        </Text>
+
+                                        {/* Metrics Row */}
+                                        <View className='flex-row gap-2 mb-3'>
+                                            <View className='flex-1 rounded-xl bg-secondary/50 border border-border/40 p-2.5 items-center'>
+                                                <Text className='text-[10px] text-muted-foreground font-semibold'>Allocation</Text>
+                                                <Text className='text-sm font-extrabold text-foreground mt-0.5'>
+                                                    {detailedProfile.monthlyAllocationKwh ?? 30} kWh
+                                                </Text>
+                                            </View>
+                                            <View className='flex-1 rounded-xl bg-secondary/50 border border-border/40 p-2.5 items-center'>
+                                                <Text className='text-[10px] text-muted-foreground font-semibold'>Total Req</Text>
+                                                <Text className='text-sm font-extrabold text-sky-500 mt-0.5'>
+                                                    {detailedProfile.energyDetails?.metrics?.totalRequestedKwh ?? 0} kWh
+                                                </Text>
+                                            </View>
+                                            <View className='flex-1 rounded-xl bg-secondary/50 border border-border/40 p-2.5 items-center'>
+                                                <Text className='text-[10px] text-muted-foreground font-semibold'>Dispatched</Text>
+                                                <Text className='text-sm font-extrabold text-[#10B981] mt-0.5'>
+                                                    {detailedProfile.energyDetails?.metrics?.totalDispatchedKwh ?? 0} kWh
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {/* Energy Requests List */}
+                                        <View className='rounded-xl bg-secondary/50 border border-border/40 p-3 mb-3'>
+                                            <Text className='text-[11px] font-bold text-foreground mb-2'>
+                                                Energy Requests ({detailedProfile.energyDetails?.energyRequests?.length ?? 0})
+                                            </Text>
+                                            {detailedProfile.energyDetails?.energyRequests && detailedProfile.energyDetails.energyRequests.length > 0 ? (
+                                                detailedProfile.energyDetails.energyRequests.map((req) => (
+                                                    <View key={req.id} className='py-2 border-b border-border/20 last:border-b-0'>
+                                                        <View className='flex-row items-center justify-between'>
+                                                            <Text className='text-xs font-bold text-foreground'>{req.requestedEnergyKwh} kWh</Text>
+                                                            <View className={`px-2 py-0.5 rounded-full border ${
+                                                                req.status === 'fulfilled' || req.status === 'approved'
+                                                                    ? 'bg-emerald-500/15 border-emerald-500/30'
+                                                                    : req.status === 'pending'
+                                                                    ? 'bg-yellow-500/15 border-yellow-500/30'
+                                                                    : 'bg-zinc-500/15 border-zinc-500/30'
+                                                            }`}>
+                                                                <Text className={`text-[10px] font-bold uppercase ${
+                                                                    req.status === 'fulfilled' || req.status === 'approved'
+                                                                        ? 'text-[#10B981]'
+                                                                        : req.status === 'pending'
+                                                                        ? 'text-[#F59E0B]'
+                                                                        : 'text-muted-foreground'
+                                                                }`}>
+                                                                    {req.status}
+                                                                </Text>
+                                                            </View>
+                                                        </View>
+                                                        {req.reason && (
+                                                            <Text className='text-[11px] text-muted-foreground mt-0.5' numberOfLines={1}>
+                                                                {req.reason}
+                                                            </Text>
+                                                        )}
+                                                        <Text className='text-[9px] text-muted-foreground mt-0.5'>
+                                                            Requested: {new Date(req.requestedAt).toLocaleDateString()}
+                                                        </Text>
+                                                    </View>
+                                                ))
+                                            ) : (
+                                                <Text className='text-xs text-muted-foreground italic py-1'>No energy requests submitted.</Text>
+                                            )}
+                                        </View>
+
+                                        {/* Dispatches Received */}
+                                        {detailedProfile.energyDetails?.dispatches && detailedProfile.energyDetails.dispatches.length > 0 && (
+                                            <View className='rounded-xl bg-secondary/50 border border-border/40 p-3 mb-3'>
+                                                <Text className='text-[11px] font-bold text-foreground mb-2'>
+                                                    Dispatched Energy History ({detailedProfile.energyDetails.dispatches.length})
+                                                </Text>
+                                                {detailedProfile.energyDetails.dispatches.map((dsp) => (
+                                                    <View key={dsp.id} className='flex-row items-center justify-between py-1.5 border-b border-border/20 last:border-b-0'>
+                                                        <View>
+                                                            <Text className='text-xs font-semibold text-[#10B981]'>+{dsp.dispatchedEnergyKwh} kWh Dispatched</Text>
+                                                            <Text className='text-[10px] text-muted-foreground'>
+                                                                {new Date(dsp.dispatchedAt).toLocaleDateString()} {dsp.notes ? `• ${dsp.notes}` : ''}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                ))}
+                                            </View>
+                                        )}
+                                    </>
+                                )}
+
+                                {detailedProfile.role === 'technician' && (
+                                    <>
+                                        <Text className='text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2'>
+                                            Field & Maintenance Details
+                                        </Text>
+                                        <View className='rounded-xl bg-secondary/50 border border-border/40 p-3 mb-3'>
+                                            <View className='flex-row justify-between items-center mb-2'>
+                                                <Text className='text-xs text-muted-foreground'>Assigned Grid Substation</Text>
+                                                <Text className='text-xs font-bold text-foreground'>{detailedProfile.assignedGrid ?? 'Main Substation'}</Text>
+                                            </View>
+                                            <View className='flex-row justify-between items-center'>
+                                                <Text className='text-xs text-muted-foreground'>Tickets Assigned</Text>
+                                                <Text className='text-xs font-bold text-emerald-500'>
+                                                    {detailedProfile.energyDetails?.metrics?.ticketsCount ?? 0}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </>
+                                )}
+
+                                {detailedProfile.role === 'manager' && (
+                                    <>
+                                        <Text className='text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2'>
+                                            Management Overview
+                                        </Text>
+                                        <View className='rounded-xl bg-secondary/50 border border-border/40 p-3 mb-3'>
+                                            <View className='flex-row justify-between items-center mb-2'>
+                                                <Text className='text-xs text-muted-foreground'>Access Level</Text>
+                                                <Text className='text-xs font-bold text-purple-400'>Full Grid Administrator</Text>
+                                            </View>
+                                            <View className='flex-row justify-between items-center mb-2'>
+                                                <Text className='text-xs text-muted-foreground'>Dispatches Executed</Text>
+                                                <Text className='text-xs font-bold text-foreground'>
+                                                    {detailedProfile.energyDetails?.metrics?.dispatchesManagedCount ?? 0}
+                                                </Text>
+                                            </View>
+                                            <View className='flex-row justify-between items-center'>
+                                                <Text className='text-xs text-muted-foreground'>Total Dispatched</Text>
+                                                <Text className='text-xs font-bold text-[#F59E0B]'>
+                                                    {detailedProfile.energyDetails?.metrics?.totalKwhDispatched ?? 0} kWh
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </>
+                                )}
+                            </ScrollView>
+                        ) : null}
+
+                        {/* Modal Action Buttons */}
+                        <View className='flex-row gap-3 pt-3 border-t border-border/40 mt-2'>
+                            <Pressable
+                                onPress={() => setDetailsModalVisible(false)}
+                                className='flex-1 py-2.5 items-center justify-center rounded-xl bg-secondary border border-border/60 active:opacity-75'
+                            >
+                                <Text className='text-xs font-bold text-foreground'>
+                                    Close
+                                </Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={() => {
+                                    setDetailsModalVisible(false);
+                                    if (selectedMemberForDetails) {
+                                        openRoleModal(selectedMemberForDetails);
+                                    }
+                                }}
+                                className='flex-1 py-2.5 items-center justify-center rounded-xl bg-primary border border-primary/40 active:opacity-80 shadow-sm'
+                            >
+                                <Text className='text-xs font-bold text-primary-foreground'>
+                                    Change Role
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
 
             {/* Role Assignment Modal */}
             <Modal

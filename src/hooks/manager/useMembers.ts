@@ -46,3 +46,20 @@ export function useMembers() {
         refetch: fetchMembers,
     };
 }
+
+export async function fetchMemberDetails(memberId: string): Promise<any> {
+    const response = await fetch(getApiUrl(`/api/users?id=${encodeURIComponent(memberId)}`));
+
+    if (!response.ok) {
+        throw new Error(`Failed to fetch member details (${response.status})`);
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+        throw new Error(data.error || "Failed to load member details");
+    }
+
+    return data.member || data.data?.member;
+}
+
