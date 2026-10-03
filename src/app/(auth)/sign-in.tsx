@@ -125,13 +125,13 @@ export default function SignInScreen() {
                                 className={`mt-2.5 h-13.5 flex-row items-center rounded-2xl border border-border bg-background/60 py-3 px-4 active:bg-secondary/40 ${isLoading ? "opacity-70" : ""
                                     }`}
                                 disabled={isLoading}
-                                onPress={() => {}}
+                                onPress={() => handleSocialAuth("oauth_github")}
                             >
                                 <View className="h-8 w-8 items-center justify-center rounded-full bg-card border border-border/50">
-                                    <FontAwesome name="facebook" size={20} color="#1877F2" />
+                                    <FontAwesome name="github" size={20} color={iconColor} />
                                 </View>
                                 <Text className="ml-3 flex-1 text-base font-semibold text-card-foreground">
-                                    Continue with Facebook
+                                    {isGitHubClicked ? "Connecting GitHub..." : "Continue with GitHub"}
                                 </Text>
                                 <FontAwesome name="angle-right" size={18} color={arrowColor} />
                             </Pressable>

@@ -1,7 +1,10 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
+import WaitUntilRoleAssigned from '@/components/shared/WaitUntilRoleAssigned';
+import { useUserSync } from '@/hooks/useUserSync';
+import { getUserRole } from '@/lib/getUserRole';
 import { useUser } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -47,7 +50,8 @@ const filters: TicketFilter[] = [
 ];
 
 const RequestsScreen = () => {
-    const { user } = useUser();
+    const { user, isLoaded, isSignedIn } = useUser();
+    const { dbUser } = useUserSync();
     const [search, setSearch] = useState('');
     const [selectedFilter, setSelectedFilter] =
         useState<TicketFilter>('All');
@@ -55,6 +59,23 @@ const RequestsScreen = () => {
     const [tickets, setTickets] = useState<ServiceTicket[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    if (!isLoaded) {
+        return null;
+    }
+
+    if (!isSignedIn || !user) {
+        return <Redirect href="/(auth)/sign-in" />;
+    }
+
+    const role = getUserRole(user?.publicMetadata?.role, dbUser?.role);
+
+    if (role !== "technician") {
+        if (!role) {
+            return <WaitUntilRoleAssigned />;
+        }
+        return <Redirect href="/(tabs)" />;
+    }
 
     const loadTickets = async () => {
         try {

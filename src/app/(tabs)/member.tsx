@@ -20,13 +20,15 @@ const MemberScreen = () => {
 
     const role = getUserRole(user?.publicMetadata?.role, dbUser?.role);
 
-    switch (role) {
-        case "manager":
-            return <ManagerMembers />;
-
-        default:
-            return <ManagerMembers />;
+    if (role === "manager") {
+        return <ManagerMembers />;
     }
+
+    if (!role) {
+        return <WaitUntilRoleAssigned />;
+    }
+
+    return <Redirect href="/(tabs)" />;
 };
 
 export default MemberScreen;

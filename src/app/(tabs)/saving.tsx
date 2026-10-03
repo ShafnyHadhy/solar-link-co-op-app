@@ -1,7 +1,11 @@
 import TabScreenBackground from "@/components/shared/TabScreenBackground";
+import WaitUntilRoleAssigned from "@/components/shared/WaitUntilRoleAssigned";
 import { useHouseholdEnergyRequests } from "@/hooks/household/useHouseholdEnergyRequests";
+import { useUserSync } from "@/hooks/useUserSync";
+import { getUserRole } from "@/lib/getUserRole";
+import { useUser } from "@clerk/expo";
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import { useColorScheme } from "nativewind";
 import React from "react";
 import {
@@ -14,6 +18,8 @@ import {
 } from "react-native";
 
 const SavingsDashboard = () => {
+  const { user, isLoaded, isSignedIn } = useUser();
+  const { dbUser } = useUserSync();
   const { colorScheme } = useColorScheme();
   const router = useRouter();
   const isDark = colorScheme === "dark";
@@ -23,6 +29,23 @@ const SavingsDashboard = () => {
     loading: isLoadingStats,
     refetch,
   } = useHouseholdEnergyRequests();
+
+  if (!isLoaded) {
+    return null;
+  }
+
+  if (!isSignedIn || !user) {
+    return <Redirect href="/(auth)/sign-in" />;
+  }
+
+  const role = getUserRole(user?.publicMetadata?.role, dbUser?.role);
+
+  if (role !== "household") {
+    if (!role) {
+      return <WaitUntilRoleAssigned />;
+    }
+    return <Redirect href="/(tabs)" />;
+  }
 
   const isRefreshing = isLoadingStats;
 
