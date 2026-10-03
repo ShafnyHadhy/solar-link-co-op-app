@@ -170,19 +170,31 @@ export async function getServiceTicketById(ticketId: string) {
 }
 
 
-// CESA-201 - Update service ticket status
+// CESA-201 / CESA-260 - Update service ticket status
 export async function updateServiceTicketStatus(
     ticketId: string,
     status: "open" | "assigned" | "in_progress" | "resolved" | "closed"
 ) {
     try {
+        // CESA-260 - Update ticket status
+        const updateData: {
+            status: "open" | "assigned" | "in_progress" | "resolved" | "closed";
+            updatedAt: Date;
+            resolvedAt?: Date;
+        } = {
+            status,
+            updatedAt: new Date(),
+        };
+
+        // Set resolution time when maintenance is completed.
+        // Do not erase it when the resolved ticket is later closed.
+        if (status === "resolved") {
+            updateData.resolvedAt = new Date();
+        }
+
         const [updatedTicket] = await db
             .update(serviceTickets)
-            .set({
-                status,
-                updatedAt: new Date(),
-                resolvedAt: status === "resolved" ? new Date() : null,
-            })
+            .set(updateData)
             .where(eq(serviceTickets.id, ticketId))
             .returning();
 
