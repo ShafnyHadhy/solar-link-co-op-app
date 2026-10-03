@@ -3,6 +3,7 @@
 
 import {
     createMaintenanceDiagnosis,
+    getMaintenanceHistory,
     updateMaintenanceNotes,
     updateMaintenanceParts,
 } from "@/lib/server/services/maintenanceService";
@@ -11,6 +12,28 @@ import {
     errorResponse,
     successResponse,
 } from "@/lib/server/utils/response";
+
+// CESA-209 - Get maintenance history for a service ticket
+export async function GET(request: Request) {
+    try {
+        const url = new URL(request.url);
+        const ticketId =
+            url.searchParams.get("ticketId");
+
+        if (!ticketId) {
+            throw new BadRequestError(
+                "ticketId is required"
+            );
+        }
+
+        const records =
+            await getMaintenanceHistory(ticketId);
+
+        return successResponse({ records });
+    } catch (error) {
+        return errorResponse(error);
+    }
+}
 
 export async function POST(request: Request) {
     try {

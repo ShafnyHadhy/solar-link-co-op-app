@@ -46,6 +46,16 @@ interface ServiceTicket {
     resolvedAt: string | null;
 }
 
+interface MaintenanceRecord {
+    id: string;
+    ticketId: string;
+    technicianId: string;
+    description: string | null;
+    partsUsed: string | null;
+    maintenanceDate: string;
+    notes: string | null;
+}
+
 const TicketDetailsScreen = () => {
     const { id } =
         useLocalSearchParams<{ id: string }>();
@@ -86,6 +96,13 @@ const TicketDetailsScreen = () => {
         useState("");
 
     const [savingNotes, setSavingNotes] =
+        useState(false);
+
+    // CESA-209 - Maintenance history
+    const [maintenanceHistory, setMaintenanceHistory] =
+        useState<MaintenanceRecord[]>([]);
+
+    const [loadingHistory, setLoadingHistory] =
         useState(false);
 
     useEffect(() => {
@@ -146,6 +163,53 @@ const TicketDetailsScreen = () => {
 
         fetchTicket();
     }, [id]);
+
+    // CESA-209 - Load history when the ticket opens
+    useEffect(() => {
+        if (id) {
+            fetchMaintenanceHistory();
+        }
+    }, [id]);
+
+    // CESA-209 - Load maintenance history
+    const fetchMaintenanceHistory = async () => {
+        if (!id) {
+            return;
+        }
+
+        try {
+            setLoadingHistory(true);
+
+            const response = await fetch(
+                `/api/maintenance-records?ticketId=${encodeURIComponent(
+                    id
+                )}`
+            );
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    result.message ??
+                        "Failed to load maintenance history"
+                );
+            }
+
+            const records =
+                result.data?.records ??
+                result.records ??
+                [];
+
+            setMaintenanceHistory(records);
+        } catch (err) {
+            console.error(
+                "Failed to load maintenance history:",
+                err
+            );
+        } finally {
+            setLoadingHistory(false);
+        }
+    };
 
     const formatStatus = (
         status: TicketStatus
@@ -391,6 +455,8 @@ const TicketDetailsScreen = () => {
             );
             setDiagnosis("");
 
+            await fetchMaintenanceHistory();
+
             Alert.alert(
                 "Diagnosis Saved",
                 "The maintenance diagnosis has been recorded successfully."
@@ -464,6 +530,8 @@ const TicketDetailsScreen = () => {
 
             setPartsUsed("");
 
+            await fetchMaintenanceHistory();
+
             Alert.alert(
                 "Parts Saved",
                 "The replaced parts have been recorded successfully."
@@ -536,6 +604,8 @@ const TicketDetailsScreen = () => {
             }
 
             setMaintenanceNotes("");
+
+            await fetchMaintenanceHistory();
 
             Alert.alert(
                 "Notes Saved",
@@ -1152,6 +1222,121 @@ const TicketDetailsScreen = () => {
                                 : "Save Maintenance Notes"}
                         </Text>
                     </Pressable>
+                </View>
+
+                {/* CESA-209 - Maintenance History */}
+                <Text className="mb-3 mt-7 text-lg font-extrabold text-foreground">
+                    Maintenance History
+                </Text>
+
+                <View className="rounded-[24px] border border-border bg-card p-5">
+                    <View className="mb-4 flex-row items-center">
+                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-muted">
+                            <Feather
+                                name="clock"
+                                size={18}
+                                color="#6B7280"
+                            />
+                        </View>
+
+                        <View className="ml-3 flex-1">
+                            <Text className="text-sm font-bold text-foreground">
+                                Previous Maintenance Records
+                            </Text>
+
+                            <Text className="mt-1 text-xs text-muted-foreground">
+                                Maintenance activity recorded for this service ticket.
+                            </Text>
+                        </View>
+                    </View>
+
+                    {loadingHistory ? (
+                        <View className="items-center py-5">
+                            <ActivityIndicator size="small" />
+
+                            <Text className="mt-2 text-xs text-muted-foreground">
+                                Loading maintenance history...
+                            </Text>
+                        </View>
+                    ) : maintenanceHistory.length === 0 ? (
+                        <View className="items-center py-5">
+                            <Feather
+                                name="inbox"
+                                size={24}
+                                color="#9CA3AF"
+                            />
+
+                            <Text className="mt-2 text-sm text-muted-foreground">
+                                No maintenance records found.
+                            </Text>
+                        </View>
+                    ) : (
+                        maintenanceHistory.map(
+                            (record, index) => (
+                                <View
+                                    key={record.id}
+                                    className={`${
+                                        index > 0
+                                            ? "mt-4 border-t border-border pt-4"
+                                            : ""
+                                    }`}
+                                >
+                                    <View className="mb-3 flex-row items-center justify-between">
+                                        <Text className="text-sm font-extrabold text-foreground">
+                                            Maintenance Record
+                                        </Text>
+
+                                        <Text className="text-xs text-muted-foreground">
+                                            {formatDate(
+                                                record.maintenanceDate
+                                            )}
+                                        </Text>
+                                    </View>
+
+                                    <Text className="text-xs font-bold text-muted-foreground">
+                                        Diagnosis
+                                    </Text>
+
+                                    <Text className="mt-1 text-sm text-foreground">
+                                        {record.description ??
+                                            "No diagnosis recorded"}
+                                    </Text>
+
+                                    <View className="my-3 h-px bg-border" />
+
+                                    <Text className="text-xs font-bold text-muted-foreground">
+                                        Replaced Parts
+                                    </Text>
+
+                                    <Text className="mt-1 text-sm text-foreground">
+                                        {record.partsUsed ??
+                                            "No replaced parts recorded"}
+                                    </Text>
+
+                                    <View className="my-3 h-px bg-border" />
+
+                                    <Text className="text-xs font-bold text-muted-foreground">
+                                        Maintenance Notes
+                                    </Text>
+
+                                    <Text className="mt-1 text-sm text-foreground">
+                                        {record.notes ??
+                                            "No maintenance notes recorded"}
+                                    </Text>
+
+                                    <View className="my-3 h-px bg-border" />
+
+                                    <Text className="text-xs font-bold text-muted-foreground">
+                                        Technician
+                                    </Text>
+
+                                    <Text className="mt-1 text-sm text-foreground">
+                                        {record.technicianId}
+                                    </Text>
+                                </View>
+                            )
+                        )
+                    )}
                 </View>
 
                 {/* CESA-208 - Mark Ticket Resolved */}

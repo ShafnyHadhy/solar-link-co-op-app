@@ -267,3 +267,35 @@ export async function updateMaintenanceNotes(
         );
     }
 }
+
+// CESA-209 - Retrieve maintenance history for a service ticket
+export async function getMaintenanceHistory(
+    ticketId: string
+) {
+    try {
+        const records = await db
+            .select()
+            .from(maintenanceRecords)
+            .where(
+                eq(
+                    maintenanceRecords.ticketId,
+                    ticketId
+                )
+            )
+            .orderBy(
+                desc(
+                    maintenanceRecords.maintenanceDate
+                )
+            );
+
+        return records;
+    } catch (error) {
+        console.error(
+            "Failed to retrieve maintenance history:",
+            error
+        );
+        throw new Error(
+            "Failed to retrieve maintenance history"
+        );
+    }
+}
