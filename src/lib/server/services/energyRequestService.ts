@@ -7,6 +7,7 @@ import {
     NotFoundError,
     UnauthorizedError,
 } from "../utils/errors";
+import { createNotification } from "./notificationService";
 
 /**
  * Retrieve all energy requests for the manager.
@@ -387,6 +388,7 @@ export async function createHouseholdEnergyRequest(input: {
             name: users.name,
             role: users.role,
             status: users.status,
+            assignedGrid: users.assignedGrid,
         })
         .from(users)
         .where(eq(users.id, input.householdId))
@@ -432,6 +434,45 @@ export async function createHouseholdEnergyRequest(input: {
         }),
         createdAt: now,
     });
+
+    // Notify co-op manager(s) of new energy request (isolated in try/catch to avoid corrupting request)
+    try {
+        const managers = await db
+            .select({
+                id: users.id,
+                assignedGrid: users.assignedGrid,
+            })
+            .from(users)
+            .where(eq(users.role, "manager"));
+
+        if (managers.length > 0) {
+            // Prioritize manager on the same grid if assigned, otherwise notify all co-op managers
+            let targetManagers = managers;
+            if (householdUser.assignedGrid) {
+                const gridManagers = managers.filter(
+                    (m) => m.assignedGrid === householdUser.assignedGrid
+                );
+                if (gridManagers.length > 0) {
+                    targetManagers = gridManagers;
+                }
+            }
+
+            const kwhText = Number.isInteger(numericKwh)
+                ? numericKwh.toString()
+                : numericKwh.toFixed(1);
+
+            for (const manager of targetManagers) {
+                await createNotification({
+                    userId: manager.id,
+                    type: "request",
+                    title: "New Energy Request",
+                    message: `A household has submitted a new energy request for ${kwhText} kWh.`,
+                });
+            }
+        }
+    } catch (notifError) {
+        console.error("[EnergyRequest] Failed to generate manager notification:", notifError);
+    }
 
     return createdRequest;
 }
