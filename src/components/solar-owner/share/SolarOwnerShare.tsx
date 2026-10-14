@@ -326,7 +326,7 @@ export const SolarOwnerShare = () => {
                                         : isApproved
                                         ? { bg: 'bg-emerald-500/15 border-emerald-500/40', text: 'text-emerald-500', color: '#10B981', icon: 'check-circle' as const, label: 'Approved' }
                                         : isRejected
-                                        ? { bg: 'bg-destructive/15 border-destructive/40', text: 'text-destructive', color: '#EF4444', icon: 'alert-circle' as const, label: 'Rejected' }
+                                        ? { bg: 'bg-red-500/15 border-red-500/40', text: 'text-red-500', color: '#EF4444', icon: 'alert-circle' as const, label: 'Rejected' }
                                         : isCancelled
                                         ? { bg: 'bg-secondary border-border/80', text: 'text-muted-foreground', color: '#94A3B8', icon: 'slash' as const, label: 'Cancelled' }
                                         : { bg: 'bg-sky-500/15 border-sky-500/40', text: 'text-sky-500', color: '#0EA5E9', icon: 'zap' as const, label: 'Completed' };
@@ -457,8 +457,8 @@ export const SolarOwnerShare = () => {
                                         </View>
 
                                         {req.urgency === 'urgent' && isPending && (
-                                            <View className="bg-destructive/20 border border-destructive/40 px-2 py-0.5 rounded-full">
-                                                <Text className="text-[9px] font-black text-destructive uppercase">
+                                            <View className="bg-red-500/20 border border-red-500/40 px-2 py-0.5 rounded-full">
+                                                <Text className="text-[9px] font-black text-red-500 uppercase">
                                                     Urgent
                                                 </Text>
                                             </View>
@@ -497,7 +497,7 @@ export const SolarOwnerShare = () => {
                                                     isAccepted
                                                         ? 'text-emerald-500'
                                                         : isRejected
-                                                        ? 'text-destructive'
+                                                        ? 'text-red-500'
                                                         : 'text-amber-500'
                                                 }`}
                                             >
