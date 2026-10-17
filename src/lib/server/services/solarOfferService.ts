@@ -1,126 +1,136 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "../db/client";
 import type { NewSolarOffer } from "../db/schema";
-import { auditLogs, dispatches, energyRequests, notifications, solarOffers, users } from "../db/schema";
 import {
-    BadRequestError,
-    ForbiddenError,
-    NotFoundError,
-    UnauthorizedError,
+  auditLogs,
+  dispatches,
+  energyRequests,
+  notifications,
+  solarOffers,
+  users,
+} from "../db/schema";
+import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+  UnauthorizedError,
 } from "../utils/errors";
 
 // ==========================================
 // SOLAR OWNER SERVICES (US-04B)
 // ==========================================
-
+//crudsolar
 export async function createSolarOffer(offer: NewSolarOffer) {
-    const result = await db.insert(solarOffers).values(offer).returning();
-    return result[0];
+  const result = await db.insert(solarOffers).values(offer).returning();
+  return result[0];
 }
 
 export async function getOffersByOwner(ownerId: string) {
-    return db
-        .select()
-        .from(solarOffers)
-        .where(eq(solarOffers.ownerId, ownerId))
-        .orderBy(desc(solarOffers.offeredAt));
+  return db
+    .select()
+    .from(solarOffers)
+    .where(eq(solarOffers.ownerId, ownerId))
+    .orderBy(desc(solarOffers.offeredAt));
 }
 
 export async function getOfferById(offerId: string) {
-    const result = await db
-        .select()
-        .from(solarOffers)
-        .where(eq(solarOffers.id, offerId))
-        .limit(1);
+  const result = await db
+    .select()
+    .from(solarOffers)
+    .where(eq(solarOffers.id, offerId))
+    .limit(1);
 
-    return result[0] ?? null;
+  return result[0] ?? null;
 }
 
 export async function cancelSolarOffer(offerId: string) {
-    const result = await db
-        .update(solarOffers)
-        .set({ status: "cancelled" })
-        .where(eq(solarOffers.id, offerId))
-        .returning();
+  const result = await db
+    .update(solarOffers)
+    .set({ status: "cancelled" })
+    .where(eq(solarOffers.id, offerId))
+    .returning();
 
-    return result[0] ?? null;
+  return result[0] ?? null;
 }
 
 /**
  * Retrieve completed sharing dispatches for a solar owner.
  */
 export async function getOwnerSharingHistory(ownerId: string) {
-    const records = await db
-        .select({
-            id: dispatches.id,
-            offerId: solarOffers.id,
-            amountKWh: dispatches.dispatchedEnergyKwh,
-            dispatchedAt: dispatches.dispatchedAt,
-            notes: dispatches.notes,
-            recipientName: users.name,
-            reason: energyRequests.reason,
-        })
-        .from(dispatches)
-        .innerJoin(solarOffers, eq(dispatches.offerId, solarOffers.id))
-        .leftJoin(energyRequests, eq(dispatches.requestId, energyRequests.id))
-        .leftJoin(users, eq(energyRequests.householdId, users.id))
-        .where(eq(solarOffers.ownerId, ownerId))
-        .orderBy(desc(dispatches.dispatchedAt));
+  const records = await db
+    .select({
+      id: dispatches.id,
+      offerId: solarOffers.id,
+      amountKWh: dispatches.dispatchedEnergyKwh,
+      dispatchedAt: dispatches.dispatchedAt,
+      notes: dispatches.notes,
+      recipientName: users.name,
+      reason: energyRequests.reason,
+    })
+    .from(dispatches)
+    .innerJoin(solarOffers, eq(dispatches.offerId, solarOffers.id))
+    .leftJoin(energyRequests, eq(dispatches.requestId, energyRequests.id))
+    .leftJoin(users, eq(energyRequests.householdId, users.id))
+    .where(eq(solarOffers.ownerId, ownerId))
+    .orderBy(desc(dispatches.dispatchedAt));
 
-    const ratePerKwh = 0.15; // Standard co-op credit rate ($0.15 / kWh)
+  const ratePerKwh = 0.15; // Standard co-op credit rate ($0.15 / kWh)
 
-    return records.map((record) => {
-        const kwh = Number(record.amountKWh || 0);
-        const dateObj = record.dispatchedAt ? new Date(record.dispatchedAt) : new Date();
+  return records.map((record) => {
+    const kwh = Number(record.amountKWh || 0);
+    const dateObj = record.dispatchedAt
+      ? new Date(record.dispatchedAt)
+      : new Date();
 
-        return {
-            id: record.id,
-            recipientName: record.recipientName || "Community Member",
-            amountKWh: kwh,
-            creditsEarnedUSD: +(kwh * ratePerKwh).toFixed(2),
-            co2SavedKg: +(kwh * 0.4).toFixed(1),
-            date: dateObj.toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-            }),
-            time: dateObj.toLocaleTimeString("en-US", {
-                hour: "2-digit",
-                minute: "2-digit",
-            }),
-            type: "request_fulfillment" as const,
-            status: "completed" as const,
-            notes: record.notes,
-        };
-    });
+    return {
+      id: record.id,
+      recipientName: record.recipientName || "Community Member",
+      amountKWh: kwh,
+      creditsEarnedUSD: +(kwh * ratePerKwh).toFixed(2),
+      co2SavedKg: +(kwh * 0.4).toFixed(1),
+      date: dateObj.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }),
+      time: dateObj.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      type: "request_fulfillment" as const,
+      status: "completed" as const,
+      notes: record.notes,
+    };
+  });
 }
 
 /**
  * Retrieve aggregated sharing & credit metrics for a solar owner.
  */
 export async function getOwnerOfferSummary(ownerId: string, ratePerKwh = 0.15) {
-    const history = await getOwnerSharingHistory(ownerId);
-    const offers = await getOffersByOwner(ownerId);
+  const history = await getOwnerSharingHistory(ownerId);
+  const offers = await getOffersByOwner(ownerId);
 
-    const totalSharedKWh = history.reduce((sum, h) => sum + h.amountKWh, 0);
-    const totalCreditsEarned = +(totalSharedKWh * ratePerKwh).toFixed(2);
-    const uniqueHouseholdsSupported = new Set(history.map((h) => h.recipientName)).size;
+  const totalSharedKWh = history.reduce((sum, h) => sum + h.amountKWh, 0);
+  const totalCreditsEarned = +(totalSharedKWh * ratePerKwh).toFixed(2);
+  const uniqueHouseholdsSupported = new Set(history.map((h) => h.recipientName))
+    .size;
 
-    const pendingCount = offers.filter((o) => o.status === "pending").length;
-    const approvedCount = offers.filter((o) => o.status === "approved").length;
-    const completedCount = offers.filter((o) => o.status === "completed").length;
+  const pendingCount = offers.filter((o) => o.status === "pending").length;
+  const approvedCount = offers.filter((o) => o.status === "approved").length;
+  const completedCount = offers.filter((o) => o.status === "completed").length;
 
-    return {
-        totalSharedKWh: +totalSharedKWh.toFixed(1),
-        totalCreditsEarned,
-        uniqueHouseholdsSupported,
-        activeOffersCount: pendingCount + approvedCount,
-        pendingCount,
-        approvedCount,
-        completedCount,
-        totalOffersCount: offers.length,
-        ratePerKwh,
-    };
+  return {
+    totalSharedKWh: +totalSharedKWh.toFixed(1),
+    totalCreditsEarned,
+    uniqueHouseholdsSupported,
+    activeOffersCount: pendingCount + approvedCount,
+    pendingCount,
+    approvedCount,
+    completedCount,
+    totalOffersCount: offers.length,
+    ratePerKwh,
+  };
 }
 // MANAGER SOLAR OFFER SERVICES
 // ==========================================
@@ -131,47 +141,52 @@ export async function getOwnerOfferSummary(ownerId: string, ratePerKwh = 0.15) {
  * Computes dynamic totalDispatchedKwh and remainingEnergyKwh from the dispatches table.
  */
 export async function getSolarOffers() {
-    const rows = await db
-        .select({
-            id: solarOffers.id,
-            ownerId: solarOffers.ownerId,
-            ownerName: users.name,
-            ownerEmail: users.email,
-            energyAmountKwh: solarOffers.energyAmountKwh,
-            minimumBatteryPercent: solarOffers.minimumBatteryPercent,
-            status: solarOffers.status,
-            offeredAt: solarOffers.offeredAt,
-            expiresAt: solarOffers.expiresAt,
-            createdAt: solarOffers.createdAt,
-        })
-        .from(solarOffers)
-        .innerJoin(users, eq(solarOffers.ownerId, users.id))
-        .orderBy(desc(solarOffers.offeredAt));
+  const rows = await db
+    .select({
+      id: solarOffers.id,
+      ownerId: solarOffers.ownerId,
+      ownerName: users.name,
+      ownerEmail: users.email,
+      energyAmountKwh: solarOffers.energyAmountKwh,
+      minimumBatteryPercent: solarOffers.minimumBatteryPercent,
+      status: solarOffers.status,
+      offeredAt: solarOffers.offeredAt,
+      expiresAt: solarOffers.expiresAt,
+      createdAt: solarOffers.createdAt,
+    })
+    .from(solarOffers)
+    .innerJoin(users, eq(solarOffers.ownerId, users.id))
+    .orderBy(desc(solarOffers.offeredAt));
 
-    const allDispatches = await db
-        .select({
-            offerId: dispatches.offerId,
-            dispatchedEnergyKwh: dispatches.dispatchedEnergyKwh,
-        })
-        .from(dispatches);
+  const allDispatches = await db
+    .select({
+      offerId: dispatches.offerId,
+      dispatchedEnergyKwh: dispatches.dispatchedEnergyKwh,
+    })
+    .from(dispatches);
 
-    const dispatchedMap = new Map<string, number>();
-    for (const d of allDispatches) {
-        const prev = dispatchedMap.get(d.offerId) || 0;
-        dispatchedMap.set(d.offerId, prev + parseFloat(d.dispatchedEnergyKwh));
-    }
+  const dispatchedMap = new Map<string, number>();
+  for (const d of allDispatches) {
+    const prev = dispatchedMap.get(d.offerId) || 0;
+    dispatchedMap.set(d.offerId, prev + parseFloat(d.dispatchedEnergyKwh));
+  }
 
-    return rows.map((row) => {
-        const totalDispatchedKwh = parseFloat((dispatchedMap.get(row.id) || 0).toFixed(3));
-        const totalOfferedKwh = parseFloat(row.energyAmountKwh) || 0;
-        const remainingEnergyKwh = Math.max(0, parseFloat((totalOfferedKwh - totalDispatchedKwh).toFixed(3)));
+  return rows.map((row) => {
+    const totalDispatchedKwh = parseFloat(
+      (dispatchedMap.get(row.id) || 0).toFixed(3),
+    );
+    const totalOfferedKwh = parseFloat(row.energyAmountKwh) || 0;
+    const remainingEnergyKwh = Math.max(
+      0,
+      parseFloat((totalOfferedKwh - totalDispatchedKwh).toFixed(3)),
+    );
 
-        return {
-            ...row,
-            totalDispatchedKwh,
-            remainingEnergyKwh,
-        };
-    });
+    return {
+      ...row,
+      totalDispatchedKwh,
+      remainingEnergyKwh,
+    };
+  });
 }
 
 /**
@@ -180,73 +195,76 @@ export async function getSolarOffers() {
  * Throws NotFoundError (404) if not found.
  */
 export async function getSolarOfferById(id: string) {
-    const results = await db
-        .select({
-            id: solarOffers.id,
-            ownerId: solarOffers.ownerId,
-            ownerName: users.name,
-            ownerEmail: users.email,
-            ownerPhone: users.phone,
-            ownerGrid: users.assignedGrid,
-            ownerSolarCapacityKw: users.solarCapacityKw,
-            energyAmountKwh: solarOffers.energyAmountKwh,
-            minimumBatteryPercent: solarOffers.minimumBatteryPercent,
-            status: solarOffers.status,
-            offeredAt: solarOffers.offeredAt,
-            expiresAt: solarOffers.expiresAt,
-            createdAt: solarOffers.createdAt,
-        })
-        .from(solarOffers)
-        .innerJoin(users, eq(solarOffers.ownerId, users.id))
-        .where(eq(solarOffers.id, id))
-        .limit(1);
+  const results = await db
+    .select({
+      id: solarOffers.id,
+      ownerId: solarOffers.ownerId,
+      ownerName: users.name,
+      ownerEmail: users.email,
+      ownerPhone: users.phone,
+      ownerGrid: users.assignedGrid,
+      ownerSolarCapacityKw: users.solarCapacityKw,
+      energyAmountKwh: solarOffers.energyAmountKwh,
+      minimumBatteryPercent: solarOffers.minimumBatteryPercent,
+      status: solarOffers.status,
+      offeredAt: solarOffers.offeredAt,
+      expiresAt: solarOffers.expiresAt,
+      createdAt: solarOffers.createdAt,
+    })
+    .from(solarOffers)
+    .innerJoin(users, eq(solarOffers.ownerId, users.id))
+    .where(eq(solarOffers.id, id))
+    .limit(1);
 
-    if (!results || results.length === 0) {
-        throw new NotFoundError("Solar offer not found");
-    }
+  if (!results || results.length === 0) {
+    throw new NotFoundError("Solar offer not found");
+  }
 
-    const row = results[0];
+  const row = results[0];
 
-    const offerDispatches = await db
-        .select({
-            dispatchedEnergyKwh: dispatches.dispatchedEnergyKwh,
-        })
-        .from(dispatches)
-        .where(eq(dispatches.offerId, id));
+  const offerDispatches = await db
+    .select({
+      dispatchedEnergyKwh: dispatches.dispatchedEnergyKwh,
+    })
+    .from(dispatches)
+    .where(eq(dispatches.offerId, id));
 
-    const totalDispatchedKwh = parseFloat(
-        offerDispatches
-            .reduce((sum, d) => sum + parseFloat(d.dispatchedEnergyKwh), 0)
-            .toFixed(3)
-    );
-    const totalOfferedKwh = parseFloat(row.energyAmountKwh) || 0;
-    const remainingEnergyKwh = Math.max(0, parseFloat((totalOfferedKwh - totalDispatchedKwh).toFixed(3)));
+  const totalDispatchedKwh = parseFloat(
+    offerDispatches
+      .reduce((sum, d) => sum + parseFloat(d.dispatchedEnergyKwh), 0)
+      .toFixed(3),
+  );
+  const totalOfferedKwh = parseFloat(row.energyAmountKwh) || 0;
+  const remainingEnergyKwh = Math.max(
+    0,
+    parseFloat((totalOfferedKwh - totalDispatchedKwh).toFixed(3)),
+  );
 
-    return {
-        id: row.id,
-        ownerId: row.ownerId,
-        ownerName: row.ownerName,
-        ownerEmail: row.ownerEmail,
-        ownerPhone: row.ownerPhone,
-        ownerGrid: row.ownerGrid,
-        ownerSolarCapacityKw: row.ownerSolarCapacityKw,
-        energyAmountKwh: row.energyAmountKwh,
-        totalDispatchedKwh,
-        remainingEnergyKwh,
-        minimumBatteryPercent: row.minimumBatteryPercent,
-        status: row.status,
-        offeredAt: row.offeredAt,
-        expiresAt: row.expiresAt,
-        createdAt: row.createdAt,
-        owner: {
-            id: row.ownerId,
-            name: row.ownerName,
-            email: row.ownerEmail,
-            phone: row.ownerPhone,
-            assignedGrid: row.ownerGrid,
-            solarCapacityKw: row.ownerSolarCapacityKw,
-        },
-    };
+  return {
+    id: row.id,
+    ownerId: row.ownerId,
+    ownerName: row.ownerName,
+    ownerEmail: row.ownerEmail,
+    ownerPhone: row.ownerPhone,
+    ownerGrid: row.ownerGrid,
+    ownerSolarCapacityKw: row.ownerSolarCapacityKw,
+    energyAmountKwh: row.energyAmountKwh,
+    totalDispatchedKwh,
+    remainingEnergyKwh,
+    minimumBatteryPercent: row.minimumBatteryPercent,
+    status: row.status,
+    offeredAt: row.offeredAt,
+    expiresAt: row.expiresAt,
+    createdAt: row.createdAt,
+    owner: {
+      id: row.ownerId,
+      name: row.ownerName,
+      email: row.ownerEmail,
+      phone: row.ownerPhone,
+      assignedGrid: row.ownerGrid,
+      solarCapacityKw: row.ownerSolarCapacityKw,
+    },
+  };
 }
 
 /**
@@ -258,11 +276,11 @@ export async function getSolarOfferById(id: string) {
  * - cancelled
  */
 export const SOLAR_OFFER_STATUSES = [
-    "pending",
-    "approved",
-    "rejected",
-    "completed",
-    "cancelled",
+  "pending",
+  "approved",
+  "rejected",
+  "completed",
+  "cancelled",
 ] as const;
 
 export type SolarOfferStatus = (typeof SOLAR_OFFER_STATUSES)[number];
@@ -274,14 +292,14 @@ export type SolarOfferStatus = (typeof SOLAR_OFFER_STATUSES)[number];
  * All other transitions are strictly blocked.
  */
 export const VALID_MANAGER_OFFER_STATUS_TRANSITIONS: Record<
-    SolarOfferStatus,
-    readonly SolarOfferStatus[]
+  SolarOfferStatus,
+  readonly SolarOfferStatus[]
 > = {
-    pending: ["approved", "rejected"],
-    approved: [],
-    rejected: [],
-    completed: [],
-    cancelled: [],
+  pending: ["approved", "rejected"],
+  approved: [],
+  rejected: [],
+  completed: [],
+  cancelled: [],
 };
 
 /**
@@ -289,280 +307,291 @@ export const VALID_MANAGER_OFFER_STATUS_TRANSITIONS: Record<
  * Throws BadRequestError if the transition is prohibited.
  */
 export function validateManagerOfferStatusTransition(
-    currentStatus: string,
-    targetStatus: "approved" | "rejected"
+  currentStatus: string,
+  targetStatus: "approved" | "rejected",
 ) {
-    const validNextStatuses =
-        VALID_MANAGER_OFFER_STATUS_TRANSITIONS[currentStatus as SolarOfferStatus];
+  const validNextStatuses =
+    VALID_MANAGER_OFFER_STATUS_TRANSITIONS[currentStatus as SolarOfferStatus];
 
-    if (!validNextStatuses || !validNextStatuses.includes(targetStatus)) {
-        throw new BadRequestError(
-            `Invalid status transition: Cannot transition solar offer from '${currentStatus}' to '${targetStatus}'. Only pending offers can be approved or rejected.`
-        );
-    }
+  if (!validNextStatuses || !validNextStatuses.includes(targetStatus)) {
+    throw new BadRequestError(
+      `Invalid status transition: Cannot transition solar offer from '${currentStatus}' to '${targetStatus}'. Only pending offers can be approved or rejected.`,
+    );
+  }
 }
 
 /**
  * Approve a pending solar offer.
  */
 export async function approveSolarOffer(offerId: string, managerId: string) {
-    if (!managerId) {
-        throw new UnauthorizedError("Manager identity is required to approve a solar offer.");
-    }
+  if (!managerId) {
+    throw new UnauthorizedError(
+      "Manager identity is required to approve a solar offer.",
+    );
+  }
 
-    const managerResults = await db
-        .select({
-            id: users.id,
-            name: users.name,
-            role: users.role,
-        })
-        .from(users)
-        .where(eq(users.id, managerId))
-        .limit(1);
+  const managerResults = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      role: users.role,
+    })
+    .from(users)
+    .where(eq(users.id, managerId))
+    .limit(1);
 
-    if (!managerResults || managerResults.length === 0) {
-        throw new NotFoundError(`Manager with ID '${managerId}' was not found.`);
-    }
+  if (!managerResults || managerResults.length === 0) {
+    throw new NotFoundError(`Manager with ID '${managerId}' was not found.`);
+  }
 
-    const manager = managerResults[0];
-    if (manager.role !== "manager") {
-        throw new ForbiddenError("Forbidden: Only managers can approve solar offers.");
-    }
+  const manager = managerResults[0];
+  if (manager.role !== "manager") {
+    throw new ForbiddenError(
+      "Forbidden: Only managers can approve solar offers.",
+    );
+  }
 
-    const offerResults = await db
-        .select()
-        .from(solarOffers)
-        .where(eq(solarOffers.id, offerId))
-        .limit(1);
+  const offerResults = await db
+    .select()
+    .from(solarOffers)
+    .where(eq(solarOffers.id, offerId))
+    .limit(1);
 
-    if (!offerResults || offerResults.length === 0) {
-        throw new NotFoundError(`Solar offer '${offerId}' not found.`);
-    }
+  if (!offerResults || offerResults.length === 0) {
+    throw new NotFoundError(`Solar offer '${offerId}' not found.`);
+  }
 
-    const existingOffer = offerResults[0];
+  const existingOffer = offerResults[0];
 
-    validateManagerOfferStatusTransition(existingOffer.status, "approved");
+  validateManagerOfferStatusTransition(existingOffer.status, "approved");
 
-    const now = new Date();
+  const now = new Date();
 
-    await db
-        .update(solarOffers)
-        .set({
-            status: "approved",
-        })
-        .where(eq(solarOffers.id, offerId));
+  await db
+    .update(solarOffers)
+    .set({
+      status: "approved",
+    })
+    .where(eq(solarOffers.id, offerId));
 
-    const auditId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    await db.insert(auditLogs).values({
-        id: auditId,
-        userId: managerId,
-        action: "APPROVE_SOLAR_OFFER",
-        entityType: "solar_offer",
-        entityId: offerId,
-        details: JSON.stringify({
-            offerId,
-            ownerId: existingOffer.ownerId,
-            energyAmountKwh: existingOffer.energyAmountKwh,
-            minimumBatteryPercent: existingOffer.minimumBatteryPercent,
-            previousStatus: existingOffer.status,
-            newStatus: "approved",
-            approvedBy: managerId,
-            managerName: manager.name,
-            approvedAt: now.toISOString(),
-        }),
-        createdAt: now,
-    });
+  const auditId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  await db.insert(auditLogs).values({
+    id: auditId,
+    userId: managerId,
+    action: "APPROVE_SOLAR_OFFER",
+    entityType: "solar_offer",
+    entityId: offerId,
+    details: JSON.stringify({
+      offerId,
+      ownerId: existingOffer.ownerId,
+      energyAmountKwh: existingOffer.energyAmountKwh,
+      minimumBatteryPercent: existingOffer.minimumBatteryPercent,
+      previousStatus: existingOffer.status,
+      newStatus: "approved",
+      approvedBy: managerId,
+      managerName: manager.name,
+      approvedAt: now.toISOString(),
+    }),
+    createdAt: now,
+  });
 
-    // Notify solar owner of approval
-    const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    await db.insert(notifications).values({
-        id: notifId,
-        userId: existingOffer.ownerId,
-        type: "energy",
-        title: "Sharing Offer Approved",
-        message: `Your ${existingOffer.energyAmountKwh} kWh solar offer has been approved by the co-op manager.`,
-        isRead: false,
-        createdAt: now,
-    });
+  // Notify solar owner of approval
+  const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  await db.insert(notifications).values({
+    id: notifId,
+    userId: existingOffer.ownerId,
+    type: "energy",
+    title: "Sharing Offer Approved",
+    message: `Your ${existingOffer.energyAmountKwh} kWh solar offer has been approved by the co-op manager.`,
+    isRead: false,
+    createdAt: now,
+  });
 
-    return getSolarOfferById(offerId);
+  return getSolarOfferById(offerId);
 }
 
 /**
  * Reject a pending solar offer.
  */
 export async function rejectSolarOffer(offerId: string, managerId: string) {
-    if (!managerId) {
-        throw new UnauthorizedError("Manager identity is required to reject a solar offer.");
-    }
+  if (!managerId) {
+    throw new UnauthorizedError(
+      "Manager identity is required to reject a solar offer.",
+    );
+  }
 
-    const managerResults = await db
-        .select({
-            id: users.id,
-            name: users.name,
-            role: users.role,
-        })
-        .from(users)
-        .where(eq(users.id, managerId))
-        .limit(1);
+  const managerResults = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      role: users.role,
+    })
+    .from(users)
+    .where(eq(users.id, managerId))
+    .limit(1);
 
-    if (!managerResults || managerResults.length === 0) {
-        throw new NotFoundError(`Manager with ID '${managerId}' was not found.`);
-    }
+  if (!managerResults || managerResults.length === 0) {
+    throw new NotFoundError(`Manager with ID '${managerId}' was not found.`);
+  }
 
-    const manager = managerResults[0];
-    if (manager.role !== "manager") {
-        throw new ForbiddenError("Forbidden: Only managers can reject solar offers.");
-    }
+  const manager = managerResults[0];
+  if (manager.role !== "manager") {
+    throw new ForbiddenError(
+      "Forbidden: Only managers can reject solar offers.",
+    );
+  }
 
-    const offerResults = await db
-        .select()
-        .from(solarOffers)
-        .where(eq(solarOffers.id, offerId))
-        .limit(1);
+  const offerResults = await db
+    .select()
+    .from(solarOffers)
+    .where(eq(solarOffers.id, offerId))
+    .limit(1);
 
-    if (!offerResults || offerResults.length === 0) {
-        throw new NotFoundError(`Solar offer '${offerId}' not found.`);
-    }
+  if (!offerResults || offerResults.length === 0) {
+    throw new NotFoundError(`Solar offer '${offerId}' not found.`);
+  }
 
-    const existingOffer = offerResults[0];
+  const existingOffer = offerResults[0];
 
-    validateManagerOfferStatusTransition(existingOffer.status, "rejected");
+  validateManagerOfferStatusTransition(existingOffer.status, "rejected");
 
-    const now = new Date();
+  const now = new Date();
 
-    await db
-        .update(solarOffers)
-        .set({
-            status: "rejected",
-        })
-        .where(eq(solarOffers.id, offerId));
+  await db
+    .update(solarOffers)
+    .set({
+      status: "rejected",
+    })
+    .where(eq(solarOffers.id, offerId));
 
-    const auditId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    await db.insert(auditLogs).values({
-        id: auditId,
-        userId: managerId,
-        action: "REJECT_SOLAR_OFFER",
-        entityType: "solar_offer",
-        entityId: offerId,
-        details: JSON.stringify({
-            offerId,
-            ownerId: existingOffer.ownerId,
-            energyAmountKwh: existingOffer.energyAmountKwh,
-            minimumBatteryPercent: existingOffer.minimumBatteryPercent,
-            previousStatus: existingOffer.status,
-            newStatus: "rejected",
-            rejectedBy: managerId,
-            managerName: manager.name,
-            rejectedAt: now.toISOString(),
-        }),
-        createdAt: now,
-    });
+  const auditId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  await db.insert(auditLogs).values({
+    id: auditId,
+    userId: managerId,
+    action: "REJECT_SOLAR_OFFER",
+    entityType: "solar_offer",
+    entityId: offerId,
+    details: JSON.stringify({
+      offerId,
+      ownerId: existingOffer.ownerId,
+      energyAmountKwh: existingOffer.energyAmountKwh,
+      minimumBatteryPercent: existingOffer.minimumBatteryPercent,
+      previousStatus: existingOffer.status,
+      newStatus: "rejected",
+      rejectedBy: managerId,
+      managerName: manager.name,
+      rejectedAt: now.toISOString(),
+    }),
+    createdAt: now,
+  });
 
-    // Notify solar owner of rejection
-    const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    await db.insert(notifications).values({
-        id: notifId,
-        userId: existingOffer.ownerId,
-        type: "energy",
-        title: "Sharing Offer Rejected",
-        message: `Your ${existingOffer.energyAmountKwh} kWh solar offer was rejected by the co-op manager.`,
-        isRead: false,
-        createdAt: now,
-    });
+  // Notify solar owner of rejection
+  const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  await db.insert(notifications).values({
+    id: notifId,
+    userId: existingOffer.ownerId,
+    type: "energy",
+    title: "Sharing Offer Rejected",
+    message: `Your ${existingOffer.energyAmountKwh} kWh solar offer was rejected by the co-op manager.`,
+    isRead: false,
+    createdAt: now,
+  });
 
-    return getSolarOfferById(offerId);
+  return getSolarOfferById(offerId);
 }
 
-export type ManagerSolarOffer = Awaited<ReturnType<typeof getSolarOffers>>[number];
-export type ManagerSolarOfferDetail = Awaited<ReturnType<typeof getSolarOfferById>>;
+export type ManagerSolarOffer = Awaited<
+  ReturnType<typeof getSolarOffers>
+>[number];
+export type ManagerSolarOfferDetail = Awaited<
+  ReturnType<typeof getSolarOfferById>
+>;
 
 // ============================================================================
 // Community Reserve Calculation (US-13 Manager Dashboard)
 // ============================================================================
 
 export interface CommunityReserveBreakdownItem {
-    id: string;
-    ownerName: string | null;
-    offeredKwh: number;
-    dispatchedKwh: number;
-    remainingKwh: number;
-    status: string;
+  id: string;
+  ownerName: string | null;
+  offeredKwh: number;
+  dispatchedKwh: number;
+  remainingKwh: number;
+  status: string;
 }
 
 export interface CommunityReserveResult {
-    availableReserveKwh: number;
-    totalPoolCapacityKwh: number;
-    totalDispatchedKwh: number;
-    percentageAvailable: number;
-    percentageAllocated: number;
-    activeOffersCount: number;
-    breakdownByOffer?: CommunityReserveBreakdownItem[];
+  availableReserveKwh: number;
+  totalPoolCapacityKwh: number;
+  totalDispatchedKwh: number;
+  percentageAvailable: number;
+  percentageAllocated: number;
+  activeOffersCount: number;
+  breakdownByOffer?: CommunityReserveBreakdownItem[];
 }
 
 /**
  * Calculates the real-time community energy reserve from active approved solar offers
  * and dispatched energy records.
- * 
+ *
  * Logic:
  * Community Reserve = Sum of remaining available energy across all active approved solar offers.
  * Percentage Available = (Community Reserve / Total Approved Pool Capacity) * 100
  */
 export async function getCommunityReserve(): Promise<CommunityReserveResult> {
-    const offers = await getSolarOffers();
+  const offers = await getSolarOffers();
 
-    const now = Date.now();
-    const approvedOffers = offers.filter((o) => {
-        if (o.status !== "approved") return false;
-        if (o.expiresAt && new Date(o.expiresAt).getTime() < now) return false;
-        return true;
-    });
+  const now = Date.now();
+  const approvedOffers = offers.filter((o) => {
+    if (o.status !== "approved") return false;
+    if (o.expiresAt && new Date(o.expiresAt).getTime() < now) return false;
+    return true;
+  });
 
-    let availableReserveKwh = 0;
-    let totalPoolCapacityKwh = 0;
-    let totalDispatchedKwh = 0;
+  let availableReserveKwh = 0;
+  let totalPoolCapacityKwh = 0;
+  let totalDispatchedKwh = 0;
 
-    const breakdownByOffer = approvedOffers.map((o) => {
-        const remaining = o.remainingEnergyKwh;
-        const offered = parseFloat(o.energyAmountKwh) || 0;
-        const dispatched = o.totalDispatchedKwh;
+  const breakdownByOffer = approvedOffers.map((o) => {
+    const remaining = o.remainingEnergyKwh;
+    const offered = parseFloat(o.energyAmountKwh) || 0;
+    const dispatched = o.totalDispatchedKwh;
 
-        availableReserveKwh += remaining;
-        totalPoolCapacityKwh += offered;
-        totalDispatchedKwh += dispatched;
-
-        return {
-            id: o.id,
-            ownerName: o.ownerName,
-            offeredKwh: +offered.toFixed(1),
-            dispatchedKwh: +dispatched.toFixed(1),
-            remainingKwh: +remaining.toFixed(1),
-            status: o.status,
-        };
-    });
-
-    availableReserveKwh = +availableReserveKwh.toFixed(1);
-    totalPoolCapacityKwh = +totalPoolCapacityKwh.toFixed(1);
-    totalDispatchedKwh = +totalDispatchedKwh.toFixed(1);
-
-    const percentageAvailable =
-        totalPoolCapacityKwh > 0
-            ? +((availableReserveKwh / totalPoolCapacityKwh) * 100).toFixed(1)
-            : 0;
-
-    const percentageAllocated =
-        totalPoolCapacityKwh > 0
-            ? +((totalDispatchedKwh / totalPoolCapacityKwh) * 100).toFixed(1)
-            : 0;
+    availableReserveKwh += remaining;
+    totalPoolCapacityKwh += offered;
+    totalDispatchedKwh += dispatched;
 
     return {
-        availableReserveKwh,
-        totalPoolCapacityKwh,
-        totalDispatchedKwh,
-        percentageAvailable,
-        percentageAllocated,
-        activeOffersCount: approvedOffers.length,
-        breakdownByOffer,
+      id: o.id,
+      ownerName: o.ownerName,
+      offeredKwh: +offered.toFixed(1),
+      dispatchedKwh: +dispatched.toFixed(1),
+      remainingKwh: +remaining.toFixed(1),
+      status: o.status,
     };
-}
+  });
 
+  availableReserveKwh = +availableReserveKwh.toFixed(1);
+  totalPoolCapacityKwh = +totalPoolCapacityKwh.toFixed(1);
+  totalDispatchedKwh = +totalDispatchedKwh.toFixed(1);
+
+  const percentageAvailable =
+    totalPoolCapacityKwh > 0
+      ? +((availableReserveKwh / totalPoolCapacityKwh) * 100).toFixed(1)
+      : 0;
+
+  const percentageAllocated =
+    totalPoolCapacityKwh > 0
+      ? +((totalDispatchedKwh / totalPoolCapacityKwh) * 100).toFixed(1)
+      : 0;
+
+  return {
+    availableReserveKwh,
+    totalPoolCapacityKwh,
+    totalDispatchedKwh,
+    percentageAvailable,
+    percentageAllocated,
+    activeOffersCount: approvedOffers.length,
+    breakdownByOffer,
+  };
+}
