@@ -386,6 +386,7 @@ const INITIAL_ALERTS: SolarAlertItem[] = [
   },
 ];
 
+//wweather and forecast are hardcoded
 const INITIAL_WEATHER: WeatherForecastData = {
   condition: "sunny",
   conditionText: "Clear & High Irradiance",
