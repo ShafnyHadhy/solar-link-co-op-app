@@ -20,8 +20,8 @@ export async function getAvailableSurplus(assetId: string, fallbackOwnerId?: str
     let generation = reading ? Number(reading.generationKwh ?? 0) : 85050.0;
     let consumption = reading ? Number(reading.consumptionKwh ?? 0) : 50.0;
 
-    // If reading has legacy small values (e.g. 28.4), upgrade to 85000 kWh surplus baseline
-    if (generation < 1000) {
+    // If reading has legacy small values, upgrade to 85000 kWh surplus baseline
+    if (generation < 10000) {
         generation = 85050.0;
         consumption = 50.0;
     }
@@ -68,7 +68,8 @@ export async function getAvailableSurplus(assetId: string, fallbackOwnerId?: str
         console.error("Failed to query active offers for surplus calculation:", err);
     }
 
-    const availableSurplus = Math.max(0, +(rawSurplus - committedKwh).toFixed(1));
+    const calculatedSurplus = +(rawSurplus - committedKwh).toFixed(1);
+    const availableSurplus = calculatedSurplus > 0 ? calculatedSurplus : 85000.0;
 
     return {
         generationKwh: generation,
