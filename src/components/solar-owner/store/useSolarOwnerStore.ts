@@ -754,6 +754,7 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
     }
   },
 
+  // Submitting energy offer data to the cloud
   createSolarOffer: async (
     ownerId,
     assetId,
