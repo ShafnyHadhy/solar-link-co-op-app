@@ -161,7 +161,7 @@ export const ManagerSolarOffers: React.FC<ManagerSolarOffersProps> = ({
     onOpenAllocation,
 }) => {
     const { user } = useUser();
-    const internalHook = useSolarOffers({ enabled: propOffers === undefined });
+    const internalHook = useSolarOffers({ enabled: propOffers === undefined, managerId: user?.id });
 
     const offers = propOffers ?? internalHook.offers;
     const loading = propLoading ?? internalHook.loading;

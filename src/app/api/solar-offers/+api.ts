@@ -2,6 +2,7 @@
 // GET  /api/solar-offers?ownerId=... — list owner's offers
 // POST /api/solar-offers             — create a new sharing offer
 
+import { requireSolarOwner } from "@/lib/server/auth/authorization";
 import { getAvailableSurplus } from "@/lib/server/services/energyService";
 import {
   createSolarOffer,
@@ -13,13 +14,12 @@ import { errorResponse, successResponse } from "@/lib/server/utils/response";
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const ownerId = url.searchParams.get("ownerId");
+    const authUser = await requireSolarOwner(
+      request,
+      url.searchParams.get("ownerId") || undefined,
+    );
 
-    if (!ownerId) {
-      throw new BadRequestError("ownerId is required");
-    }
-
-    const offers = await getOffersByOwner(ownerId);
+    const offers = await getOffersByOwner(authUser.id);
 
     return successResponse({ offers });
   } catch (error) {
@@ -29,31 +29,42 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    let body: {
+      id?: string;
+      ownerId?: string;
+      assetId?: string;
+      energyAmountKwh?: number | string;
+      minimumBatteryPercent?: number | string;
+      expiresAt?: string;
+    };
 
+    try {
+      body = await request.json();
+    } catch {
+      throw new BadRequestError("Request body must be valid JSON");
+    }
+
+    const authUser = await requireSolarOwner(request, body.ownerId);
     const {
       id,
-      ownerId,
       assetId,
       energyAmountKwh,
       minimumBatteryPercent,
       expiresAt,
     } = body;
-    //1123 Missing Required Fields check -> 400 Bad Request
-    if (!id || !ownerId || !assetId || energyAmountKwh === undefined) {
+
+    if (!id || !assetId || energyAmountKwh === undefined) {
       throw new BadRequestError(
-        "id, ownerId, assetId and energyAmountKwh are required",
+        "id, assetId and energyAmountKwh are required",
       );
     }
 
     const requestedEnergy = Number(energyAmountKwh);
-    // 2. Positive number check -> 400 Bad Request
-    if (requestedEnergy <= 0) {
-      throw new BadRequestError("Energy amount must be greater than 0");
+    if (!Number.isFinite(requestedEnergy) || requestedEnergy <= 0) {
+      throw new BadRequestError("Energy amount must be a positive number");
     }
 
-    const surplus = await getAvailableSurplus(assetId, ownerId);
-
+    const surplus = await getAvailableSurplus(assetId, authUser.id);
     if (requestedEnergy > surplus.surplusKwh) {
       return Response.json(
         {
@@ -67,7 +78,7 @@ export async function POST(request: Request) {
 
     const offer = await createSolarOffer({
       id,
-      ownerId,
+      ownerId: authUser.id,
       energyAmountKwh: requestedEnergy.toString(),
       minimumBatteryPercent:
         minimumBatteryPercent !== undefined

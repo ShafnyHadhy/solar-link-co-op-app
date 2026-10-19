@@ -1,6 +1,4 @@
-// Energy Surplus API Route
-// GET /api/energy-surplus?assetId=... — calculate available surplus for an asset
-
+import { requireSolarOwner } from "@/lib/server/auth/authorization";
 import { getAvailableSurplus } from "@/lib/server/services/energyService";
 import { BadRequestError } from "@/lib/server/utils/errors";
 import {
@@ -11,6 +9,8 @@ import {
 export async function GET(request: Request) {
     try {
         const url = new URL(request.url);
+        await requireSolarOwner(request, url.searchParams.get("ownerId") || undefined);
+
         const assetId = url.searchParams.get("assetId");
 
         if (!assetId) {

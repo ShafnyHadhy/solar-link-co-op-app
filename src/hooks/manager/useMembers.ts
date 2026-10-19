@@ -3,7 +3,7 @@ import { CommunityMember, MemberStatus } from "@/types/member";
 import { UserRole } from "@/types/role";
 import { useCallback, useEffect, useState } from "react";
 
-export function useMembers() {
+export function useMembers(options?: { managerId?: string }) {
     const [members, setMembers] = useState<CommunityMember[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -13,7 +13,12 @@ export function useMembers() {
         setError(null);
 
         try {
-            const response = await fetch(getApiUrl("/api/users"));
+            const headers: Record<string, string> = {};
+            if (options?.managerId) {
+                headers["x-user-id"] = options.managerId;
+            }
+
+            const response = await fetch(getApiUrl("/api/users"), { headers });
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch members (${response.status})`);
@@ -33,7 +38,7 @@ export function useMembers() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [options?.managerId]);
 
     useEffect(() => {
         fetchMembers();
@@ -48,8 +53,13 @@ export function useMembers() {
     };
 }
 
-export async function fetchMemberDetails(memberId: string): Promise<any> {
-    const response = await fetch(getApiUrl(`/api/users?id=${encodeURIComponent(memberId)}`));
+export async function fetchMemberDetails(memberId: string, managerId?: string): Promise<any> {
+    const headers: Record<string, string> = {};
+    if (managerId) {
+        headers["x-user-id"] = managerId;
+    }
+
+    const response = await fetch(getApiUrl(`/api/users?id=${encodeURIComponent(memberId)}`), { headers });
 
     if (!response.ok) {
         throw new Error(`Failed to fetch member details (${response.status})`);

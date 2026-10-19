@@ -1,12 +1,15 @@
 // Manager Dispatches Validate API Route
 // POST /api/manager/dispatches/validate — validate available energy and dispatch parameters
 
+import { requireManager } from "@/lib/server/auth/authorization";
 import { validateDispatchEnergy } from "@/lib/server/services/dispatchService";
 import { BadRequestError } from "@/lib/server/utils/errors";
 import { errorResponse } from "@/lib/server/utils/response";
 
 export async function POST(request: Request) {
     try {
+        await requireManager(request);
+
         const body = await request.json().catch(() => ({}));
         const { offerId, requestId, dispatchedEnergyKwh, allocationAmountKwh } = body;
         const amount = dispatchedEnergyKwh ?? allocationAmountKwh;

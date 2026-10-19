@@ -1,3 +1,4 @@
+import { requireHousehold } from "@/lib/server/auth/authorization";
 import {
     createHouseholdEnergyRequest,
     getEnergyRequestsByHousehold,
@@ -11,11 +12,8 @@ import {
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
-        const householdId = searchParams.get("householdId");
-
-        if (!householdId) {
-            throw new BadRequestError("Query parameter 'householdId' is required.");
-        }
+        const authUser = await requireHousehold(request, searchParams.get("householdId") || undefined);
+        const householdId = authUser.id;
 
         const requests = await getEnergyRequestsByHousehold(householdId);
 
@@ -27,12 +25,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
     try {
-        const body = await request.json();
-        const { householdId, requestedEnergyKwh, reason } = body;
+        const body = await request.json().catch(() => ({}));
+        const authUser = await requireHousehold(request, body?.householdId);
+        const householdId = authUser.id;
 
-        if (!householdId) {
-            throw new BadRequestError("'householdId' is required in request body.");
-        }
+        const { requestedEnergyKwh, reason } = body;
 
         if (requestedEnergyKwh === undefined || requestedEnergyKwh === null || requestedEnergyKwh === "") {
             throw new BadRequestError("'requestedEnergyKwh' is required in request body.");

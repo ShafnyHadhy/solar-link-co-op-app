@@ -1,3 +1,4 @@
+import { requireHousehold } from "@/lib/server/auth/authorization";
 import {
     cancelHouseholdEnergyRequest,
     getEnergyRequestById,
@@ -13,6 +14,9 @@ export async function GET(
     { id }: { id: string }
 ) {
     try {
+        const { searchParams } = new URL(request.url);
+        await requireHousehold(request, searchParams.get("householdId") || undefined);
+
         if (!id) {
             throw new BadRequestError("Request ID is required.");
         }
@@ -30,15 +34,14 @@ export async function PATCH(
     { id }: { id: string }
 ) {
     try {
-        const body = await request.json();
-        const { householdId, action } = body;
+        const body = await request.json().catch(() => ({}));
+        const authUser = await requireHousehold(request, body?.householdId);
+        const householdId = authUser.id;
+
+        const { action } = body;
 
         if (!id) {
             throw new BadRequestError("Request ID is required.");
-        }
-
-        if (!householdId) {
-            throw new BadRequestError("'householdId' is required.");
         }
 
         if (action !== "cancel") {
@@ -59,14 +62,11 @@ export async function DELETE(
 ) {
     try {
         const { searchParams } = new URL(request.url);
-        const householdId = searchParams.get("householdId");
+        const authUser = await requireHousehold(request, searchParams.get("householdId") || undefined);
+        const householdId = authUser.id;
 
         if (!id) {
             throw new BadRequestError("Request ID is required.");
-        }
-
-        if (!householdId) {
-            throw new BadRequestError("Query parameter 'householdId' is required.");
         }
 
         const updated = await cancelHouseholdEnergyRequest(id, householdId);

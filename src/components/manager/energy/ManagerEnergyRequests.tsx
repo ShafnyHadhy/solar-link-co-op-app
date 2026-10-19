@@ -6,13 +6,14 @@ import {
     type ManagerEnergyRequest,
 } from '@/hooks/manager/useEnergyRequests';
 import { useSolarOffers, type ManagerSolarOffer } from '@/hooks/manager/useSolarOffers';
+import { useCommunityReserve } from '@/hooks/manager/useCommunityReserve';
 import { useDispatches } from '@/hooks/manager/useDispatches';
-import ManagerSolarOffers from './ManagerSolarOffers';
+import ManagerSolarOffers, { getOfferRemainingKwh, isOfferDispatchable } from './ManagerSolarOffers';
 import ManagerDispatchHistory from './ManagerDispatchHistory';
 import { useUser } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Modal,
@@ -99,7 +100,7 @@ export const ManagerEnergyRequests: React.FC<ManagerEnergyRequestsProps> = ({
 }) => {
     const router = useRouter();
     const { user } = useUser();
-    const { requests, loading, error, refetch, approveRequest, rejectRequest } = useEnergyRequests();
+    const { requests, loading, error, refetch, approveRequest, rejectRequest } = useEnergyRequests({ managerId: user?.id });
     const {
         offers,
         loading: offersLoading,
@@ -107,13 +108,28 @@ export const ManagerEnergyRequests: React.FC<ManagerEnergyRequestsProps> = ({
         refetch: refetchOffers,
         approveOffer: approveSolarOffer,
         rejectOffer: rejectSolarOffer,
-    } = useSolarOffers();
+    } = useSolarOffers({ managerId: user?.id });
     const {
         dispatches,
         loading: dispatchesLoading,
         error: dispatchesError,
         refetch: refetchDispatches,
-    } = useDispatches();
+    } = useDispatches({ managerId: user?.id });
+    const {
+        data: reserveData,
+        loading: reserveLoading,
+        error: reserveError,
+        refetch: refetchReserve,
+    } = useCommunityReserve({ managerId: user?.id });
+
+    // Automatically synchronize live data when screen regains focus
+    useFocusEffect(
+        useCallback(() => {
+            refetch();
+            refetchOffers();
+            refetchReserve();
+        }, [refetch, refetchOffers, refetchReserve])
+    );
 
     const [activeSection, setActiveSection] = useState<'requests' | 'offers' | 'dispatches'>('requests');
     const [searchQuery, setSearchQuery] = useState('');
@@ -281,7 +297,7 @@ export const ManagerEnergyRequests: React.FC<ManagerEnergyRequestsProps> = ({
             onAllocationAmountChange?.('');
 
             // Synchronize with database
-            await Promise.all([refetch(), refetchOffers(), refetchDispatches()]);
+            await Promise.all([refetch(), refetchOffers(), refetchDispatches(), refetchReserve()]);
 
             setSuccessMessage(
                 `Successfully dispatched ${amount.toFixed(1)} kWh from ${producerName} to ${householdName}! (Request status: ${reqStatus}, Offer status: ${offStatus})`
@@ -337,7 +353,22 @@ export const ManagerEnergyRequests: React.FC<ManagerEnergyRequestsProps> = ({
     const pendingCount = requests.filter((r) => r.status === 'pending').length;
     const approvedCount = requests.filter((r) => r.status === 'approved').length;
     const rejectedCount = requests.filter((r) => r.status === 'rejected').length;
-    const availableEnergy = 45;
+
+    // Calculate live available community solar energy from approved, non-expired offers
+    const calculatedAvailableEnergy = parseFloat(
+        offers
+            .filter(isOfferDispatchable)
+            .reduce((sum, o) => sum + getOfferRemainingKwh(o), 0)
+            .toFixed(1)
+    );
+
+    const availableEnergy =
+        reserveData?.availableReserveKwh !== undefined
+            ? reserveData.availableReserveKwh
+            : (!isNaN(calculatedAvailableEnergy) ? calculatedAvailableEnergy : 0);
+
+    const isAvailableLoading =
+        reserveLoading && !reserveData && offersLoading && offers.length === 0;
 
     const openReviewModal = (id: string) => {
         setSelectedRequestId(id);
@@ -410,17 +441,23 @@ export const ManagerEnergyRequests: React.FC<ManagerEnergyRequestsProps> = ({
     });
 
     const isRefreshing =
-        activeSection === 'requests'
-            ? loading
-            : activeSection === 'offers'
-                ? offersLoading
-                : dispatchesLoading;
+        loading || offersLoading || dispatchesLoading || reserveLoading;
 
-    const handleRefresh = () => {
-        if (activeSection === 'requests') return refetch();
-        if (activeSection === 'offers') return refetchOffers();
-        return refetchDispatches();
-    };
+    const handleRefresh = useCallback(async () => {
+        if (activeSection === 'requests') {
+            await Promise.all([refetch(), refetchOffers(), refetchReserve()]);
+            return;
+        }
+        if (activeSection === 'offers') {
+            await Promise.all([refetchOffers(), refetchReserve(), refetch()]);
+            return;
+        }
+        await Promise.all([refetchDispatches(), refetchReserve()]);
+    }, [activeSection, refetch, refetchOffers, refetchDispatches, refetchReserve]);
+
+    const handleRefetchOffers = useCallback(async () => {
+        await Promise.all([refetchOffers(), refetchReserve()]);
+    }, [refetchOffers, refetchReserve]);
 
     return (
         <View className='flex-1 bg-background'>
@@ -558,7 +595,7 @@ export const ManagerEnergyRequests: React.FC<ManagerEnergyRequestsProps> = ({
                         offers={offers}
                         loading={offersLoading}
                         error={offersError}
-                        refetch={refetchOffers}
+                        refetch={handleRefetchOffers}
                         approveOffer={approveSolarOffer}
                         rejectOffer={rejectSolarOffer}
                         selectedDispatchRequestId={selectedDispatchRequestId}
@@ -597,9 +634,15 @@ export const ManagerEnergyRequests: React.FC<ManagerEnergyRequestsProps> = ({
                     {/* Available Energy */}
                     <View className='flex-1 flex-col justify-between rounded-xl border border-border/40 bg-secondary/60 p-4 shadow-sm'>
                         <View className='flex-row items-center justify-between'>
-                            <Text className='text-3xl font-extrabold text-foreground'>
-                                {availableEnergy} <Text className='text-base font-bold text-muted-foreground'>kWh</Text>
-                            </Text>
+                            {isAvailableLoading ? (
+                                <View className='h-9 justify-center'>
+                                    <ActivityIndicator size="small" color="#10B981" />
+                                </View>
+                            ) : (
+                                <Text className='text-3xl font-extrabold text-foreground'>
+                                    {availableEnergy} <Text className='text-base font-bold text-muted-foreground'>kWh</Text>
+                                </Text>
+                            )}
                             <View className='h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 border border-emerald-500/30'>
                                 <Feather name="zap" size={16} color="#10B981" />
                             </View>

@@ -1,7 +1,11 @@
 import TabScreenBackground from '@/components/shared/TabScreenBackground';
+import WaitUntilRoleAssigned from '@/components/shared/WaitUntilRoleAssigned';
+import { useUserSync } from '@/hooks/useUserSync';
+import { getUserRole } from '@/lib/getUserRole';
+import { useUser } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import { Redirect, router } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Pressable,
@@ -46,6 +50,8 @@ const filters: TicketFilter[] = [
 ];
 
 const RequestsScreen = () => {
+    const { user, isLoaded, isSignedIn } = useUser();
+    const { dbUser } = useUserSync();
     const [search, setSearch] = useState('');
     const [selectedFilter, setSelectedFilter] =
         useState<TicketFilter>('All');
@@ -54,47 +60,67 @@ const RequestsScreen = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const loadTickets = async () => {
+    // CESA-253 - Retrieve tickets assigned to logged-in technician
+    const loadTickets = useCallback(async () => {
+        if (!isLoaded) {
+            return;
+        }
+
+        if (!user?.id) {
+            setTickets([]);
+            setError('Unable to identify the logged-in technician.');
+            setLoading(false);
+            return;
+        }
+
         try {
             setLoading(true);
             setError(null);
 
-            const response = await fetch('/api/service-tickets');
+            const headers: Record<string, string> = {
+                'x-user-id': user.id,
+            };
+
+            const response = await fetch(
+                `/api/service-tickets?assignedTechnicianId=${encodeURIComponent(
+                    user.id
+                )}`,
+                { headers }
+            );
             const result = await response.json();
 
             if (!response.ok || result.success === false) {
                 throw new Error(
-                    result.error || 'Failed to load service tickets'
+                    result.error ||
+                        'Failed to load assigned service tickets'
                 );
             }
 
-            /*
-             * Supports the common API response structures:
-             *
-             * { success: true, data: { tickets: [...] } }
-             *
-             * or
-             *
-             * { success: true, tickets: [...] }
-             */
             const receivedTickets =
-                result.data?.tickets ?? result.tickets ?? [];
+                result.data?.tickets ??
+                result.tickets ??
+                [];
 
             setTickets(receivedTickets);
         } catch (err) {
-            console.error('Failed to load service tickets:', err);
+            console.error(
+                'Failed to load assigned service tickets:',
+                err
+            );
 
             setError(
-                'Unable to load service tickets. Please try again.'
+                'Unable to load your assigned service tickets. Please try again.'
             );
         } finally {
             setLoading(false);
         }
-    };
+    }, [isLoaded, user?.id]);
 
     useEffect(() => {
-        loadTickets();
-    }, []);
+        if (isLoaded && user?.id) {
+            loadTickets();
+        }
+    }, [isLoaded, user?.id, loadTickets]);
 
     const filteredTickets = useMemo(() => {
         const searchText = search.trim().toLowerCase();
@@ -117,6 +143,24 @@ const RequestsScreen = () => {
             return matchesSearch && matchesFilter;
         });
     }, [tickets, search, selectedFilter]);
+
+    if (!isLoaded) {
+        return null;
+    }
+
+    if (!isSignedIn || !user) {
+        return <Redirect href="/(auth)/sign-in" />;
+    }
+
+    const role = getUserRole(user?.publicMetadata?.role, dbUser?.role);
+
+    if (role !== "technician") {
+        if (!role) {
+            return <WaitUntilRoleAssigned />;
+        }
+        return <Redirect href="/(tabs)" />;
+    }
+
 
     const getPriorityStyle = (priority: TicketPriority) => {
         switch (priority) {

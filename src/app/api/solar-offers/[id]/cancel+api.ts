@@ -1,6 +1,4 @@
-// Cancel Solar Offer Route
-// PATCH /api/solar-offers/:id/cancel — cancel a pending solar offer
-
+import { requireSolarOwner } from "@/lib/server/auth/authorization";
 import {
     cancelSolarOffer,
     getOfferById,
@@ -12,10 +10,13 @@ import {
 } from "@/lib/server/utils/response";
 
 export async function PATCH(
-    _request: Request,
+    request: Request,
     { id }: Record<string, string>
 ) {
     try {
+        const url = new URL(request.url);
+        await requireSolarOwner(request, url.searchParams.get("ownerId") || undefined);
+
         const existing = await getOfferById(id);
 
         if (!existing) {

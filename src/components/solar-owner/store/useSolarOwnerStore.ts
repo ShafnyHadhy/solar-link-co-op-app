@@ -643,6 +643,7 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
       // 1. Fetch solar assets
       const assetsRes = await fetch(
         `${getApiUrl("/api/solar-assets")}?ownerId=${ownerId}`,
+        { headers: { "x-user-id": ownerId } },
       );
       const assetsData = await assetsRes.json();
 
@@ -652,7 +653,8 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
         // 2. Fetch energy surplus for the first asset
         const firstAssetId = assetsData.assets[0].id;
         const surplusRes = await fetch(
-          `${getApiUrl("/api/energy-surplus")}?assetId=${firstAssetId}`,
+          `${getApiUrl("/api/energy-surplus")}?assetId=${firstAssetId}&ownerId=${ownerId}`,
+          { headers: { "x-user-id": ownerId } },
         );
         const surplusData = await surplusRes.json();
 
@@ -680,6 +682,7 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
       // 3. Fetch solar offers
       const offersRes = await fetch(
         `${getApiUrl("/api/solar-offers")}?ownerId=${ownerId}`,
+        { headers: { "x-user-id": ownerId } },
       );
       const offersData = await offersRes.json();
 
@@ -706,6 +709,7 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
     try {
       const res = await fetch(
         `${getApiUrl("/api/solar-offers")}?ownerId=${ownerId}`,
+        { headers: { "x-user-id": ownerId } },
       );
       const data = await res.json();
       if (data.success && data.data?.offers) {
@@ -741,6 +745,7 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
       try {
         const historyRes = await fetch(
           `${getApiUrl("/api/solar-offers/history")}?ownerId=${ownerId}`,
+          { headers: { "x-user-id": ownerId } },
         );
         const historyData = await historyRes.json();
         if (historyData.success && historyData.data?.history) {
@@ -767,7 +772,10 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
       const offerId = `offer_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
       const res = await fetch(getApiUrl("/api/solar-offers"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": ownerId,
+        },
         body: JSON.stringify({
           id: offerId,
           ownerId,
@@ -814,6 +822,7 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
         getApiUrl(`/api/solar-offers/${offerId}/cancel`),
         {
           method: "PATCH",
+          headers: { "x-user-id": ownerId },
         },
       );
       const data = await res.json();
@@ -846,7 +855,10 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
       const assetId = `asset_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
       const res = await fetch(getApiUrl("/api/solar-assets"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": ownerId,
+        },
         body: JSON.stringify({
           id: assetId,
           ownerId,
@@ -887,7 +899,10 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
     try {
       const res = await fetch(getApiUrl(`/api/solar-assets/${assetId}`), {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": ownerId,
+        },
         body: JSON.stringify({
           ...updates,
           capacityKw:
@@ -1181,7 +1196,10 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
           : "asset_agash_001";
       fetch(getApiUrl("/api/solar-offers"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": targetOwnerId,
+        },
         body: JSON.stringify({
           id: offerId,
           ownerId: targetOwnerId,
@@ -1289,7 +1307,10 @@ export const useSolarOwnerStore = create<SolarOwnerState>((set, get) => ({
       try {
         const res = await fetch(getApiUrl("/api/solar-offers"), {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-id": targetOwnerId,
+          },
           body: JSON.stringify({
             id: offerId,
             ownerId: targetOwnerId,

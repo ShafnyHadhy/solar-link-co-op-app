@@ -20,7 +20,7 @@ export interface CommunityReserveData {
     breakdownByOffer?: CommunityReserveBreakdownItem[];
 }
 
-export function useCommunityReserve() {
+export function useCommunityReserve(options?: { managerId?: string }) {
     const [data, setData] = useState<CommunityReserveData | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -30,7 +30,12 @@ export function useCommunityReserve() {
         setError(null);
 
         try {
-            const response = await fetch(getApiUrl("/api/manager/solar-offers?view=reserve"));
+            const headers: Record<string, string> = {};
+            if (options?.managerId) {
+                headers["x-user-id"] = options.managerId;
+            }
+
+            const response = await fetch(getApiUrl("/api/manager/solar-offers?view=reserve"), { headers });
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch community reserve (${response.status})`);

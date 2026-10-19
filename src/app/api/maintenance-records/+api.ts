@@ -1,9 +1,8 @@
-// Maintenance Records API Routes
-// POST /api/maintenance-records - record technician diagnosis
-
+import { requireTechnician } from "@/lib/server/auth/authorization";
 import {
     createMaintenanceDiagnosis,
     getMaintenanceHistory,
+    updateMaintenanceDiagnosis,
     updateMaintenanceNotes,
     updateMaintenanceParts,
 } from "@/lib/server/services/maintenanceService";
@@ -16,6 +15,8 @@ import {
 // CESA-209 - Get maintenance history for a service ticket
 export async function GET(request: Request) {
     try {
+        await requireTechnician(request);
+
         const url = new URL(request.url);
         const ticketId =
             url.searchParams.get("ticketId");
@@ -37,18 +38,20 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
     try {
-        const body = await request.json();
+        const body = await request.json().catch(() => ({}));
+
+        const technician = await requireTechnician(request, body?.technicianId);
+        const technicianId = technician.id;
 
         const {
             id,
             ticketId,
-            technicianId,
             diagnosis,
         } = body;
 
-        if (!ticketId || !technicianId || !diagnosis) {
+        if (!ticketId || !diagnosis) {
             throw new BadRequestError(
-                "ticketId, technicianId and diagnosis are required"
+                "ticketId and diagnosis are required"
             );
         }
 
@@ -71,14 +74,16 @@ export async function POST(request: Request) {
     }
 }
 
-
-// CESA-206 & CESA-207 - Update maintenance record
+// CESA-255, CESA-206 & CESA-207 - Update maintenance record
 export async function PATCH(request: Request) {
     try {
+        await requireTechnician(request);
+
         const body = await request.json();
 
         const {
             recordId,
+            diagnosis,
             partsUsed,
             notes,
         } = body;
@@ -91,8 +96,19 @@ export async function PATCH(request: Request) {
 
         let record;
 
-        // CESA-206 - Record replaced parts
+        // CESA-255 - Update diagnosis
         if (
+            typeof diagnosis === "string" &&
+            diagnosis.trim()
+        ) {
+            record = await updateMaintenanceDiagnosis(
+                recordId,
+                diagnosis.trim()
+            );
+        }
+
+        // CESA-257 / existing CESA-206 - Replacement parts
+        else if (
             typeof partsUsed === "string" &&
             partsUsed.trim()
         ) {
@@ -102,7 +118,7 @@ export async function PATCH(request: Request) {
             );
         }
 
-        // CESA-207 - Record maintenance notes
+        // CESA-256 / existing CESA-207 - Maintenance notes
         else if (
             typeof notes === "string" &&
             notes.trim()
@@ -113,7 +129,7 @@ export async function PATCH(request: Request) {
             );
         } else {
             throw new BadRequestError(
-                "partsUsed or notes is required"
+                "diagnosis, partsUsed or notes is required"
             );
         }
 
@@ -121,8 +137,7 @@ export async function PATCH(request: Request) {
             return Response.json(
                 {
                     success: false,
-                    message:
-                        "Maintenance record not found",
+                    message: "Maintenance record not found",
                 },
                 { status: 404 }
             );

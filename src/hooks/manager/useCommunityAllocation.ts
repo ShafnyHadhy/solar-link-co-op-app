@@ -22,7 +22,7 @@ export interface CommunityAllocationData {
     breakdownByDispatch?: CommunityAllocationBreakdownItem[];
 }
 
-export function useCommunityAllocation(options?: { date?: string }) {
+export function useCommunityAllocation(options?: { date?: string; managerId?: string }) {
     const [data, setData] = useState<CommunityAllocationData | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -33,7 +33,12 @@ export function useCommunityAllocation(options?: { date?: string }) {
 
         try {
             const query = options?.date ? `?date=${encodeURIComponent(options.date)}` : "";
-            const response = await fetch(getApiUrl(`/api/manager/energy-allocation${query}`));
+            const headers: Record<string, string> = {};
+            if (options?.managerId) {
+                headers["x-user-id"] = options.managerId;
+            }
+
+            const response = await fetch(getApiUrl(`/api/manager/energy-allocation${query}`), { headers });
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch allocation data (${response.status})`);

@@ -7,10 +7,8 @@ import {
     getDispatches,
     validateDispatchEnergy,
 } from "@/lib/server/services/dispatchService";
-import { db } from "@/lib/server/db/client";
-import { users } from "@/lib/server/db/schema";
-import { eq } from "drizzle-orm";
-import { BadRequestError, UnauthorizedError } from "@/lib/server/utils/errors";
+import { requireManager } from "@/lib/server/auth/authorization";
+import { BadRequestError } from "@/lib/server/utils/errors";
 import { errorResponse } from "@/lib/server/utils/response";
 
 export async function GET(request: Request) {
@@ -73,29 +71,9 @@ export async function POST(request: Request) {
             });
         }
 
-        // Obtain manager identity from Clerk header/body or fallback to registered manager in DB
-        let managerId =
-            request.headers.get("x-user-id") ||
-            request.headers.get("x-manager-id") ||
-            body?.managerId;
-
-        if (!managerId) {
-            const [firstManager] = await db
-                .select({ id: users.id })
-                .from(users)
-                .where(eq(users.role, "manager"))
-                .limit(1);
-
-            if (firstManager) {
-                managerId = firstManager.id;
-            }
-        }
-
-        if (!managerId) {
-            throw new UnauthorizedError(
-                "Manager identity could not be verified. Authentication required."
-            );
-        }
+        // Authenticate user and confirm authoritative PostgreSQL DB role is manager
+        const manager = await requireManager(request, body?.managerId);
+        const managerId = manager.id;
 
         const newDispatch = await createDispatch({
             id,

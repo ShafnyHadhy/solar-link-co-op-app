@@ -77,28 +77,28 @@ const ManagementDashboard = () => {
         loading: generationLoading,
         error: generationError,
         refetch: refetchGeneration,
-    } = useCommunityGeneration();
+    } = useCommunityGeneration({ managerId: user?.id });
 
     const {
         data: allocationData,
         loading: allocationLoading,
         error: allocationError,
         refetch: refetchAllocation,
-    } = useCommunityAllocation();
+    } = useCommunityAllocation({ managerId: user?.id });
 
     const {
         data: reserveData,
         loading: reserveLoading,
         error: reserveError,
         refetch: refetchReserve,
-    } = useCommunityReserve();
+    } = useCommunityReserve({ managerId: user?.id });
 
     const {
         requests,
         loading: requestsLoading,
         error: requestsError,
         refetch: refetchRequests,
-    } = useEnergyRequests();
+    } = useEnergyRequests({ managerId: user?.id });
 
     const {
         alerts,

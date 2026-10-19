@@ -5,6 +5,7 @@
 import {
     createServiceTicket,
     getAllServiceTickets,
+    getAssignedServiceTickets,
     getServiceTicketsByOwner,
 } from "@/lib/server/services/maintenanceService";
 import { BadRequestError } from "@/lib/server/utils/errors";
@@ -16,14 +17,37 @@ import {
 export async function GET(request: Request) {
     try {
         const url = new URL(request.url);
-        const reportedBy = url.searchParams.get("reportedBy");
 
-        if (reportedBy) {
-            const tickets = await getServiceTicketsByOwner(reportedBy);
+        const reportedBy =
+            url.searchParams.get("reportedBy");
+
+        const assignedTechnicianId =
+            url.searchParams.get(
+                "assignedTechnicianId"
+            );
+
+        // CESA-253 - Retrieve tickets assigned to technician
+        if (assignedTechnicianId) {
+            const tickets =
+                await getAssignedServiceTickets(
+                    assignedTechnicianId
+                );
+
             return successResponse({ tickets });
         }
 
-        const tickets = await getAllServiceTickets();
+        if (reportedBy) {
+            const tickets =
+                await getServiceTicketsByOwner(
+                    reportedBy
+                );
+
+            return successResponse({ tickets });
+        }
+
+        const tickets =
+            await getAllServiceTickets();
+
         return successResponse({ tickets });
     } catch (error) {
         return errorResponse(error);

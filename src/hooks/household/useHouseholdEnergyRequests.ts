@@ -65,6 +65,11 @@ export function useHouseholdEnergyRequests() {
       // 1. Fetch user's requests
       const reqRes = await fetch(
         `${getApiUrl("/api/household/energy-requests")}?householdId=${encodeURIComponent(householdId)}`,
+        {
+          headers: {
+            "x-user-id": householdId,
+          },
+        }
       );
       const reqJson = await reqRes.json();
 
@@ -77,6 +82,11 @@ export function useHouseholdEnergyRequests() {
       // 2. Fetch user's energy & savings stats
       const statsRes = await fetch(
         `${getApiUrl("/api/household/stats")}?householdId=${encodeURIComponent(householdId)}`,
+        {
+          headers: {
+            "x-user-id": householdId,
+          },
+        }
       );
       const statsJson = await statsRes.json();
 
@@ -126,6 +136,7 @@ export function useHouseholdEnergyRequests() {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              "x-user-id": householdId,
             },
             body: JSON.stringify({
               householdId,
@@ -178,6 +189,7 @@ export function useHouseholdEnergyRequests() {
             method: "PATCH",
             headers: {
               "Content-Type": "application/json",
+              "x-user-id": householdId,
             },
             body: JSON.stringify({
               householdId,
