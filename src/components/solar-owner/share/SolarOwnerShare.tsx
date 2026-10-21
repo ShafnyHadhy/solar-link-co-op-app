@@ -33,6 +33,11 @@ export const SolarOwnerShare = () => {
     const [selectedPool, setSelectedPool] = useState<string>('Co-Op Community Pool');
     const [offerFilter, setOfferFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'cancelled'>('all');
     const [cancellingOfferId, setCancellingOfferId] = useState<string | null>(null);
+    const [expandedSection, setExpandedSection] = useState<'offers' | 'requests' | 'history' | null>(null);
+
+    const toggleSection = (section: 'offers' | 'requests' | 'history') => {
+        setExpandedSection((prev) => (prev === section ? null : section));
+    };
 
     useEffect(() => {
         if (user?.id) {
@@ -214,10 +219,33 @@ export const SolarOwnerShare = () => {
                                 Co-Op Manager review & dispatch status
                             </Text>
                         </View>
-                        <View className="bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-500/30 flex-shrink-0">
-                            <Text className="text-[10px] font-black text-amber-500">
-                                {solarOffers.filter((o) => o.status === 'pending').length} Pending
-                            </Text>
+                        <View className="flex-row items-center gap-2 flex-shrink-0">
+                            <View className="bg-amber-500/20 px-2.5 py-1 rounded-full border border-amber-500/30">
+                                <Text className="text-[10px] font-black text-amber-500">
+                                    {solarOffers.filter((o) => o.status === 'pending').length} Pending
+                                </Text>
+                            </View>
+                            <Pressable
+                                onPress={() => toggleSection('offers')}
+                                className={`h-7 px-2.5 rounded-full border flex-row items-center active:opacity-75 ${
+                                    expandedSection === 'offers'
+                                        ? 'bg-amber-500 border-amber-600'
+                                        : 'bg-secondary border-border/80'
+                                }`}
+                            >
+                                <Text
+                                    className={`text-[10px] font-bold mr-1 ${
+                                        expandedSection === 'offers' ? 'text-amber-950 font-black' : 'text-foreground'
+                                    }`}
+                                >
+                                    {expandedSection === 'offers' ? 'Show 3' : 'View All'}
+                                </Text>
+                                <Feather
+                                    name={expandedSection === 'offers' ? 'chevron-up' : 'chevron-right'}
+                                    size={12}
+                                    color={expandedSection === 'offers' ? '#451A03' : '#F59E0B'}
+                                />
+                            </Pressable>
                         </View>
                     </View>
 
@@ -303,9 +331,12 @@ export const SolarOwnerShare = () => {
                             );
                         }
 
+                        const isOffersExpanded = expandedSection === 'offers';
+                        const displayedOffers = isOffersExpanded ? filtered : filtered.slice(0, 3);
+
                         return (
                             <View className="gap-2.5">
-                                {filtered.map((offer) => {
+                                {displayedOffers.map((offer) => {
                                     const isPending = offer.status === 'pending';
                                     const isApproved = offer.status === 'approved';
                                     const isRejected = offer.status === 'rejected';
@@ -326,7 +357,7 @@ export const SolarOwnerShare = () => {
                                         : isApproved
                                         ? { bg: 'bg-emerald-500/15 border-emerald-500/40', text: 'text-emerald-500', color: '#10B981', icon: 'check-circle' as const, label: 'Approved' }
                                         : isRejected
-                                        ? { bg: 'bg-destructive/15 border-destructive/40', text: 'text-destructive', color: '#EF4444', icon: 'alert-circle' as const, label: 'Rejected' }
+                                        ? { bg: 'bg-red-500/15 border-red-500/40', text: 'text-red-500', color: '#EF4444', icon: 'alert-circle' as const, label: 'Rejected' }
                                         : isCancelled
                                         ? { bg: 'bg-secondary border-border/80', text: 'text-muted-foreground', color: '#94A3B8', icon: 'slash' as const, label: 'Cancelled' }
                                         : { bg: 'bg-sky-500/15 border-sky-500/40', text: 'text-sky-500', color: '#0EA5E9', icon: 'zap' as const, label: 'Completed' };
@@ -392,6 +423,24 @@ export const SolarOwnerShare = () => {
                                         </View>
                                     );
                                 })}
+
+                                {filtered.length > 3 && (
+                                    <Pressable
+                                        onPress={() => toggleSection('offers')}
+                                        className="mt-1 py-2.5 px-3 rounded-xl bg-secondary/50 border border-border/60 flex-row items-center justify-center active:opacity-75"
+                                    >
+                                        <Text className="text-xs font-bold text-amber-500 mr-1.5">
+                                            {isOffersExpanded
+                                                ? 'Show Less (3 items)'
+                                                : `View All ${filtered.length} Offers`}
+                                        </Text>
+                                        <Feather
+                                            name={isOffersExpanded ? 'chevron-up' : 'chevron-right'}
+                                            size={14}
+                                            color="#F59E0B"
+                                        />
+                                    </Pressable>
+                                )}
                             </View>
                         );
                     })()}
@@ -408,25 +457,57 @@ export const SolarOwnerShare = () => {
                                 Requests from neighborhood households
                             </Text>
                         </View>
-                        <View className="bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-500/30 flex-shrink-0">
-                            <Text className="text-[10px] font-black text-amber-500">
-                                {communityRequests.filter((r) => r.status === 'pending').length} Pending
-                            </Text>
+                        <View className="flex-row items-center gap-2 flex-shrink-0">
+                            <View className="bg-amber-500/20 px-2.5 py-1 rounded-full border border-amber-500/30">
+                                <Text className="text-[10px] font-black text-amber-500">
+                                    {communityRequests.filter((r) => r.status === 'pending').length} Pending
+                                </Text>
+                            </View>
+                            <Pressable
+                                onPress={() => toggleSection('requests')}
+                                className={`h-7 px-2.5 rounded-full border flex-row items-center active:opacity-75 ${
+                                    expandedSection === 'requests'
+                                        ? 'bg-amber-500 border-amber-600'
+                                        : 'bg-secondary border-border/80'
+                                }`}
+                            >
+                                <Text
+                                    className={`text-[10px] font-bold mr-1 ${
+                                        expandedSection === 'requests' ? 'text-amber-950 font-black' : 'text-foreground'
+                                    }`}
+                                >
+                                    {expandedSection === 'requests' ? 'Show 3' : 'View All'}
+                                </Text>
+                                <Feather
+                                    name={expandedSection === 'requests' ? 'chevron-up' : 'chevron-right'}
+                                    size={12}
+                                    color={expandedSection === 'requests' ? '#451A03' : '#F59E0B'}
+                                />
+                            </Pressable>
                         </View>
                     </View>
 
-                    {communityRequests.length === 0 ? (
-                        <View className="rounded-2xl border border-dashed border-border/70 p-6 items-center justify-center bg-secondary/15 my-1">
-                            <MaterialCommunityIcons name="account-group-outline" size={28} color="#9CA3AF" />
-                            <Text className="text-xs font-bold text-foreground mt-2">
-                                No incoming community requests
-                            </Text>
-                            <Text className="text-[10px] text-muted-foreground mt-0.5 text-center">
-                                Real household requests will appear here automatically.
-                            </Text>
-                        </View>
-                    ) : (
-                        communityRequests.map((req) => {
+                    {(() => {
+                        if (communityRequests.length === 0) {
+                            return (
+                                <View className="rounded-2xl border border-dashed border-border/70 p-6 items-center justify-center bg-secondary/15 my-1">
+                                    <MaterialCommunityIcons name="account-group-outline" size={28} color="#9CA3AF" />
+                                    <Text className="text-xs font-bold text-foreground mt-2">
+                                        No incoming community requests
+                                    </Text>
+                                    <Text className="text-[10px] text-muted-foreground mt-0.5 text-center">
+                                        Real household requests will appear here automatically.
+                                    </Text>
+                                </View>
+                            );
+                        }
+
+                        const isRequestsExpanded = expandedSection === 'requests';
+                        const displayedRequests = isRequestsExpanded ? communityRequests : communityRequests.slice(0, 3);
+
+                        return (
+                            <View>
+                                {displayedRequests.map((req) => {
                             const isPending = req.status === 'pending';
                             const isAccepted = req.status === 'accepted';
                             const isRejected = req.status === 'rejected';
@@ -457,8 +538,8 @@ export const SolarOwnerShare = () => {
                                         </View>
 
                                         {req.urgency === 'urgent' && isPending && (
-                                            <View className="bg-destructive/20 border border-destructive/40 px-2 py-0.5 rounded-full">
-                                                <Text className="text-[9px] font-black text-destructive uppercase">
+                                            <View className="bg-red-500/20 border border-red-500/40 px-2 py-0.5 rounded-full">
+                                                <Text className="text-[9px] font-black text-red-500 uppercase">
                                                     Urgent
                                                 </Text>
                                             </View>
@@ -497,7 +578,7 @@ export const SolarOwnerShare = () => {
                                                     isAccepted
                                                         ? 'text-emerald-500'
                                                         : isRejected
-                                                        ? 'text-destructive'
+                                                        ? 'text-red-500'
                                                         : 'text-amber-500'
                                                 }`}
                                             >
@@ -529,11 +610,31 @@ export const SolarOwnerShare = () => {
                                     )}
                                 </View>
                             );
-                        })
-                    )}
+                        })}
+
+                                {communityRequests.length > 3 && (
+                                    <Pressable
+                                        onPress={() => toggleSection('requests')}
+                                        className="mt-1 py-2.5 px-3 rounded-xl bg-secondary/50 border border-border/60 flex-row items-center justify-center active:opacity-75"
+                                    >
+                                        <Text className="text-xs font-bold text-amber-500 mr-1.5">
+                                            {isRequestsExpanded
+                                                ? 'Show Less (3 items)'
+                                                : `View All ${communityRequests.length} Requests`}
+                                        </Text>
+                                        <Feather
+                                            name={isRequestsExpanded ? 'chevron-up' : 'chevron-right'}
+                                            size={14}
+                                            color="#F59E0B"
+                                        />
+                                    </Pressable>
+                                )}
+                            </View>
+                        );
+                    })()}
                 </View>
 
-                {/* 4. TRANSPARENT SHARING HISTORY */}
+                {/* 5. TRANSPARENT SHARING HISTORY */}
                 <View className="rounded-[28px] border border-border/70 bg-card/85 dark:bg-card/50 p-5 mb-5 shadow-sm">
                     <View className="flex-row items-center justify-between mb-4">
                         <View className="flex-1 mr-2">
@@ -541,67 +642,118 @@ export const SolarOwnerShare = () => {
                                 <Text className="text-base font-bold text-foreground">
                                     Sharing History
                                 </Text>
-                                <View className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30">
-                                    <Text className="text-[10px] font-bold text-emerald-500">
-                                        {sharingHistory.length} Completed
-                                    </Text>
-                                </View>
                             </View>
                             <Text className="text-xs text-muted-foreground font-medium">
                                 Transparent records of dispatched energy
                             </Text>
                         </View>
-                        <Feather name="clock" size={16} color="#9CA3AF" />
+                        <View className="flex-row items-center gap-2 flex-shrink-0">
+                            <View className="px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30">
+                                <Text className="text-[10px] font-bold text-emerald-500">
+                                    {sharingHistory.length} Completed
+                                </Text>
+                            </View>
+                            <Pressable
+                                onPress={() => toggleSection('history')}
+                                className={`h-7 px-2.5 rounded-full border flex-row items-center active:opacity-75 ${
+                                    expandedSection === 'history'
+                                        ? 'bg-emerald-500 border-emerald-600'
+                                        : 'bg-secondary border-border/80'
+                                }`}
+                            >
+                                <Text
+                                    className={`text-[10px] font-bold mr-1 ${
+                                        expandedSection === 'history' ? 'text-white font-black' : 'text-foreground'
+                                    }`}
+                                >
+                                    {expandedSection === 'history' ? 'Show 3' : 'View All'}
+                                </Text>
+                                <Feather
+                                    name={expandedSection === 'history' ? 'chevron-up' : 'chevron-right'}
+                                    size={12}
+                                    color={expandedSection === 'history' ? '#FFFFFF' : '#10B981'}
+                                />
+                            </Pressable>
+                        </View>
                     </View>
 
                     <View className="divide-y divide-border/40">
-                        {sharingHistory.length === 0 ? (
-                            <View className="py-8 items-center justify-center">
-                                <View className="h-12 w-12 rounded-2xl bg-secondary/80 items-center justify-center mb-2.5">
-                                    <Feather name="inbox" size={22} color="#9CA3AF" />
-                                </View>
-                                <Text className="text-xs font-bold text-foreground mb-1">
-                                    No Sharing History Yet
-                                </Text>
-                                <Text className="text-[11px] text-muted-foreground text-center px-4">
-                                    Completed energy dispatches and earned credits will appear here automatically.
-                                </Text>
-                            </View>
-                        ) : (
-                            sharingHistory.map((item) => (
-                                <View key={item.id} className="py-3.5 flex-row items-center justify-between">
-                                    <View className="flex-row items-center flex-1 mr-2">
-                                        <View className="h-9 w-9 rounded-xl bg-emerald-500/15 items-center justify-center mr-2.5 border border-emerald-500/30">
-                                            <Feather name="arrow-up-right" size={17} color="#10B981" />
+                        {(() => {
+                            if (sharingHistory.length === 0) {
+                                return (
+                                    <View className="py-8 items-center justify-center">
+                                        <View className="h-12 w-12 rounded-2xl bg-secondary/80 items-center justify-center mb-2.5">
+                                            <Feather name="inbox" size={22} color="#9CA3AF" />
                                         </View>
-                                        <View className="flex-1">
-                                            <View className="flex-row items-center gap-1.5 flex-wrap">
-                                                <Text className="text-xs font-bold text-foreground" numberOfLines={1}>
-                                                    {item.recipientName}
-                                                </Text>
-                                                <View className="px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">
-                                                    <Text className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
-                                                        {(item.co2SavedKg || +(item.amountKWh * 0.4).toFixed(1))} kg CO₂
+                                        <Text className="text-xs font-bold text-foreground mb-1">
+                                            No Sharing History Yet
+                                        </Text>
+                                        <Text className="text-[11px] text-muted-foreground text-center px-4">
+                                            Completed energy dispatches and earned credits will appear here automatically.
+                                        </Text>
+                                    </View>
+                                );
+                            }
+
+                            const isHistoryExpanded = expandedSection === 'history';
+                            const displayedHistory = isHistoryExpanded ? sharingHistory : sharingHistory.slice(0, 3);
+
+                            return (
+                                <View>
+                                    {displayedHistory.map((item) => (
+                                        <View key={item.id} className="py-3.5 flex-row items-center justify-between">
+                                            <View className="flex-row items-center flex-1 mr-2">
+                                                <View className="h-9 w-9 rounded-xl bg-emerald-500/15 items-center justify-center mr-2.5 border border-emerald-500/30">
+                                                    <Feather name="arrow-up-right" size={17} color="#10B981" />
+                                                </View>
+                                                <View className="flex-1">
+                                                    <View className="flex-row items-center gap-1.5 flex-wrap">
+                                                        <Text className="text-xs font-bold text-foreground" numberOfLines={1}>
+                                                            {item.recipientName}
+                                                        </Text>
+                                                        <View className="px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+                                                            <Text className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                                                                {(item.co2SavedKg || +(item.amountKWh * 0.4).toFixed(1))} kg CO₂
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                    <Text className="text-[10px] text-muted-foreground mt-0.5">
+                                                        {item.date} • {item.time || 'Completed'}
                                                     </Text>
                                                 </View>
                                             </View>
-                                            <Text className="text-[10px] text-muted-foreground mt-0.5">
-                                                {item.date} • {item.time || 'Completed'}
-                                            </Text>
-                                        </View>
-                                    </View>
 
-                                    <View className="items-end">
-                                        <Text className="text-xs font-black text-amber-500">
-                                            {item.amountKWh} kWh
-                                        </Text>
-                                        <Text className="text-[10px] font-bold text-emerald-500 mt-0.5">
-                                            +${item.creditsEarnedUSD.toFixed(2)}
-                                        </Text>
-                                    </View>
+                                            <View className="items-end">
+                                                <Text className="text-xs font-black text-amber-500">
+                                                    {item.amountKWh} kWh
+                                                </Text>
+                                                <Text className="text-[10px] font-bold text-emerald-500 mt-0.5">
+                                                    +${item.creditsEarnedUSD.toFixed(2)}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    ))}
+
+                                    {sharingHistory.length > 3 && (
+                                        <Pressable
+                                            onPress={() => toggleSection('history')}
+                                            className="mt-3 py-2.5 px-3 rounded-xl bg-secondary/50 border border-border/60 flex-row items-center justify-center active:opacity-75"
+                                        >
+                                            <Text className="text-xs font-bold text-emerald-500 mr-1.5">
+                                                {isHistoryExpanded
+                                                    ? 'Show Less (3 items)'
+                                                    : `View All ${sharingHistory.length} History Records`}
+                                            </Text>
+                                            <Feather
+                                                name={isHistoryExpanded ? 'chevron-up' : 'chevron-right'}
+                                                size={14}
+                                                color="#10B981"
+                                            />
+                                        </Pressable>
+                                    )}
                                 </View>
-                            ))
-                        )}
+                            );
+                        })()}
                     </View>
                 </View>
             </ScrollView>
